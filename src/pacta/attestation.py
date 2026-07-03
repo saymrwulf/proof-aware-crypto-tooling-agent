@@ -6,6 +6,7 @@ from typing import Any
 
 from .config import RepoConfig
 from .signing import verify_attestation_signature
+from .transparency import load_receipt, verify_receipt
 from .yamlio import load_data
 
 
@@ -34,6 +35,10 @@ def validate_attestation(
     trusted_provider: str | None = None,
     public_key_path: str | Path | None = None,
     allow_unsigned: bool = False,
+    transparency_receipt_path: str | Path | None = None,
+    transparency_log_public_key_path: str | Path | None = None,
+    require_transparency_signatures: str = "ed25519",
+    require_transparency_receipt: bool = False,
 ) -> AttestationResult:
     provider = raw.get("provider")
     subject = raw.get("subject") or {}
@@ -80,6 +85,25 @@ def validate_attestation(
     elif signature_status != "verified":
         diagnostics.append(f"Attestation signature status is not acceptable: {signature_status}")
 
+    transparency_evidence: dict[str, Any] = {}
+    if require_transparency_receipt and not transparency_receipt_path:
+        diagnostics.append("Transparency receipt is required by policy but was not supplied.")
+    if transparency_receipt_path:
+        if not transparency_log_public_key_path:
+            diagnostics.append("Transparency receipt verification requires --transparency-log-public-key.")
+        else:
+            receipt = load_receipt(transparency_receipt_path)
+            receipt_result = verify_receipt(
+                raw,
+                receipt,
+                transparency_log_public_key_path,
+                require_signatures=require_transparency_signatures,
+            )
+            transparency_evidence = receipt_result.evidence()
+            transparency_evidence["transparency_receipt_path"] = str(transparency_receipt_path)
+            if not receipt_result.accepted:
+                diagnostics.extend(receipt_result.diagnostics)
+
     accepted = not diagnostics
     evidence = {
         "evidence_mode": "third_party_attestation",
@@ -92,11 +116,14 @@ def validate_attestation(
         "axiom_log_path": (raw.get("replay") or {}).get("axiom_log_path"),
         "lean_version": environment.get("lean_version"),
         "lake_version": environment.get("lake_version"),
+        **transparency_evidence,
     }
     trusted_base = []
     if accepted:
         trusted_base.append(f"Third-party proof-checking attestation provider: {provider}.")
         trusted_base.append("Provider environment, replay implementation, signing key custody, and log retention.")
+        if transparency_receipt_path:
+            trusted_base.append("Transparency log append-only behavior, signed tree head key custody, and monitor/auditor availability.")
     return AttestationResult(
         accepted=accepted,
         provider=str(provider) if provider else None,

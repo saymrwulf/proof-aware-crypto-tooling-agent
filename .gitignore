@@ -2,6 +2,8 @@
 .pacta/
 .pacta-*/
 .pytest_cache/
+.pytest-tmp/
+.tmp/
 artifacts*/
 repos/
 provider/out/

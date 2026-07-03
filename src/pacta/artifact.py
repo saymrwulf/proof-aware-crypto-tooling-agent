@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -68,6 +69,9 @@ def build_proof_gated_capsule(
         )
 
     cmd = [cargo, "build", "--release", "--manifest-path", str(crate_dir / "Cargo.toml")]
+    tmpdir = os.environ.get("TMPDIR")
+    if tmpdir:
+        Path(tmpdir).mkdir(parents=True, exist_ok=True)
     try:
         completed = subprocess.run(
             cmd,

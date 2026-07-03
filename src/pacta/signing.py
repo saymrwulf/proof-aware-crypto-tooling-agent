@@ -16,7 +16,11 @@ class SignatureError(RuntimeError):
 
 def canonical_attestation_payload(attestation: dict[str, Any]) -> bytes:
     unsigned = {key: value for key, value in attestation.items() if key != "signature"}
-    return json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return canonical_json(unsigned)
+
+
+def canonical_json(document: Any) -> bytes:
+    return json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def payload_digest(attestation: dict[str, Any]) -> str:
@@ -39,28 +43,14 @@ def generate_ed25519_keypair(private_key_path: str | Path, public_key_path: str 
 
 
 def sign_attestation(attestation: dict[str, Any], private_key_path: str | Path, public_key_path: str | Path | None = None) -> dict[str, Any]:
-    openssl = _openssl()
     payload = canonical_attestation_payload(attestation)
-    with tempfile.TemporaryDirectory(prefix="pacta-sign-") as tmp:
-        payload_path = Path(tmp) / "payload.json"
-        signature_path = Path(tmp) / "payload.sig"
-        payload_path.write_bytes(payload)
-        completed = subprocess.run(
-            [openssl, "pkeyutl", "-sign", "-inkey", str(private_key_path), "-rawin", "-in", str(payload_path), "-out", str(signature_path)],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if completed.returncode != 0:
-            raise SignatureError((completed.stderr or completed.stdout or "openssl signing failed").strip())
-        signature_bytes = signature_path.read_bytes()
+    signature_base64 = sign_payload_ed25519(payload, private_key_path)
     signed = dict(attestation)
     signed["signature"] = {
         "scheme": "openssl-ed25519",
         "status": "signed",
         "payload_digest_sha256": hashlib.sha256(payload).hexdigest(),
-        "signature_base64": base64.b64encode(signature_bytes).decode("ascii"),
+        "signature_base64": signature_base64,
     }
     if public_key_path:
         signed["signature"]["public_key_fingerprint_sha256"] = public_key_fingerprint(public_key_path)
@@ -68,7 +58,6 @@ def sign_attestation(attestation: dict[str, Any], private_key_path: str | Path, 
 
 
 def verify_attestation_signature(attestation: dict[str, Any], public_key_path: str | Path) -> tuple[bool, str | None]:
-    openssl = _openssl()
     signature = attestation.get("signature") or {}
     if signature.get("scheme") != "openssl-ed25519":
         return False, f"Unsupported attestation signature scheme: {signature.get('scheme')}"
@@ -84,14 +73,38 @@ def verify_attestation_signature(attestation: dict[str, Any], public_key_path: s
         actual_fingerprint = public_key_fingerprint(public_key_path)
         if expected_fingerprint != actual_fingerprint:
             return False, "Attestation public key fingerprint does not match signature metadata."
+    return verify_payload_ed25519(canonical_attestation_payload(attestation), encoded, public_key_path)
+
+
+def sign_payload_ed25519(payload: bytes, private_key_path: str | Path) -> str:
+    openssl = _openssl()
+    with tempfile.TemporaryDirectory(prefix="pacta-sign-") as tmp:
+        payload_path = Path(tmp) / "payload.bin"
+        signature_path = Path(tmp) / "payload.sig"
+        payload_path.write_bytes(payload)
+        completed = subprocess.run(
+            [openssl, "pkeyutl", "-sign", "-inkey", str(private_key_path), "-rawin", "-in", str(payload_path), "-out", str(signature_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if completed.returncode != 0:
+            raise SignatureError((completed.stderr or completed.stdout or "openssl signing failed").strip())
+        signature_bytes = signature_path.read_bytes()
+    return base64.b64encode(signature_bytes).decode("ascii")
+
+
+def verify_payload_ed25519(payload: bytes, signature_base64: str, public_key_path: str | Path) -> tuple[bool, str | None]:
+    openssl = _openssl()
     try:
-        signature_bytes = base64.b64decode(encoded, validate=True)
+        signature_bytes = base64.b64decode(signature_base64, validate=True)
     except ValueError as exc:
         return False, f"Invalid base64 signature: {exc}"
     with tempfile.TemporaryDirectory(prefix="pacta-verify-") as tmp:
-        payload_path = Path(tmp) / "payload.json"
+        payload_path = Path(tmp) / "payload.bin"
         signature_path = Path(tmp) / "payload.sig"
-        payload_path.write_bytes(canonical_attestation_payload(attestation))
+        payload_path.write_bytes(payload)
         signature_path.write_bytes(signature_bytes)
         completed = subprocess.run(
             [

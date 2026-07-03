@@ -39,6 +39,7 @@ pacta audit --repo ./repos/dalek-ed25519-verified
 pacta lean-check --repo ./repos/dalek-ed25519-verified
 pacta report --claims claims.yaml --out report.md
 pacta score --claims claims.yaml
+pacta receipt-verify --attestation provider/out/dalek-ed25519.attestation.yaml --receipt provider/out/dalek-ed25519.receipt.yaml --log-public-key provider/state/local-provider/provider.ed25519.pub
 pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --offline-fixture --action build-library
 pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --clone --run-axioms --action build-library --artifact-dir artifacts-live
 pacta agent --claims claims.yaml --action build-wallet-demo
@@ -97,6 +98,66 @@ This changes the trusted base. The agent is no longer trusting local Lean replay
 
 The included `examples/dalek-ed25519.attestation.yaml` is an unsigned schema/demo fixture and requires `--allow-unsigned-attestation`. Real provider certificates should be signed and consumed with `--attestation-public-key`.
 
+## Transparency-Logged Attestations
+
+Standalone signatures prove who signed an attestation, but they do not make the provider accountable for equivocation or silent replacement. The nested provider can also append attestations to a local RFC 9162-style Merkle transparency log and issue inclusion receipts.
+
+The log uses:
+
+- `RFC9162_SHA256` Merkle leaf/node hashing with `0x00` leaf and `0x01` node domain separation.
+- Signed Tree Heads over canonical JSON tree-head payloads.
+- OpenSSL Ed25519 signatures today.
+- An explicit `ML-DSA-65` / FIPS 204 signature slot that is `unavailable` unless the host has a real backend. If an agent policy requires both signatures, verification fails closed.
+
+Example:
+
+```bash
+PYTHONPATH=src:provider/src python -m pacta_provider log-init \
+  --log-dir provider/state/transparency-log \
+  --provider local-pacta-provider \
+  --public-key provider/state/local-provider/provider.ed25519.pub
+
+PYTHONPATH=src:provider/src python -m pacta_provider log-append \
+  --log-dir provider/state/transparency-log \
+  --attestation provider/out/dalek-ed25519.attestation.yaml \
+  --private-key provider/state/local-provider/provider.ed25519.key \
+  --public-key provider/state/local-provider/provider.ed25519.pub \
+  --out provider/out/dalek-ed25519.receipt.yaml
+
+pacta receipt-verify \
+  --attestation provider/out/dalek-ed25519.attestation.yaml \
+  --receipt provider/out/dalek-ed25519.receipt.yaml \
+  --log-public-key provider/state/local-provider/provider.ed25519.pub
+```
+
+Agents can require the receipt before building anything:
+
+```bash
+pacta agent \
+  --config examples/repos.yaml \
+  --repo-name dalek-ed25519-verified \
+  --repo repos/dalek-ed25519-verified \
+  --attestation provider/out/dalek-ed25519.attestation.yaml \
+  --trust-attestation-provider local-pacta-provider \
+  --attestation-public-key provider/state/local-provider/provider.ed25519.pub \
+  --transparency-receipt provider/out/dalek-ed25519.receipt.yaml \
+  --transparency-log-public-key provider/state/local-provider/provider.ed25519.pub \
+  --require-transparency-receipt \
+  --action build-library
+```
+
+To demand post-quantum log signatures as well:
+
+```bash
+pacta receipt-verify \
+  --attestation provider/out/dalek-ed25519.attestation.yaml \
+  --receipt provider/out/dalek-ed25519.receipt.yaml \
+  --log-public-key provider/state/local-provider/provider.ed25519.pub \
+  --require-signatures both
+```
+
+On a host without ML-DSA support, that command should fail. That is intentional. The system records the missing capability as a deployment blocker instead of treating the Ed25519 signature as quantum-robust.
+
 ## Nested Proof-Check Provider
 
 This repository includes a nested provider prototype under `provider/`. It searches read-only under your home/GitClone tree for reusable Lean/Aeneas infrastructure, runs the proof replay, signs the result with OpenSSL Ed25519, and emits an attestation.
@@ -121,6 +182,9 @@ pacta agent \
   --attestation provider/out/dalek-ed25519.attestation.yaml \
   --trust-attestation-provider local-pacta-provider \
   --attestation-public-key provider/state/local-provider/provider.ed25519.pub \
+  --transparency-receipt provider/out/dalek-ed25519.receipt.yaml \
+  --transparency-log-public-key provider/state/local-provider/provider.ed25519.pub \
+  --require-transparency-receipt \
   --action build-library
 ```
 

@@ -10,6 +10,7 @@ from pacta.yamlio import dump_data
 
 from .discovery import discover_toolchains
 from .service import build_attestation
+from .transparency_log import TransparencyLog
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -48,6 +49,26 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--log-dir", default="provider/out/logs")
     check.add_argument("--out", required=True)
     check.set_defaults(func=cmd_check)
+
+    log_init = sub.add_parser("log-init", help="Initialize a local RFC9162-style transparency log.")
+    log_init.add_argument("--log-dir", default="provider/state/transparency-log")
+    log_init.add_argument("--provider", required=True)
+    log_init.add_argument("--public-key", required=True)
+    log_init.set_defaults(func=cmd_log_init)
+
+    log_append = sub.add_parser("log-append", help="Append a signed proof-check attestation and emit an inclusion receipt.")
+    log_append.add_argument("--log-dir", default="provider/state/transparency-log")
+    log_append.add_argument("--attestation", required=True)
+    log_append.add_argument("--private-key", required=True)
+    log_append.add_argument("--public-key", required=True)
+    log_append.add_argument("--out", required=True)
+    log_append.set_defaults(func=cmd_log_append)
+
+    log_sth = sub.add_parser("log-sth", help="Sign and print the latest transparency-log tree head.")
+    log_sth.add_argument("--log-dir", default="provider/state/transparency-log")
+    log_sth.add_argument("--private-key", required=True)
+    log_sth.add_argument("--public-key", required=True)
+    log_sth.set_defaults(func=cmd_log_sth)
     return parser
 
 
@@ -85,4 +106,32 @@ def cmd_check(args: argparse.Namespace) -> int:
     )
     dump_data(attestation, args.out)
     print(f"attestation: {args.out}")
+    return 0
+
+
+def cmd_log_init(args: argparse.Namespace) -> int:
+    metadata = TransparencyLog(args.log_dir).init(args.provider, args.public_key)
+    print(json.dumps(metadata, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_log_append(args: argparse.Namespace) -> int:
+    receipt = TransparencyLog(args.log_dir).append_attestation(
+        args.attestation,
+        private_key_path=args.private_key,
+        public_key_path=args.public_key,
+        receipt_out=args.out,
+    )
+    print(f"receipt: {args.out}")
+    print(f"log_id: {receipt['log_id']}")
+    print(f"tree_size: {receipt['tree_size']}")
+    print(f"leaf_hash: {receipt['leaf_hash']}")
+    print(f"ed25519_sth_signature: {receipt['sth']['signatures']['ed25519']['status']}")
+    print(f"ml_dsa_sth_signature: {receipt['sth']['signatures']['ml_dsa']['status']}")
+    return 0
+
+
+def cmd_log_sth(args: argparse.Namespace) -> int:
+    sth = TransparencyLog(args.log_dir).latest_sth(args.private_key, args.public_key)
+    print(json.dumps(sth, indent=2, sort_keys=True))
     return 0

@@ -14,3 +14,7 @@ Guidance for future Codex runs in this repository:
 - Consequence-producing commands must be policy gated. Do not build wallet or trading-agent artifacts from `R3` arithmetic evidence.
 - Distinguish verifier capability failures from proof failures. Missing `Mathlib`, missing `Aeneas`, or a missing pinned env script means local replay is unavailable; do not treat it as a clean proof.
 - Third-party proof-checking attestations are allowed only as an explicit trust transformation. They must identify the provider, subject repo/commit, theorem names, observed axioms, and signature status. Untrusted attestations must not authorize builds.
+- Transparency receipts must be verified against the exact attestation bytes, Signed Tree Head, log public key, and inclusion proof before they can authorize consequences.
+- Keep the Merkle log RFC 9162-style unless a new standard is deliberately adopted and documented. Do not replace it with an ad hoc hash chain.
+- Do not pretend ML-DSA exists. If no real ML-DSA backend is available, record the signature slot as unavailable and fail closed for policies that require both Ed25519 and ML-DSA.
+- Provider private keys and transparency log state belong under ignored `provider/state/` or `provider/out/` paths. Do not commit local trust state.

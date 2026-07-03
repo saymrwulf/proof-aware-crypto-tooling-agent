@@ -24,6 +24,7 @@ from .profiles import get_profile
 from .repo import clone_or_fetch, status_for
 from .report import render_markdown
 from .risk import score_claim_card
+from .transparency import load_receipt, verify_receipt
 from .yamlio import dump_data, load_data
 
 
@@ -106,6 +107,10 @@ def build_parser() -> argparse.ArgumentParser:
     claims.add_argument("--trust-attestation-provider")
     claims.add_argument("--attestation-public-key")
     claims.add_argument("--allow-unsigned-attestation", action="store_true")
+    claims.add_argument("--transparency-receipt")
+    claims.add_argument("--transparency-log-public-key")
+    claims.add_argument("--require-transparency-signatures", choices=["ed25519", "both"], default="ed25519")
+    claims.add_argument("--require-transparency-receipt", action="store_true")
     claims.set_defaults(func=cmd_claims)
 
     report = sub.add_parser("report", help="Generate a human-readable Markdown risk report.")
@@ -121,6 +126,13 @@ def build_parser() -> argparse.ArgumentParser:
     score = sub.add_parser("score", help="Score an existing claim card.")
     score.add_argument("--claims", required=True)
     score.set_defaults(func=cmd_score)
+
+    receipt_verify = sub.add_parser("receipt-verify", help="Verify a transparency-log inclusion receipt for an attestation.")
+    receipt_verify.add_argument("--attestation", required=True)
+    receipt_verify.add_argument("--receipt", required=True)
+    receipt_verify.add_argument("--log-public-key", required=True)
+    receipt_verify.add_argument("--require-signatures", choices=["ed25519", "both"], default="ed25519")
+    receipt_verify.set_defaults(func=cmd_receipt_verify)
 
     agent = sub.add_parser("agent", help="Apply a policy-gated consequence to verification evidence.")
     agent.add_argument("--claims", help="Existing claim card to act on.")
@@ -143,6 +155,10 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--trust-attestation-provider")
     agent.add_argument("--attestation-public-key")
     agent.add_argument("--allow-unsigned-attestation", action="store_true")
+    agent.add_argument("--transparency-receipt")
+    agent.add_argument("--transparency-log-public-key")
+    agent.add_argument("--require-transparency-signatures", choices=["ed25519", "both"], default="ed25519")
+    agent.add_argument("--require-transparency-receipt", action="store_true")
     agent.set_defaults(func=cmd_agent)
     return parser
 
@@ -347,6 +363,24 @@ def cmd_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_receipt_verify(args: argparse.Namespace) -> int:
+    attestation = load_attestation(args.attestation)
+    receipt = load_receipt(args.receipt)
+    result = verify_receipt(attestation, receipt, args.log_public_key, require_signatures=args.require_signatures)
+    print(f"accepted: {str(result.accepted).lower()}")
+    print(f"log_id: {result.log_id or 'unknown'}")
+    print(f"tree_size: {result.tree_size if result.tree_size is not None else 'unknown'}")
+    print(f"leaf_hash: {result.leaf_hash or 'unknown'}")
+    print("signatures:")
+    for name, status in sorted(result.signatures.items()):
+        print(f"  {name}: {status}")
+    if result.diagnostics:
+        print("diagnostics:")
+        for diagnostic in result.diagnostics:
+            print(f"  - {diagnostic}")
+    return 0 if result.accepted else 1
+
+
 def cmd_agent(args: argparse.Namespace) -> int:
     card = _card_for_agent(args)
     decision = run_agent_action(
@@ -456,4 +490,8 @@ def _attestation_for_args(args: argparse.Namespace, repo: RepoConfig):
         trusted_provider=getattr(args, "trust_attestation_provider", None),
         public_key_path=getattr(args, "attestation_public_key", None),
         allow_unsigned=bool(getattr(args, "allow_unsigned_attestation", False)),
+        transparency_receipt_path=getattr(args, "transparency_receipt", None),
+        transparency_log_public_key_path=getattr(args, "transparency_log_public_key", None),
+        require_transparency_signatures=str(getattr(args, "require_transparency_signatures", "ed25519")),
+        require_transparency_receipt=bool(getattr(args, "require_transparency_receipt", False)),
     )
