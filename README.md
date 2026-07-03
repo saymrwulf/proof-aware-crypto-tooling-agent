@@ -46,6 +46,22 @@ pacta agent --claims claims.yaml --action build-wallet-demo
 pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --attestation examples/dalek-ed25519.attestation.yaml --trust-attestation-provider example-proof-checker.invalid --action build-library
 ```
 
+## Curriculum Notebooks
+
+The `notebooks/` directory contains a zero-to-hero teaching sequence for undergraduate students moving toward research-grade assurance engineering:
+
+- `00_course_map.ipynb`: course structure, prerequisites, assessment model, references.
+- `01_threat_model_and_truth_boundary.ipynb`: threat model, theorem boundaries, exclusions.
+- `02_claim_cards_and_risk_model.ipynb`: claim card schema and R0-R5 scoring.
+- `03_lean_replay_and_axiom_audit.ipynb`: replay versus transpilation, Lean invocation, axiom audits.
+- `04_proof_hygiene_and_boundaries.ipynb`: `sorry`, local axioms, trivial targets, manifest coverage.
+- `05_third_party_attestation_provider.ipynb`: provider trust transformation and signed attestations.
+- `06_merkle_transparency_logs.ipynb`: RFC 9162-style Merkle proofs, STHs, Ed25519/ML-DSA policy.
+- `07_agent_consequences.ipynb`: receipt-gated artifact builds and wallet-denial policy.
+- `08_capstone_research_program.ipynb`: research roadmap from R3 toward R4/R5.
+
+The notebooks are committed without execution output. They can be opened in Jupyter, VS Code, or any notebook reader. They import `pacta` directly from this repository and avoid external notebook-only dependencies.
+
 ## Consequence Engine
 
 `pacta agent` turns evaluation into an operational consequence.
