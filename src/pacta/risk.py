@@ -7,6 +7,13 @@ from typing import Any
 RISK_ORDER = ["R0", "R1", "R2", "R3", "R4", "R5"]
 
 
+def risk_at_least(level: str, threshold: str) -> bool:
+    try:
+        return RISK_ORDER.index(level) >= RISK_ORDER.index(threshold)
+    except ValueError:
+        return False
+
+
 @dataclass(slots=True)
 class RiskAssessment:
     level: str

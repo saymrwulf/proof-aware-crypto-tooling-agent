@@ -1,4 +1,4 @@
-from pacta.risk import score_claim_card
+from pacta.risk import risk_at_least, score_claim_card
 
 
 def test_ed25519_field_and_edwards_clean_scores_r3():
@@ -37,3 +37,10 @@ def test_dirty_axioms_do_not_score_r3():
 def test_pasta_without_aggregate_is_foundation_r2():
     result = score_claim_card({"kind": "pasta_pallas", "certificates": []})
     assert result.level == "R2"
+
+
+def test_risk_ordering():
+    assert risk_at_least("R3", "R2")
+    assert risk_at_least("R3", "R3")
+    assert not risk_at_least("R2", "R3")
+    assert not risk_at_least("RX", "R3")

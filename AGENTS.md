@@ -11,3 +11,4 @@ Guidance for future Codex runs in this repository:
 - Do not silently lower risk ratings. A lower score must explain the failed or missing evidence.
 - Do not hide proof failures behind warnings.
 - Keep claim cards machine-readable and reports explicit about proven claims, preconditions, exclusions, trusted base, and residual risk.
+- Consequence-producing commands must be policy gated. Do not build wallet or trading-agent artifacts from `R3` arithmetic evidence.

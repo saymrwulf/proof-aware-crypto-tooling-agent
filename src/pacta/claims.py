@@ -76,6 +76,8 @@ def build_claim_card(
         },
     }
     assessment = score_claim_card(card)
+    if not _has_axiom_clean_certificate(card) and assessment.level in {"R0", "R1", "R2"}:
+        card["guarantees"] = ["No configured certificate was replayed and axiom-clean in this run."]
     card["risk"] = assessment.to_dict()
     return card
 
@@ -122,4 +124,11 @@ def _from_axiom_result(name: str, result: CertificateAxiomResult | None, expecte
         axiom_status=result.axiom_status,
         observed_axioms=result.observed_axioms,
         expected_axioms=result.expected_axioms,
+    )
+
+
+def _has_axiom_clean_certificate(card: dict[str, Any]) -> bool:
+    return any(
+        cert.get("status") == "proven" and cert.get("axiom_status") == "clean"
+        for cert in card.get("certificates") or []
     )

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .agent import component_artifact_dir, run_agent_action, write_decision
 from .audit import scan_hygiene
 from .claims import build_claim_card
 from .config import RepoConfig, load_config
@@ -92,6 +93,23 @@ def build_parser() -> argparse.ArgumentParser:
     score = sub.add_parser("score", help="Score an existing claim card.")
     score.add_argument("--claims", required=True)
     score.set_defaults(func=cmd_score)
+
+    agent = sub.add_parser("agent", help="Apply a policy-gated consequence to verification evidence.")
+    agent.add_argument("--claims", help="Existing claim card to act on.")
+    agent.add_argument("--config", help="Repository config used to generate a claim card.")
+    agent.add_argument("--repo-name", help="Configured repository name.")
+    agent.add_argument("--repo", help="Local repository path.")
+    agent.add_argument("--base-dir", default="repos")
+    agent.add_argument("--artifact-dir", default="artifacts")
+    agent.add_argument("--action", choices=["build-library", "build-wallet-demo"], default="build-library")
+    agent.add_argument("--min-risk", default="R3")
+    agent.add_argument("--clone", action="store_true", help="Clone/fetch the configured repository before acting.")
+    agent.add_argument("--offline-fixture", action="store_true", help="Use synthetic clean evidence for a showcase run.")
+    agent.add_argument("--run-axioms", action="store_true", help="Replay Lean and run axiom audit before acting.")
+    agent.add_argument("--dry-run", action="store_true")
+    agent.add_argument("--timeout", type=int, default=120)
+    agent.add_argument("--log-dir", default=".pacta")
+    agent.set_defaults(func=cmd_agent)
     return parser
 
 
@@ -231,6 +249,75 @@ def cmd_score(args: argparse.Namespace) -> int:
         for blocker in assessment.blockers:
             print(f"  - {blocker}")
     return 0
+
+
+def cmd_agent(args: argparse.Namespace) -> int:
+    card = _card_for_agent(args)
+    decision = run_agent_action(
+        card,
+        action=args.action,
+        artifact_root=args.artifact_dir,
+        minimum_build_risk=args.min_risk,
+        timeout=args.timeout,
+        dry_run=args.dry_run,
+    )
+    component_dir = component_artifact_dir(args.artifact_dir, str(card.get("component") or "component"))
+    component_dir.mkdir(parents=True, exist_ok=True)
+    dump_data(card, component_dir / "claims.yaml")
+    (component_dir / "report.md").write_text(render_markdown(card), encoding="utf-8")
+    decision_path = write_decision(decision, args.artifact_dir, str(card.get("component") or "component"))
+    print(f"action: {decision.requested_action}")
+    print(f"allowed: {str(decision.allowed).lower()}")
+    print(f"risk: {decision.risk_level}")
+    print(f"decision: {decision_path}")
+    if decision.artifact:
+        print(f"artifact: {decision.artifact.artifact_dir}")
+        if decision.artifact.crate_dir:
+            print(f"crate: {decision.artifact.crate_dir}")
+        if decision.artifact.log_path:
+            print(f"log: {decision.artifact.log_path}")
+    print(decision.rationale)
+    return 0 if decision.allowed else 1
+
+
+def _card_for_agent(args: argparse.Namespace) -> dict[str, Any]:
+    if args.claims:
+        return load_data(args.claims)
+    if not args.config or not args.repo_name:
+        raise ValueError("agent requires --claims or both --config and --repo-name")
+    config = load_config(args.config)
+    repo = config.repo_named(args.repo_name)
+    if args.clone:
+        status = clone_or_fetch(repo, args.base_dir, fetch=True)
+        local_path = status.local_path
+    else:
+        local_path = Path(args.repo) if args.repo else status_for(repo, args.base_dir).local_path
+    layout = discover_layout(local_path, repo.verification_dir) if local_path.exists() else None
+    if layout is None and not args.offline_fixture:
+        raise ValueError(f"Local repo does not exist: {local_path}")
+    check_result = None
+    axiom_result = None
+    if args.run_axioms:
+        if layout is None:
+            raise ValueError("--run-axioms requires a local repository")
+        profile = get_profile(repo.kind, repo)
+        check_result = lean_check_files(layout.compile_order, layout.verification_dir, timeout=args.timeout, log_dir=args.log_dir)
+        axiom_result = run_axiom_audit(
+            local_path / repo.verification_dir,
+            profile.axiom_imports,
+            repo.certificates or profile.default_certificates,
+            profile.expected_axioms,
+            timeout=args.timeout,
+            log_dir=args.log_dir,
+        )
+    return build_claim_card(
+        repo,
+        local_path,
+        layout=layout,
+        lean_check=check_result,
+        axiom_audit=axiom_result,
+        offline_fixture=args.offline_fixture,
+    )
 
 
 def _repo_from_optional_config(config_path: str | None, repo_name: str | None, verification_dir: str) -> RepoConfig:

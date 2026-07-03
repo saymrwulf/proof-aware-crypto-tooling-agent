@@ -38,7 +38,21 @@ pacta audit --repo ./repos/dalek-ed25519-verified
 pacta lean-check --repo ./repos/dalek-ed25519-verified
 pacta report --claims claims.yaml --out report.md
 pacta score --claims claims.yaml
+pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --offline-fixture --action build-library
+pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --clone --run-axioms --action build-library --artifact-dir artifacts-live
+pacta agent --claims claims.yaml --action build-wallet-demo
 ```
+
+## Consequence Engine
+
+`pacta agent` turns evaluation into an operational consequence.
+
+- `build-library` requires `R3` by default. It builds a small Rust proof-gated component capsule under `artifacts/`. The capsule embeds the claim card and exposes whether downstream automation may use the component for lower-layer cryptographic code only.
+- `build-wallet-demo` requires `R4`. An `R3` Ed25519 arithmetic claim will refuse this action and write a machine-readable denial artifact instead of building a wallet.
+
+This is intentional. Arithmetic proof evidence can authorize a constrained lower-layer library decision, but it must not contaminate wallet, transaction, custody, or trading-agent risk scoring.
+
+In live mode, `--clone --run-axioms` downloads the configured repository, replays the local Lean checks, runs the axiom audit, writes `claims.yaml` and `report.md`, and only builds the capsule if the resulting score satisfies the policy threshold. Failed replay is a hard consequence: no artifact is built.
 
 ## Truth Boundary
 
