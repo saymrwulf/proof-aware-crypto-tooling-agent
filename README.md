@@ -33,6 +33,7 @@ PyYAML is optional. Without it, `pacta` can still read the included simple YAML 
 ```bash
 python -m pacta --help
 pacta scan --config examples/repos.yaml
+pacta doctor --config examples/repos.yaml --repo-name dalek-ed25519-verified
 pacta claims --config examples/repos.yaml --repo-name dalek-ed25519-verified --offline-fixture --out claims.yaml
 pacta audit --repo ./repos/dalek-ed25519-verified
 pacta lean-check --repo ./repos/dalek-ed25519-verified
@@ -41,6 +42,7 @@ pacta score --claims claims.yaml
 pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --offline-fixture --action build-library
 pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --clone --run-axioms --action build-library --artifact-dir artifacts-live
 pacta agent --claims claims.yaml --action build-wallet-demo
+pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --attestation examples/dalek-ed25519.attestation.yaml --trust-attestation-provider example-proof-checker.invalid --action build-library
 ```
 
 ## Consequence Engine
@@ -53,6 +55,46 @@ pacta agent --claims claims.yaml --action build-wallet-demo
 This is intentional. Arithmetic proof evidence can authorize a constrained lower-layer library decision, but it must not contaminate wallet, transaction, custody, or trading-agent risk scoring.
 
 In live mode, `--clone --run-axioms` downloads the configured repository, replays the local Lean checks, runs the axiom audit, writes `claims.yaml` and `report.md`, and only builds the capsule if the resulting score satisfies the policy threshold. Failed replay is a hard consequence: no artifact is built.
+
+## Verifier Bootstrap
+
+Some verified repositories rely on a pinned Aeneas Lean project, usually exposed by an environment script such as `~/aeneas-toolchain/env.sh`. `pacta` can use that environment without running extraction:
+
+```bash
+pacta doctor --config examples/repos.yaml --repo-name dalek-ed25519-verified
+pacta agent --config examples/repos.yaml --repo-name dalek-ed25519-verified --clone --run-axioms --action build-library
+```
+
+The configured defaults are:
+
+- `env_script: ~/aeneas-toolchain/env.sh`
+- `lean_project_dir: $AENEAS_HOME/backends/lean`
+
+If those are missing, the result is `R0` for local replay because this machine lacks verifier capability. That is different from saying the theorem is false. It means the agent cannot trust the repository from local machine-checked evidence yet.
+
+## Third-Party Attestation
+
+For agents that should not build the full Lean/Aeneas environment locally, `pacta` also supports an attestation lane. A specialized proof-checking service can replay the proofs in its own controlled environment and publish a certificate describing:
+
+- repository URL and commit,
+- theorem/certificate names,
+- observed axioms,
+- Lean/toolchain environment,
+- service identity and signature metadata.
+
+The agent can consume that certificate only when the provider is explicitly trusted:
+
+```bash
+pacta agent --config examples/repos.yaml \
+  --repo-name dalek-ed25519-verified \
+  --attestation examples/dalek-ed25519.attestation.yaml \
+  --trust-attestation-provider example-proof-checker.invalid \
+  --action build-library
+```
+
+This changes the trusted base. The agent is no longer trusting local Lean replay; it is trusting the proof-checking service, its environment, signing key custody, and log retention. Without an explicitly trusted provider, attestation evidence scores `R0`.
+
+The included `examples/dalek-ed25519.attestation.yaml` is a schema/demo fixture. A production service should publish verifiable signatures, transparency-log entries, and reproducible logs; the prototype records signature metadata but does not yet implement cryptographic signature verification.
 
 ## Truth Boundary
 

@@ -159,6 +159,9 @@ def _lib_rs(card: dict[str, Any]) -> str:
     repo_url = _rust_string(str(card.get("repo_url") or ""))
     risk = card.get("risk") or {}
     risk_level = _rust_string(str(risk.get("level") or "R0"))
+    evidence = card.get("evidence") or {}
+    evidence_mode = _rust_string(str(evidence.get("evidence_mode") or "local_or_fixture"))
+    attestation_provider = _rust_string(str(evidence.get("attestation_provider") or ""))
     kind = _rust_string(str(card.get("kind") or "unknown"))
     backend = _rust_string(str(card.get("verified_backend") or ""))
     constraints = [_rust_string(str(item)) for item in risk.get("deployment_constraints") or []]
@@ -174,6 +177,8 @@ pub const REPO_URL: &str = "{repo_url}";
 pub const KIND: &str = "{kind}";
 pub const VERIFIED_BACKEND: &str = "{backend}";
 pub const RISK_LEVEL: &str = "{risk_level}";
+pub const EVIDENCE_MODE: &str = "{evidence_mode}";
+pub const ATTESTATION_PROVIDER: &str = "{attestation_provider}";
 pub const CLAIM_CARD_JSON: &str = include_str!("../claims.json");
 
 pub const DEPLOYMENT_CONSTRAINTS: &[&str] = &[

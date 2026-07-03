@@ -44,3 +44,16 @@ def test_risk_ordering():
     assert risk_at_least("R3", "R3")
     assert not risk_at_least("R2", "R3")
     assert not risk_at_least("RX", "R3")
+
+
+def test_verifier_capability_blocker_scores_r0():
+    card = {
+        "kind": "ed25519",
+        "certificates": [
+            {"name": "CurveFieldProofs.fieldImplementation", "status": "unknown", "axiom_status": "not_checked"},
+        ],
+        "evidence": {"replay_blockers": ["Missing Lean dependency/module prefix: Aeneas"]},
+    }
+    result = score_claim_card(card)
+    assert result.level == "R0"
+    assert "verifier capability" in result.rationale

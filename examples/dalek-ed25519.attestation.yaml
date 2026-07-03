@@ -1,0 +1,40 @@
+schema_version: 1
+provider: example-proof-checker.invalid
+issued_at: "2026-07-03T00:00:00Z"
+subject:
+  component: dalek-ed25519-verified
+  repo_url: https://github.com/saymrwulf/dalek-ed25519-verified.git
+  repo_commit: example-attested-commit
+  verification_dir: verification
+  kind: ed25519
+  verified_backend: serial/u64
+environment:
+  lean_version: Lean v4.30.0-rc2
+  lake_version: pinned provider environment
+certificates:
+  - name: CurveFieldProofs.fieldImplementation
+    status: proven
+    axiom_status: clean
+    observed_axioms:
+      - propext
+      - Classical.choice
+      - Quot.sound
+    expected_axioms:
+      - propext
+      - Classical.choice
+      - Quot.sound
+  - name: CurveFieldProofs.edwardsImplementation
+    status: proven
+    axiom_status: clean
+    observed_axioms:
+      - propext
+      - Classical.choice
+      - Quot.sound
+    expected_axioms:
+      - propext
+      - Classical.choice
+      - Quot.sound
+signature:
+  status: not_implemented
+  identity: example schema only; replace with Sigstore/minisign/service signature
+  log_url: https://example.invalid/proof-checks/dalek-ed25519

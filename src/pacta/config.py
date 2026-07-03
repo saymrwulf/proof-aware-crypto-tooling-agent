@@ -23,6 +23,8 @@ class RepoConfig:
     expected_axioms: list[str] = field(default_factory=lambda: STANDARD_LEAN_AXIOMS.copy())
     known_exclusions: list[str] = field(default_factory=list)
     axiom_imports: list[str] = field(default_factory=list)
+    env_script: str | None = None
+    lean_project_dir: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "RepoConfig":
@@ -40,6 +42,8 @@ class RepoConfig:
             expected_axioms=list(raw.get("expected_axioms") or STANDARD_LEAN_AXIOMS),
             known_exclusions=list(raw.get("known_exclusions") or []),
             axiom_imports=list(raw.get("axiom_imports") or []),
+            env_script=raw.get("env_script"),
+            lean_project_dir=raw.get("lean_project_dir"),
         )
 
 

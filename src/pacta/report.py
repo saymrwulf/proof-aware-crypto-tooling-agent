@@ -48,8 +48,11 @@ def render_markdown(card: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## macOS replay status",
+            "## Replay and attestation status",
             "",
+            f"- Evidence mode: {evidence.get('evidence_mode') or 'local_or_fixture'}",
+            f"- Attestation provider: {evidence.get('attestation_provider') or 'not used'}",
+            f"- Attestation signature: {evidence.get('attestation_signature_status') or 'not used'}",
             f"- Lean: {evidence.get('lean_version') or 'not detected'}",
             f"- Lake: {evidence.get('lake_version') or 'not detected'}",
             f"- Check log: {evidence.get('check_log_path') or 'not recorded'}",

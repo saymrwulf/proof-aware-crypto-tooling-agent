@@ -12,3 +12,5 @@ Guidance for future Codex runs in this repository:
 - Do not hide proof failures behind warnings.
 - Keep claim cards machine-readable and reports explicit about proven claims, preconditions, exclusions, trusted base, and residual risk.
 - Consequence-producing commands must be policy gated. Do not build wallet or trading-agent artifacts from `R3` arithmetic evidence.
+- Distinguish verifier capability failures from proof failures. Missing `Mathlib`, missing `Aeneas`, or a missing pinned env script means local replay is unavailable; do not treat it as a clean proof.
+- Third-party proof-checking attestations are allowed only as an explicit trust transformation. They must identify the provider, subject repo/commit, theorem names, observed axioms, and signature status. Untrusted attestations must not authorize builds.

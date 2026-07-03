@@ -34,8 +34,28 @@ def score_claim_card(card: dict[str, Any]) -> RiskAssessment:
     kind = card.get("kind", "unknown")
     certificates = card.get("certificates") or []
     exclusions = [str(item).lower() for item in card.get("exclusions") or []]
+    replay_blockers = list((card.get("evidence") or {}).get("replay_blockers") or [])
     constraints = list(card.get("risk", {}).get("deployment_constraints") or [])
+    evidence = card.get("evidence") or {}
+    attested = evidence.get("evidence_mode") == "third_party_attestation"
     blockers: list[str] = []
+
+    if replay_blockers:
+        blockers.extend(replay_blockers)
+        if any(_is_attestation_blocker(blocker) for blocker in replay_blockers):
+            return RiskAssessment(
+                "R0",
+                "Third-party attestation evidence was supplied but not accepted, so no usable verification evidence is available.",
+                blockers,
+                constraints,
+            )
+        if any(_is_verifier_capability_blocker(blocker) for blocker in replay_blockers):
+            return RiskAssessment(
+                "R0",
+                "Local verifier capability is unavailable, so no usable machine-checked replay evidence was produced on this machine.",
+                blockers,
+                constraints,
+            )
 
     clean_proven = [
         cert
@@ -75,6 +95,14 @@ def score_claim_card(card: dict[str, Any]) -> RiskAssessment:
             full_eddsa_excluded = any("eddsa" in item or "signature" in item for item in exclusions)
             if not full_eddsa_excluded:
                 blockers.append("Full EdDSA boundary is not explicitly excluded in the claim card.")
+            if attested:
+                provider = evidence.get("attestation_provider") or "unknown provider"
+                return RiskAssessment(
+                    "R3",
+                    f"Trusted third-party provider {provider} attests that configured field and Edwards certificates are proven and axiom-clean for a specific lower-layer backend boundary.",
+                    blockers,
+                    constraints,
+                )
             return RiskAssessment(
                 "R3",
                 "Configured field and Edwards implementation certificates are proven and axiom-clean for a specific lower-layer backend boundary.",
@@ -110,3 +138,23 @@ def score_claim_card(card: dict[str, Any]) -> RiskAssessment:
         blockers,
         constraints,
     )
+
+
+def _is_verifier_capability_blocker(blocker: str) -> bool:
+    lowered = blocker.lower()
+    return any(
+        token in lowered
+        for token in (
+            "env_script",
+            "environment script",
+            "neither lean nor lake",
+            "missing lean dependency",
+            "unknown module prefix",
+            "missing verifier capability",
+        )
+    )
+
+
+def _is_attestation_blocker(blocker: str) -> bool:
+    lowered = blocker.lower()
+    return "attestation" in lowered or "trusted provider" in lowered

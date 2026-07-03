@@ -6,10 +6,19 @@ from pathlib import Path
 from typing import Any
 
 from .agent import component_artifact_dir, run_agent_action, write_decision
+from .attestation import load_attestation, validate_attestation
 from .audit import scan_hygiene
 from .claims import build_claim_card
 from .config import RepoConfig, load_config
-from .lean import LeanCheckResult, lean_check_files, run_axiom_audit
+from .lean import (
+    LeanCheckResult,
+    build_lean_env,
+    detect_tools,
+    env_script_available,
+    lean_check_files,
+    resolve_lean_project_dir,
+    run_axiom_audit,
+)
 from .manifest import discover_layout
 from .profiles import get_profile
 from .repo import clone_or_fetch, status_for
@@ -39,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--fetch", action="store_true", help="Fetch existing repositories when cloning/scanning.")
     scan.set_defaults(func=cmd_scan)
 
+    doctor = sub.add_parser("doctor", help="Diagnose local verifier capabilities for a configured repository.")
+    doctor.add_argument("--config", required=True)
+    doctor.add_argument("--repo-name", required=True)
+    doctor.add_argument("--env-script")
+    doctor.add_argument("--lean-project-dir")
+    doctor.set_defaults(func=cmd_doctor)
+
     audit = sub.add_parser("audit", help="Run static proof hygiene checks.")
     audit.add_argument("--repo", required=True)
     audit.add_argument("--verification-dir", default="verification")
@@ -51,6 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
     lean_check.add_argument("--verification-dir", default="verification")
     lean_check.add_argument("--timeout", type=int, default=120)
     lean_check.add_argument("--log-dir", default=".pacta")
+    lean_check.add_argument("--env-script")
+    lean_check.add_argument("--lean-project-dir")
     lean_check.set_defaults(func=cmd_lean_check)
 
     check = sub.add_parser("check", help="Alias for lean-check.")
@@ -58,6 +76,8 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--verification-dir", default="verification")
     check.add_argument("--timeout", type=int, default=120)
     check.add_argument("--log-dir", default=".pacta")
+    check.add_argument("--env-script")
+    check.add_argument("--lean-project-dir")
     check.set_defaults(func=cmd_lean_check)
 
     axiom = sub.add_parser("axioms", help="Run configured Lean axiom audit.")
@@ -66,6 +86,8 @@ def build_parser() -> argparse.ArgumentParser:
     axiom.add_argument("--repo-name", required=True)
     axiom.add_argument("--timeout", type=int, default=120)
     axiom.add_argument("--log-dir", default=".pacta")
+    axiom.add_argument("--env-script")
+    axiom.add_argument("--lean-project-dir")
     axiom.set_defaults(func=cmd_axioms)
 
     claims = sub.add_parser("claims", help="Generate a machine-readable claim card.")
@@ -78,6 +100,10 @@ def build_parser() -> argparse.ArgumentParser:
     claims.add_argument("--run-axioms", action="store_true")
     claims.add_argument("--timeout", type=int, default=120)
     claims.add_argument("--log-dir", default=".pacta")
+    claims.add_argument("--env-script")
+    claims.add_argument("--lean-project-dir")
+    claims.add_argument("--attestation")
+    claims.add_argument("--trust-attestation-provider")
     claims.set_defaults(func=cmd_claims)
 
     report = sub.add_parser("report", help="Generate a human-readable Markdown risk report.")
@@ -109,6 +135,10 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--dry-run", action="store_true")
     agent.add_argument("--timeout", type=int, default=120)
     agent.add_argument("--log-dir", default=".pacta")
+    agent.add_argument("--env-script")
+    agent.add_argument("--lean-project-dir")
+    agent.add_argument("--attestation")
+    agent.add_argument("--trust-attestation-provider")
     agent.set_defaults(func=cmd_agent)
     return parser
 
@@ -123,6 +153,37 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print(f"  local: {status.local_path}")
         print(f"  verification: {status.verification_dir}")
         print(f"  commit: {status.commit or 'unknown'}")
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    repo = config.repo_named(args.repo_name)
+    env_script = args.env_script or repo.env_script
+    lean_project_dir = args.lean_project_dir or repo.lean_project_dir
+    ok_env, env_error = env_script_available(env_script)
+    env = build_lean_env(repo.verification_dir, env_script=env_script) if ok_env else {}
+    tools = detect_tools(env if env else None)
+    project_dir = resolve_lean_project_dir(lean_project_dir, env if env else None)
+    print(f"repo: {repo.name}")
+    print(f"env_script: {env_script or 'not configured'}")
+    print(f"env_script_status: {'ok' if ok_env else 'missing'}")
+    if env_error:
+        print(f"env_script_error: {env_error}")
+    print(f"lean_project_dir: {lean_project_dir or 'not configured'}")
+    print(f"lean_project_dir_status: {'ok' if project_dir else 'missing'}")
+    if project_dir:
+        print(f"lean_project_dir_resolved: {project_dir}")
+    print(f"lean: {tools.lean or 'missing'}")
+    print(f"lake: {tools.lake or 'missing'}")
+    print(f"lean_version: {tools.lean_version or 'unknown'}")
+    print(f"lake_version: {tools.lake_version or 'unknown'}")
+    if not ok_env or not project_dir:
+        print("remediation: install or point to the pinned verifier environment, for example --env-script ~/aeneas-toolchain/env.sh --lean-project-dir '$AENEAS_HOME/backends/lean'")
+        return 1
+    if not tools.lean and not tools.lake:
+        print("remediation: ensure lean/lake are on PATH after sourcing the verifier environment.")
+        return 1
     return 0
 
 
@@ -144,7 +205,14 @@ def cmd_lean_check(args: argparse.Namespace) -> int:
     layout = discover_layout(args.repo, args.verification_dir)
     for warning in layout.warnings:
         print(f"warning: {warning}")
-    result = lean_check_files(layout.compile_order, layout.verification_dir, timeout=args.timeout, log_dir=args.log_dir)
+    result = lean_check_files(
+        layout.compile_order,
+        layout.verification_dir,
+        timeout=args.timeout,
+        log_dir=args.log_dir,
+        env_script=args.env_script,
+        lean_project_dir=args.lean_project_dir,
+    )
     if not result.attempted:
         print("; ".join(result.diagnostics))
         return 2
@@ -159,7 +227,16 @@ def cmd_axioms(args: argparse.Namespace) -> int:
     repo = config.repo_named(args.repo_name)
     profile = get_profile(repo.kind, repo)
     layout = discover_layout(args.repo, repo.verification_dir)
-    check_result = lean_check_files(layout.compile_order, layout.verification_dir, timeout=args.timeout, log_dir=args.log_dir)
+    env_script = args.env_script or repo.env_script
+    lean_project_dir = args.lean_project_dir or repo.lean_project_dir
+    check_result = lean_check_files(
+        layout.compile_order,
+        layout.verification_dir,
+        timeout=args.timeout,
+        log_dir=args.log_dir,
+        env_script=env_script,
+        lean_project_dir=lean_project_dir,
+    )
     if check_result.log_path:
         print(f"check log: {check_result.log_path}")
     if not check_result.attempted:
@@ -174,6 +251,8 @@ def cmd_axioms(args: argparse.Namespace) -> int:
         profile.expected_axioms,
         timeout=args.timeout,
         log_dir=args.log_dir,
+        env_script=env_script,
+        lean_project_dir=lean_project_dir,
     )
     for cert in result.certificates:
         print(f"{cert.name}: {cert.status}, axioms={cert.axiom_status}, observed={cert.observed_axioms}")
@@ -197,7 +276,16 @@ def cmd_claims(args: argparse.Namespace) -> int:
         if layout is None:
             raise ValueError("--run-axioms requires a local repository")
         profile = get_profile(repo.kind, repo)
-        check_result = lean_check_files(layout.compile_order, layout.verification_dir, timeout=args.timeout, log_dir=args.log_dir)
+        env_script = args.env_script or repo.env_script
+        lean_project_dir = args.lean_project_dir or repo.lean_project_dir
+        check_result = lean_check_files(
+            layout.compile_order,
+            layout.verification_dir,
+            timeout=args.timeout,
+            log_dir=args.log_dir,
+            env_script=env_script,
+            lean_project_dir=lean_project_dir,
+        )
         axiom_result = run_axiom_audit(
             local_path / repo.verification_dir,
             profile.axiom_imports,
@@ -205,13 +293,17 @@ def cmd_claims(args: argparse.Namespace) -> int:
             profile.expected_axioms,
             timeout=args.timeout,
             log_dir=args.log_dir,
+            env_script=env_script,
+            lean_project_dir=lean_project_dir,
         )
+    attestation = _attestation_for_args(args, repo)
     card = build_claim_card(
         repo,
         local_path,
         layout=layout,
         lean_check=check_result,
         axiom_audit=axiom_result,
+        attestation=attestation,
         offline_fixture=args.offline_fixture,
     )
     if args.out:
@@ -301,7 +393,16 @@ def _card_for_agent(args: argparse.Namespace) -> dict[str, Any]:
         if layout is None:
             raise ValueError("--run-axioms requires a local repository")
         profile = get_profile(repo.kind, repo)
-        check_result = lean_check_files(layout.compile_order, layout.verification_dir, timeout=args.timeout, log_dir=args.log_dir)
+        env_script = args.env_script or repo.env_script
+        lean_project_dir = args.lean_project_dir or repo.lean_project_dir
+        check_result = lean_check_files(
+            layout.compile_order,
+            layout.verification_dir,
+            timeout=args.timeout,
+            log_dir=args.log_dir,
+            env_script=env_script,
+            lean_project_dir=lean_project_dir,
+        )
         axiom_result = run_axiom_audit(
             local_path / repo.verification_dir,
             profile.axiom_imports,
@@ -309,13 +410,17 @@ def _card_for_agent(args: argparse.Namespace) -> dict[str, Any]:
             profile.expected_axioms,
             timeout=args.timeout,
             log_dir=args.log_dir,
+            env_script=env_script,
+            lean_project_dir=lean_project_dir,
         )
+    attestation = _attestation_for_args(args, repo)
     return build_claim_card(
         repo,
         local_path,
         layout=layout,
         lean_check=check_result,
         axiom_audit=axiom_result,
+        attestation=attestation,
         offline_fixture=args.offline_fixture,
     )
 
@@ -333,3 +438,11 @@ def print_yaml(data: dict[str, Any]) -> None:
     from .yamlio import dumps
 
     print(dumps(data), end="")
+
+
+def _attestation_for_args(args: argparse.Namespace, repo: RepoConfig):
+    attestation_path = getattr(args, "attestation", None)
+    if not attestation_path:
+        return None
+    raw = load_attestation(attestation_path)
+    return validate_attestation(raw, repo, path=attestation_path, trusted_provider=getattr(args, "trust_attestation_provider", None))

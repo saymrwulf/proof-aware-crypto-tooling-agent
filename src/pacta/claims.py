@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .attestation import AttestationResult
 from .config import RepoConfig
 from .lean import AxiomAuditResult, CertificateAxiomResult, LeanCheckResult, detect_tools
 from .manifest import VerificationLayout
@@ -36,18 +37,19 @@ def build_claim_card(
     layout: VerificationLayout | None = None,
     lean_check: LeanCheckResult | None = None,
     axiom_audit: AxiomAuditResult | None = None,
+    attestation: AttestationResult | None = None,
     offline_fixture: bool = False,
 ) -> dict[str, Any]:
     path = Path(local_path)
     profile = get_profile(repo.kind, repo)
     tools = detect_tools()
-    certs = _certificate_claims(repo, axiom_audit, offline_fixture)
+    certs = _certificate_claims(repo, axiom_audit, offline_fixture, attestation)
     scanned_files = layout.relative_files() if layout else []
     card: dict[str, Any] = {
         "component": repo.name,
         "repo_url": repo.url,
         "local_path": str(path),
-        "repo_commit": None if offline_fixture else git_commit(path),
+        "repo_commit": attestation.repo_commit if attestation and attestation.repo_commit else (None if offline_fixture else git_commit(path)),
         "verification_dir": repo.verification_dir,
         "kind": repo.kind,
         "verified_backend": repo.verified_backend,
@@ -55,13 +57,15 @@ def build_claim_card(
         "guarantees": profile.guarantees,
         "preconditions": profile.preconditions,
         "exclusions": profile.exclusions,
-        "trusted_base": profile.trusted_base,
+        "trusted_base": [*profile.trusted_base, *(attestation.trusted_base if attestation and attestation.accepted else [])],
         "evidence": {
             "lean_version": tools.lean_version,
             "lake_version": tools.lake_version,
             "check_log_path": lean_check.log_path if lean_check else None,
             "axiom_log_path": axiom_audit.log_path if axiom_audit else None,
+            "replay_blockers": _replay_blockers(lean_check, axiom_audit, attestation),
             "scanned_files": scanned_files,
+            **(attestation.evidence if attestation else {"evidence_mode": "local_or_fixture"}),
         },
         "risk": {
             "level": "R0",
@@ -86,9 +90,22 @@ def _certificate_claims(
     repo: RepoConfig,
     axiom_audit: AxiomAuditResult | None,
     offline_fixture: bool,
+    attestation: AttestationResult | None,
 ) -> list[CertificateClaim]:
     profile = get_profile(repo.kind, repo)
     names = repo.certificates or profile.default_certificates
+    if attestation and attestation.accepted:
+        by_name = {cert["name"]: cert for cert in attestation.certificates}
+        return [
+            CertificateClaim(
+                name=name,
+                status=str(by_name.get(name, {}).get("status", "missing")),
+                axiom_status=str(by_name.get(name, {}).get("axiom_status", "not_checked")),
+                observed_axioms=list(by_name.get(name, {}).get("observed_axioms") or []),
+                expected_axioms=list(by_name.get(name, {}).get("expected_axioms") or profile.expected_axioms),
+            )
+            for name in names
+        ]
     if axiom_audit:
         by_name = {cert.name: cert for cert in axiom_audit.certificates}
         return [_from_axiom_result(name, by_name.get(name), profile.expected_axioms) for name in names]
@@ -132,3 +149,28 @@ def _has_axiom_clean_certificate(card: dict[str, Any]) -> bool:
         cert.get("status") == "proven" and cert.get("axiom_status") == "clean"
         for cert in card.get("certificates") or []
     )
+
+
+def _replay_blockers(
+    lean_check: LeanCheckResult | None,
+    axiom_audit: AxiomAuditResult | None,
+    attestation: AttestationResult | None,
+) -> list[str]:
+    blockers: list[str] = []
+    if attestation and not attestation.accepted:
+        blockers.extend(attestation.diagnostics)
+    if lean_check:
+        blockers.extend(lean_check.diagnostics)
+        if lean_check.missing_tool:
+            blockers.append(f"Missing verifier capability: {lean_check.missing_tool}")
+    if axiom_audit:
+        blockers.extend(axiom_audit.diagnostics)
+        if axiom_audit.missing_tool:
+            blockers.append(f"Missing verifier capability: {axiom_audit.missing_tool}")
+    seen: set[str] = set()
+    out: list[str] = []
+    for blocker in blockers:
+        if blocker and blocker not in seen:
+            seen.add(blocker)
+            out.append(blocker)
+    return out

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -50,20 +51,25 @@ class AxiomAuditResult:
     diagnostics: list[str] = field(default_factory=list)
 
 
-def detect_tools() -> LeanTools:
-    lean = shutil.which("lean")
-    lake = shutil.which("lake")
+def detect_tools(env: dict[str, str] | None = None) -> LeanTools:
+    path = env.get("PATH") if env else None
+    lean = shutil.which("lean", path=path)
+    lake = shutil.which("lake", path=path)
     return LeanTools(
         lean=lean,
         lake=lake,
-        lean_version=_version([lean, "--version"]) if lean else None,
-        lake_version=_version([lake, "--version"]) if lake else None,
+        lean_version=_version([lean, "--version"], env=env) if lean else None,
+        lake_version=_version([lake, "--version"], env=env) if lake else None,
     )
 
 
-def build_lean_env(verification_dir: str | Path, base_env: dict[str, str] | None = None) -> dict[str, str]:
+def build_lean_env(
+    verification_dir: str | Path,
+    base_env: dict[str, str] | None = None,
+    env_script: str | Path | None = None,
+) -> dict[str, str]:
     verification = Path(verification_dir).resolve()
-    env = dict(base_env or os.environ)
+    env = _base_env(base_env, env_script)
     candidates = [verification / "gen", verification]
     existing = [str(path) for path in candidates if path.exists()]
     old = env.get("LEAN_PATH")
@@ -72,6 +78,19 @@ def build_lean_env(verification_dir: str | Path, base_env: dict[str, str] | None
     if existing:
         env["LEAN_PATH"] = os.pathsep.join(existing)
     return env
+
+
+def env_script_available(env_script: str | Path | None) -> tuple[bool, str | None]:
+    if not env_script:
+        return True, None
+    path = Path(str(env_script)).expanduser()
+    if not path.exists():
+        return False, f"Verifier environment script does not exist: {path}"
+    return True, None
+
+
+def resolve_lean_project_dir(path: str | Path | None, env: dict[str, str] | None = None) -> Path | None:
+    return _resolve_project_dir(path, env or os.environ)
 
 
 def build_lean_invocation(
@@ -96,6 +115,8 @@ def lean_check_files(
     verification_dir: str | Path,
     timeout: int = 120,
     log_dir: str | Path | None = None,
+    env_script: str | Path | None = None,
+    lean_project_dir: str | Path | None = None,
 ) -> LeanCheckResult:
     if not files:
         return LeanCheckResult(
@@ -104,7 +125,19 @@ def lean_check_files(
             missing_tool=None,
             diagnostics=[f"No Lean files discovered under {verification_dir}."],
         )
-    tools = detect_tools()
+    ok_env, env_error = env_script_available(env_script)
+    if not ok_env:
+        return LeanCheckResult(
+            attempted=False,
+            ok=False,
+            missing_tool="env_script",
+            diagnostics=[
+                env_error or "Verifier environment script is not available.",
+                "Install or point --env-script at the pinned Lean/Aeneas environment; no extraction will be run.",
+            ],
+        )
+    env = build_lean_env(verification_dir, env_script=env_script)
+    tools = detect_tools(env)
     if not tools.lean and not tools.lake:
         return LeanCheckResult(
             attempted=False,
@@ -112,18 +145,23 @@ def lean_check_files(
             missing_tool="lean",
             diagnostics=["Neither lean nor lake was found on PATH."],
         )
-    verification = Path(verification_dir)
-    use_lake_env = tools.lake is not None and ((verification / "lakefile.lean").exists() or (verification / "lakefile.toml").exists())
+    verification = Path(verification_dir).resolve()
+    project_dir = _resolve_project_dir(lean_project_dir, env)
+    use_lake_env = tools.lake is not None and (
+        project_dir is not None or (verification / "lakefile.lean").exists() or (verification / "lakefile.toml").exists()
+    )
+    cwd = project_dir or verification
     logs = _log_file(log_dir, "lean-check.log")
     checked: list[str] = []
     failed: list[str] = []
     diagnostics: list[str] = []
-    env = build_lean_env(verification)
     with logs.open("w", encoding="utf-8") as log:
         log.write(f"lean: {tools.lean}\n")
         log.write(f"lake: {tools.lake}\n")
         log.write(f"lean_version: {tools.lean_version}\n")
         log.write(f"lake_version: {tools.lake_version}\n\n")
+        log.write(f"env_script: {env_script or ''}\n")
+        log.write(f"lean_project_dir: {project_dir or ''}\n\n")
         for path in files:
             cmd = build_lean_invocation(path, tools, use_lake_env=use_lake_env, output_path=path.with_suffix(".olean"))
             log.write("$ " + " ".join(cmd) + "\n")
@@ -134,7 +172,7 @@ def lean_check_files(
                     capture_output=True,
                     text=True,
                     timeout=timeout,
-                    cwd=str(verification),
+                    cwd=str(cwd),
                     env=env,
                 )
             except subprocess.TimeoutExpired:
@@ -149,6 +187,7 @@ def lean_check_files(
             log.write(f"\nexit_code: {completed.returncode}\n\n")
             if completed.returncode != 0:
                 failed.append(str(path))
+                diagnostics.extend(_dependency_diagnostics(completed.stdout + completed.stderr))
     return LeanCheckResult(
         attempted=True,
         ok=not failed,
@@ -167,21 +206,34 @@ def run_axiom_audit(
     expected_axioms: list[str] | None = None,
     timeout: int = 120,
     log_dir: str | Path | None = None,
+    env_script: str | Path | None = None,
+    lean_project_dir: str | Path | None = None,
 ) -> AxiomAuditResult:
-    tools = detect_tools()
     expected = expected_axioms or STANDARD_LEAN_AXIOMS
+    ok_env, env_error = env_script_available(env_script)
+    if not ok_env:
+        cert_results = [
+            CertificateAxiomResult(cert, "unknown", "not_checked", [], expected, [env_error or "Verifier environment unavailable."])
+            for cert in certificates
+        ]
+        return AxiomAuditResult(False, False, "env_script", cert_results, None, [env_error or "Verifier environment unavailable."])
+    env = build_lean_env(verification_dir, env_script=env_script)
+    tools = detect_tools(env)
     if not tools.lean and not tools.lake:
         cert_results = [
             CertificateAxiomResult(cert, "unknown", "not_checked", [], expected, ["Neither lean nor lake was found on PATH."])
             for cert in certificates
         ]
         return AxiomAuditResult(False, False, "lean", cert_results, None, ["Neither lean nor lake was found on PATH."])
-    verification = Path(verification_dir)
-    use_lake_env = tools.lake is not None and ((verification / "lakefile.lean").exists() or (verification / "lakefile.toml").exists())
+    verification = Path(verification_dir).resolve()
+    project_dir = _resolve_project_dir(lean_project_dir, env)
+    use_lake_env = tools.lake is not None and (
+        project_dir is not None or (verification / "lakefile.lean").exists() or (verification / "lakefile.toml").exists()
+    )
+    cwd = project_dir or verification
     logs = _log_file(log_dir, "axiom-audit.log")
     imports_text = "\n".join(f"import {module}" for module in imports)
     prints_text = "\n".join(f"#print axioms {cert}" for cert in certificates)
-    env = build_lean_env(verification)
     with tempfile.TemporaryDirectory(prefix="pacta-axioms-") as tmp:
         audit_file = Path(tmp) / "AxiomAudit.lean"
         audit_file.write_text(f"{imports_text}\n\n{prints_text}\n", encoding="utf-8")
@@ -193,7 +245,7 @@ def run_axiom_audit(
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                cwd=str(verification),
+                cwd=str(cwd),
                 env=env,
             )
             output = completed.stdout + completed.stderr
@@ -219,7 +271,7 @@ def run_axiom_audit(
         missing_tool=None,
         certificates=cert_results,
         log_path=str(logs),
-        diagnostics=[] if return_code == 0 else [f"Lean axiom audit exited with {return_code}."],
+        diagnostics=[] if return_code == 0 else [f"Lean axiom audit exited with {return_code}.", *_dependency_diagnostics(output)],
     )
 
 
@@ -249,7 +301,7 @@ def _mentions_no_axioms(text: str) -> bool:
     return "no axioms" in lowered or "does not depend on any axioms" in lowered
 
 
-def _version(cmd: list[str | None]) -> str | None:
+def _version(cmd: list[str | None], env: dict[str, str] | None = None) -> str | None:
     if not cmd[0]:
         return None
     try:
@@ -259,6 +311,7 @@ def _version(cmd: list[str | None]) -> str | None:
             capture_output=True,
             text=True,
             timeout=10,
+            env=env,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -271,3 +324,52 @@ def _log_file(log_dir: str | Path | None, name: str) -> Path:
     directory = Path(log_dir) if log_dir else Path(".pacta")
     directory.mkdir(parents=True, exist_ok=True)
     return directory / name
+
+
+def _base_env(base_env: dict[str, str] | None, env_script: str | Path | None) -> dict[str, str]:
+    env = dict(base_env or os.environ)
+    if not env_script:
+        return env
+    path = Path(str(env_script)).expanduser()
+    if not path.exists():
+        return env
+    command = f"source {shlex.quote(str(path))}; env"
+    try:
+        completed = subprocess.run(
+            ["/bin/zsh", "-lc", command],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return env
+    if completed.returncode != 0:
+        return env
+    for line in completed.stdout.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            env[key] = value
+    return env
+
+
+def _resolve_project_dir(path: str | Path | None, env: dict[str, str]) -> Path | None:
+    if not path:
+        return None
+    expanded = os.path.expandvars(str(path))
+    for key, value in env.items():
+        expanded = expanded.replace(f"${key}", value).replace(f"${{{key}}}", value)
+    resolved = Path(expanded).expanduser()
+    return resolved if resolved.exists() else None
+
+
+def _dependency_diagnostics(output: str) -> list[str]:
+    diagnostics: list[str] = []
+    modules = sorted(set(re.findall(r"unknown module prefix '([^']+)'", output)))
+    for module in modules:
+        diagnostics.append(f"Missing Lean dependency/module prefix: {module}")
+    missing_objects = sorted(set(re.findall(r"object file '([^']+)' of module ([A-Za-z0-9_'.]+) does not exist", output)))
+    for _, module in missing_objects[:8]:
+        diagnostics.append(f"Missing compiled Lean object for module: {module}")
+    return diagnostics

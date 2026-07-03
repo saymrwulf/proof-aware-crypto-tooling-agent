@@ -22,4 +22,5 @@ def test_repo_config_merges_backend_warning():
 def test_load_examples_config():
     config = load_config("examples/repos.yaml")
     assert config.repo_named("dalek-ed25519-verified").kind == "ed25519"
+    assert config.repo_named("dalek-ed25519-verified").env_script == "~/aeneas-toolchain/env.sh"
     assert config.repo_named("pasta-pallas-verified").kind == "pasta_pallas"
