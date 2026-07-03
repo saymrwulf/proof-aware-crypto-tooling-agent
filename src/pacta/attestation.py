@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import RepoConfig
+from .signing import verify_attestation_signature
 from .yamlio import load_data
 
 
@@ -31,6 +32,8 @@ def validate_attestation(
     repo: RepoConfig,
     path: str | Path | None = None,
     trusted_provider: str | None = None,
+    public_key_path: str | Path | None = None,
+    allow_unsigned: bool = False,
 ) -> AttestationResult:
     provider = raw.get("provider")
     subject = raw.get("subject") or {}
@@ -61,8 +64,21 @@ def validate_attestation(
     signature = raw.get("signature") or {}
     environment = raw.get("environment") or {}
     signature_status = signature.get("status", "not_checked")
-    if signature_status not in {"verified", "not_implemented"}:
-        diagnostics.append(f"Attestation signature status is not acceptable for this prototype: {signature_status}")
+    if public_key_path:
+        ok, error = verify_attestation_signature(raw, public_key_path)
+        if ok:
+            signature_status = "verified"
+        else:
+            diagnostics.append(f"Attestation signature verification failed: {error}")
+    elif signature_status == "signed":
+        diagnostics.append("Signed attestation requires --attestation-public-key.")
+    elif signature_status == "not_implemented":
+        if allow_unsigned:
+            signature_status = "not_implemented"
+        else:
+            diagnostics.append("Unsigned attestation requires --allow-unsigned-attestation.")
+    elif signature_status != "verified":
+        diagnostics.append(f"Attestation signature status is not acceptable: {signature_status}")
 
     accepted = not diagnostics
     evidence = {
@@ -72,6 +88,8 @@ def validate_attestation(
         "attestation_signature_status": signature_status,
         "attestation_log_url": raw.get("log_url") or signature.get("log_url"),
         "attestation_issued_at": raw.get("issued_at"),
+        "check_log_path": (raw.get("replay") or {}).get("check_log_path"),
+        "axiom_log_path": (raw.get("replay") or {}).get("axiom_log_path"),
         "lean_version": environment.get("lean_version"),
         "lake_version": environment.get("lake_version"),
     }

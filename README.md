@@ -89,12 +89,42 @@ pacta agent --config examples/repos.yaml \
   --repo-name dalek-ed25519-verified \
   --attestation examples/dalek-ed25519.attestation.yaml \
   --trust-attestation-provider example-proof-checker.invalid \
+  --allow-unsigned-attestation \
   --action build-library
 ```
 
 This changes the trusted base. The agent is no longer trusting local Lean replay; it is trusting the proof-checking service, its environment, signing key custody, and log retention. Without an explicitly trusted provider, attestation evidence scores `R0`.
 
-The included `examples/dalek-ed25519.attestation.yaml` is a schema/demo fixture. A production service should publish verifiable signatures, transparency-log entries, and reproducible logs; the prototype records signature metadata but does not yet implement cryptographic signature verification.
+The included `examples/dalek-ed25519.attestation.yaml` is an unsigned schema/demo fixture and requires `--allow-unsigned-attestation`. Real provider certificates should be signed and consumed with `--attestation-public-key`.
+
+## Nested Proof-Check Provider
+
+This repository includes a nested provider prototype under `provider/`. It searches read-only under your home/GitClone tree for reusable Lean/Aeneas infrastructure, runs the proof replay, signs the result with OpenSSL Ed25519, and emits an attestation.
+
+```bash
+PYTHONPATH=src:provider/src python -m pacta_provider discover --root ~/GitClone
+PYTHONPATH=src:provider/src python -m pacta_provider init-key --key-dir provider/state/local-provider
+PYTHONPATH=src:provider/src python -m pacta_provider check \
+  --config examples/repos.yaml \
+  --repo-name dalek-ed25519-verified \
+  --repo repos/dalek-ed25519-verified \
+  --provider local-pacta-provider \
+  --private-key provider/state/local-provider/provider.ed25519.key \
+  --public-key provider/state/local-provider/provider.ed25519.pub \
+  --env-script /path/to/aeneas-toolchain/env.sh \
+  --lean-project-dir '$AENEAS_HOME/backends/lean' \
+  --out provider/out/dalek-ed25519.attestation.yaml
+
+pacta agent \
+  --config examples/repos.yaml \
+  --repo-name dalek-ed25519-verified \
+  --attestation provider/out/dalek-ed25519.attestation.yaml \
+  --trust-attestation-provider local-pacta-provider \
+  --attestation-public-key provider/state/local-provider/provider.ed25519.pub \
+  --action build-library
+```
+
+This is the intended trust transformation: local agents can avoid constructing the full verifier environment, but they must explicitly trust the provider identity and verification key.
 
 ## Truth Boundary
 

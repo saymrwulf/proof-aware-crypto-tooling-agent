@@ -4,6 +4,8 @@
 .pytest_cache/
 artifacts*/
 repos/
+provider/out/
+provider/state/
 __pycache__/
 *.py[cod]
 *.egg-info/

@@ -26,8 +26,8 @@ def test_parse_axiom_output_no_axioms_wording():
 
 def test_mac_safe_lean_command_is_argument_list():
     tools = LeanTools(lean="/usr/local/bin/lean", lake=None)
-    cmd = build_lean_invocation(Path("Proofs/A.lean"), tools, output_path=Path("Proofs/A.olean"))
-    assert cmd == ["/usr/local/bin/lean", "-o", "Proofs/A.olean", "Proofs/A.lean"]
+    cmd = build_lean_invocation(Path("Proofs/A.lean"), tools, output_path=Path("Proofs/A.olean"), root_path=Path("."))
+    assert cmd == ["/usr/local/bin/lean", "--root=.", "-o", "Proofs/A.olean", "Proofs/A.lean"]
     assert "timeout" not in cmd
     assert "taskset" not in cmd
     assert "free" not in cmd

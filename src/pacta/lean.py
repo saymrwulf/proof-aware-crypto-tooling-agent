@@ -98,8 +98,11 @@ def build_lean_invocation(
     tools: LeanTools,
     use_lake_env: bool = False,
     output_path: str | Path | None = None,
+    root_path: str | Path | None = None,
 ) -> list[str]:
     args = ["lean"]
+    if root_path is not None:
+        args.append(f"--root={root_path}")
     if output_path is not None:
         args.extend(["-o", str(output_path)])
     args.append(str(file_path))
@@ -163,7 +166,13 @@ def lean_check_files(
         log.write(f"env_script: {env_script or ''}\n")
         log.write(f"lean_project_dir: {project_dir or ''}\n\n")
         for path in files:
-            cmd = build_lean_invocation(path, tools, use_lake_env=use_lake_env, output_path=path.with_suffix(".olean"))
+            cmd = build_lean_invocation(
+                path,
+                tools,
+                use_lake_env=use_lake_env,
+                output_path=path.with_suffix(".olean"),
+                root_path=_lean_root_for_file(path, verification),
+            )
             log.write("$ " + " ".join(cmd) + "\n")
             try:
                 completed = subprocess.run(
@@ -326,6 +335,15 @@ def _log_file(log_dir: str | Path | None, name: str) -> Path:
     return directory / name
 
 
+def _lean_root_for_file(path: Path, verification_dir: Path) -> Path:
+    gen_dir = verification_dir / "gen"
+    try:
+        path.relative_to(gen_dir)
+        return gen_dir
+    except ValueError:
+        return verification_dir
+
+
 def _base_env(base_env: dict[str, str] | None, env_script: str | Path | None) -> dict[str, str]:
     env = dict(base_env or os.environ)
     if not env_script:
@@ -336,7 +354,7 @@ def _base_env(base_env: dict[str, str] | None, env_script: str | Path | None) ->
     command = f"source {shlex.quote(str(path))}; env"
     try:
         completed = subprocess.run(
-            ["/bin/zsh", "-lc", command],
+            ["/bin/bash", "-lc", command],
             check=False,
             capture_output=True,
             text=True,

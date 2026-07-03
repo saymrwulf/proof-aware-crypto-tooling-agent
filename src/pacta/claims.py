@@ -45,6 +45,7 @@ def build_claim_card(
     tools = detect_tools()
     certs = _certificate_claims(repo, axiom_audit, offline_fixture, attestation)
     scanned_files = layout.relative_files() if layout else []
+    attestation_evidence = attestation.evidence if attestation else {}
     card: dict[str, Any] = {
         "component": repo.name,
         "repo_url": repo.url,
@@ -59,13 +60,13 @@ def build_claim_card(
         "exclusions": profile.exclusions,
         "trusted_base": [*profile.trusted_base, *(attestation.trusted_base if attestation and attestation.accepted else [])],
         "evidence": {
-            "lean_version": tools.lean_version,
-            "lake_version": tools.lake_version,
-            "check_log_path": lean_check.log_path if lean_check else None,
-            "axiom_log_path": axiom_audit.log_path if axiom_audit else None,
+            "lean_version": attestation_evidence.get("lean_version") or tools.lean_version,
+            "lake_version": attestation_evidence.get("lake_version") or tools.lake_version,
+            "check_log_path": attestation_evidence.get("check_log_path") or (lean_check.log_path if lean_check else None),
+            "axiom_log_path": attestation_evidence.get("axiom_log_path") or (axiom_audit.log_path if axiom_audit else None),
             "replay_blockers": _replay_blockers(lean_check, axiom_audit, attestation),
             "scanned_files": scanned_files,
-            **(attestation.evidence if attestation else {"evidence_mode": "local_or_fixture"}),
+            **(attestation_evidence if attestation else {"evidence_mode": "local_or_fixture"}),
         },
         "risk": {
             "level": "R0",

@@ -104,6 +104,8 @@ def build_parser() -> argparse.ArgumentParser:
     claims.add_argument("--lean-project-dir")
     claims.add_argument("--attestation")
     claims.add_argument("--trust-attestation-provider")
+    claims.add_argument("--attestation-public-key")
+    claims.add_argument("--allow-unsigned-attestation", action="store_true")
     claims.set_defaults(func=cmd_claims)
 
     report = sub.add_parser("report", help="Generate a human-readable Markdown risk report.")
@@ -139,6 +141,8 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--lean-project-dir")
     agent.add_argument("--attestation")
     agent.add_argument("--trust-attestation-provider")
+    agent.add_argument("--attestation-public-key")
+    agent.add_argument("--allow-unsigned-attestation", action="store_true")
     agent.set_defaults(func=cmd_agent)
     return parser
 
@@ -445,4 +449,11 @@ def _attestation_for_args(args: argparse.Namespace, repo: RepoConfig):
     if not attestation_path:
         return None
     raw = load_attestation(attestation_path)
-    return validate_attestation(raw, repo, path=attestation_path, trusted_provider=getattr(args, "trust_attestation_provider", None))
+    return validate_attestation(
+        raw,
+        repo,
+        path=attestation_path,
+        trusted_provider=getattr(args, "trust_attestation_provider", None),
+        public_key_path=getattr(args, "attestation_public_key", None),
+        allow_unsigned=bool(getattr(args, "allow_unsigned_attestation", False)),
+    )
