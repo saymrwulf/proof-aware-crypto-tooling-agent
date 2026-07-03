@@ -1,0 +1,27 @@
+{
+  "component": "pasta-pallas-verified",
+  "repo_url": "https://github.com/saymrwulf/pasta-pallas-verified.git",
+  "local_path": "repos/pasta-pallas-verified",
+  "repo_commit": null,
+  "verification_dir": "verification",
+  "kind": "pasta_pallas",
+  "verified_backend": null,
+  "certificates": [],
+  "guarantees": ["Foundation evidence only unless aggregate certificates are present."],
+  "preconditions": ["Require add/mul/reduce/square/invert and aggregate fieldImplementation coverage."],
+  "exclusions": ["production-ready Pallas arithmetic unless add/mul/reduce/square/invert are proven"],
+  "trusted_base": [],
+  "evidence": {
+    "lean_version": null,
+    "lake_version": null,
+    "check_log_path": null,
+    "axiom_log_path": null,
+    "scanned_files": []
+  },
+  "risk": {
+    "level": "R2",
+    "rationale": "Foundation work without aggregate production field certificate.",
+    "blockers": ["No aggregate fieldImplementation-style certificate."],
+    "deployment_constraints": ["Do not classify as complete production field implementation."]
+  }
+}

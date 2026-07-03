@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from .config import RepoConfig
+from .lean import AxiomAuditResult, CertificateAxiomResult, LeanCheckResult, detect_tools
+from .manifest import VerificationLayout
+from .profiles import get_profile
+from .repo import git_commit
+from .risk import score_claim_card
+
+
+@dataclass(slots=True)
+class CertificateClaim:
+    name: str
+    status: str = "unknown"
+    axiom_status: str = "not_checked"
+    observed_axioms: list[str] = field(default_factory=list)
+    expected_axioms: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "status": self.status,
+            "axiom_status": self.axiom_status,
+            "observed_axioms": self.observed_axioms,
+            "expected_axioms": self.expected_axioms,
+        }
+
+
+def build_claim_card(
+    repo: RepoConfig,
+    local_path: str | Path,
+    layout: VerificationLayout | None = None,
+    lean_check: LeanCheckResult | None = None,
+    axiom_audit: AxiomAuditResult | None = None,
+    offline_fixture: bool = False,
+) -> dict[str, Any]:
+    path = Path(local_path)
+    profile = get_profile(repo.kind, repo)
+    tools = detect_tools()
+    certs = _certificate_claims(repo, axiom_audit, offline_fixture)
+    scanned_files = layout.relative_files() if layout else []
+    card: dict[str, Any] = {
+        "component": repo.name,
+        "repo_url": repo.url,
+        "local_path": str(path),
+        "repo_commit": None if offline_fixture else git_commit(path),
+        "verification_dir": repo.verification_dir,
+        "kind": repo.kind,
+        "verified_backend": repo.verified_backend,
+        "certificates": [cert.to_dict() for cert in certs],
+        "guarantees": profile.guarantees,
+        "preconditions": profile.preconditions,
+        "exclusions": profile.exclusions,
+        "trusted_base": profile.trusted_base,
+        "evidence": {
+            "lean_version": tools.lean_version,
+            "lake_version": tools.lake_version,
+            "check_log_path": lean_check.log_path if lean_check else None,
+            "axiom_log_path": axiom_audit.log_path if axiom_audit else None,
+            "scanned_files": scanned_files,
+        },
+        "risk": {
+            "level": "R0",
+            "rationale": "Not scored yet.",
+            "blockers": [],
+            "deployment_constraints": profile.deployment_constraints,
+        },
+        "meta": {
+            "profile_axiom_imports": profile.axiom_imports,
+            "what_would_invalidate_this_evidence": profile.invalidation_conditions,
+            "next_proof_milestones": profile.next_milestones,
+        },
+    }
+    assessment = score_claim_card(card)
+    card["risk"] = assessment.to_dict()
+    return card
+
+
+def _certificate_claims(
+    repo: RepoConfig,
+    axiom_audit: AxiomAuditResult | None,
+    offline_fixture: bool,
+) -> list[CertificateClaim]:
+    profile = get_profile(repo.kind, repo)
+    names = repo.certificates or profile.default_certificates
+    if axiom_audit:
+        by_name = {cert.name: cert for cert in axiom_audit.certificates}
+        return [_from_axiom_result(name, by_name.get(name), profile.expected_axioms) for name in names]
+    if offline_fixture:
+        return [
+            CertificateClaim(
+                name=name,
+                status="proven",
+                axiom_status="clean",
+                observed_axioms=list(profile.expected_axioms),
+                expected_axioms=list(profile.expected_axioms),
+            )
+            for name in names
+        ]
+    return [
+        CertificateClaim(
+            name=name,
+            status="unknown",
+            axiom_status="not_checked",
+            observed_axioms=[],
+            expected_axioms=list(profile.expected_axioms),
+        )
+        for name in names
+    ]
+
+
+def _from_axiom_result(name: str, result: CertificateAxiomResult | None, expected_axioms: list[str]) -> CertificateClaim:
+    if not result:
+        return CertificateClaim(name=name, status="missing", axiom_status="not_checked", expected_axioms=expected_axioms)
+    return CertificateClaim(
+        name=name,
+        status=result.status,
+        axiom_status=result.axiom_status,
+        observed_axioms=result.observed_axioms,
+        expected_axioms=result.expected_axioms,
+    )

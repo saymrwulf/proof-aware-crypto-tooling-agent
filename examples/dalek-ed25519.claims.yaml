@@ -1,0 +1,42 @@
+{
+  "component": "dalek-ed25519-verified",
+  "repo_url": "https://github.com/saymrwulf/dalek-ed25519-verified.git",
+  "local_path": "repos/dalek-ed25519-verified",
+  "repo_commit": null,
+  "verification_dir": "verification",
+  "kind": "ed25519",
+  "verified_backend": "serial/u64",
+  "certificates": [
+    {
+      "name": "CurveFieldProofs.fieldImplementation",
+      "status": "proven",
+      "axiom_status": "clean",
+      "observed_axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "expected_axioms": ["propext", "Classical.choice", "Quot.sound"]
+    },
+    {
+      "name": "CurveFieldProofs.edwardsImplementation",
+      "status": "proven",
+      "axiom_status": "clean",
+      "observed_axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "expected_axioms": ["propext", "Classical.choice", "Quot.sound"]
+    }
+  ],
+  "guarantees": [],
+  "preconditions": [],
+  "exclusions": ["full EdDSA verification", "side-channel resistance"],
+  "trusted_base": [],
+  "evidence": {
+    "lean_version": null,
+    "lake_version": null,
+    "check_log_path": null,
+    "axiom_log_path": null,
+    "scanned_files": []
+  },
+  "risk": {
+    "level": "R3",
+    "rationale": "Example fixture for lower-layer arithmetic evidence.",
+    "blockers": [],
+    "deployment_constraints": ["Use verified serial/u64 backend only."]
+  }
+}

@@ -1,0 +1,68 @@
+repos:
+  - name: dalek-ed25519-verified
+    url: https://github.com/saymrwulf/dalek-ed25519-verified.git
+    kind: ed25519
+    verification_dir: verification
+    verified_backend: serial/u64
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+    expected_axioms:
+      - propext
+      - Classical.choice
+      - Quot.sound
+    known_exclusions:
+      - full EdDSA verification
+      - Scalar52 arithmetic completeness
+      - SHA-512
+      - encoding/canonicality unless separately proven
+      - side-channel resistance
+      - compiler correctness
+      - SIMD/AVX/accelerator paths
+
+  - name: anza-ed25519-verified
+    url: https://github.com/saymrwulf/anza-ed25519-verified.git
+    kind: ed25519
+    verification_dir: verification
+    verified_backend: serial/u64
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+    expected_axioms:
+      - propext
+      - Classical.choice
+      - Quot.sound
+    known_exclusions:
+      - Solana runtime semantics
+      - Solana transaction construction
+      - full EdDSA verification unless separately proven
+      - accelerator paths
+
+  - name: risc0-ed25519-verified
+    url: https://github.com/saymrwulf/risc0-ed25519-verified.git
+    kind: ed25519
+    verification_dir: verification
+    verified_backend: serial/u64
+    backend_warning: pure Rust path only; do not treat zkVM accelerator/syscall path as verified
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+
+  - name: betrusted-ed25519-verified
+    url: https://github.com/saymrwulf/betrusted-ed25519-verified.git
+    kind: ed25519
+    verification_dir: verification
+    verified_backend: serial/u64
+    backend_warning: pure Rust path only; do not treat Engine25519/hardware accelerator as verified
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+
+  - name: pasta-pallas-verified
+    url: https://github.com/saymrwulf/pasta-pallas-verified.git
+    kind: pasta_pallas
+    verification_dir: verification
+    known_status: foundation only unless aggregate field certificate is present
+    known_exclusions:
+      - full fieldImplementation certificate unless present and axiom-clean
+      - production-ready Pallas arithmetic unless add/mul/reduce/square/invert are proven

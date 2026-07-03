@@ -1,0 +1,10 @@
+.venv/
+.pacta/
+.pacta-*/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.lake/
+*.olean
+*.ilean
