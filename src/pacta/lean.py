@@ -270,7 +270,15 @@ def run_axiom_audit(
     with tempfile.TemporaryDirectory(prefix="pacta-axioms-") as tmp:
         audit_file = Path(tmp) / "AxiomAudit.lean"
         audit_file.write_text(f"{imports_text}\n\n{prints_text}\n", encoding="utf-8")
-        cmd = build_lean_invocation(audit_file, tools, use_lake_env=use_lake_env, lean_guard=lean_guard)
+        cmd = build_lean_invocation(
+            audit_file,
+            tools,
+            use_lake_env=use_lake_env,
+            lean_guard=lean_guard,
+            # the audit file lives in a temp dir outside the toolchain root;
+            # --root makes lean accept it (guard mode forwards the flag).
+            root_path=audit_file.parent,
+        )
         try:
             completed = subprocess.run(
                 cmd,
@@ -316,8 +324,12 @@ def parse_axiom_output(output: str, certificates: list[str]) -> dict[str, list[s
         for i, line in enumerate(lines):
             if cert not in line:
                 continue
-            window = "\n".join(lines[i : i + 4])
-            bracket = re.search(r"\[([^\]]*)\]", window)
+            # Lean wraps long axiom lists (the apex tiers carry 11 axioms)
+            # across many lines; take a window wide enough for the largest
+            # documented boundary and flatten it before matching, the same
+            # move the corpus' check scripts make (tr '\n' ' ').
+            window = "\n".join(lines[i : i + 16])
+            bracket = re.search(r"\[([^\]]*)\]", window, re.DOTALL)
             if bracket:
                 cert_results = [item.strip() for item in bracket.group(1).split(",") if item.strip()]
                 break
