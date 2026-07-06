@@ -1831,6 +1831,22 @@ COURSE = {
             ),
             md(
                 """
+                ## Dogfood in BOTH directions
+
+                Since this lecture was first written the loop closed on the
+                provider's side too: the binary gained a `sign` mode, so the
+                transparency log's tree heads are now SIGNED by the merkleized
+                library - and before every signature the provider runs the same
+                Merkle inclusion check an agent runs, on its own signing library's
+                leaf, against the very tree it is about to sign. The verdict is
+                embedded in the signature block (`signing_provenance`: backend,
+                library commit, leaf index, `self_inclusion: verified`,
+                certificates 16/16). Lectures 6a/6b walk both sides of this.
+                Honesty note unchanged: the library's VERIFY path is
+                certificate-covered; the signing path is declared trusted base -
+                but it is the attested artifact, not an un-attested third
+                implementation.
+
                 ## The post-quantum line, held honestly
 
                 The dogfood loop deliberately does NOT extend to ML-DSA. There is no formally verified ML-DSA implementation in this corpus, and pretending otherwise would poison the whole posture. The hybrid strategy is therefore asymmetric on purpose:
@@ -2010,6 +2026,7 @@ The course teaches:
 - proof hygiene,
 - third-party proof-check provider trust,
 - RFC 9162-style Merkle transparency logs,
+- the mirrored provider/agent domain split (6a: one provider builds and dogfood-signs the log; 6b: many agents verify inclusion in ~25 lines, no Lean),
 - receipt-gated agent consequences (including the R4 wallet gate, now reachable),
 - split-view defense: STH pinning, consistency enforcement, freshness, monitoring,
 - dogfood verified cryptography and the honest hybrid post-quantum posture,

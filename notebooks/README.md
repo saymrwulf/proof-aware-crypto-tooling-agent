@@ -12,6 +12,7 @@ The course teaches:
 - proof hygiene,
 - third-party proof-check provider trust,
 - RFC 9162-style Merkle transparency logs,
+- the mirrored provider/agent domain split (6a: one provider builds and dogfood-signs the log; 6b: many agents verify inclusion in ~25 lines, no Lean),
 - receipt-gated agent consequences (including the R4 wallet gate, now reachable),
 - split-view defense: STH pinning, consistency enforcement, freshness, monitoring,
 - dogfood verified cryptography and the honest hybrid post-quantum posture,
