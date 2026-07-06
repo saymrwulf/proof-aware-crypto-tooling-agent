@@ -84,7 +84,7 @@ COURSE = {
                 - Implement and verify RFC 9162-style Merkle inclusion and consistency proofs.
                 - Explain why Signed Tree Heads need accountable signatures, why Ed25519 is useful here, and why ML-DSA requires a real backend.
                 - Design policy gates that convert verification evidence into consequences.
-                - Write a research plan for moving from R3 lower-layer arithmetic evidence toward R4/R5 production assurance.
+                - Read R4 four-tier apex evidence, name its residual blockers, and write a research plan toward R5 production assurance.
                 """
             ),
             md(
@@ -146,7 +146,15 @@ COURSE = {
                    Connect evidence to action: build a lower-layer Rust capsule only when policy gates pass.
 
                 8. `08_capstone_research_program.ipynb`
-                   Design a PhD-level roadmap for closing the gaps from R3 toward R4/R5.
+                   Design a PhD-level roadmap for closing the gaps from R4 toward R5.
+
+                9. `09_dogfood_verified_crypto.ipynb`
+
+                   Eat your own dogfood: run the agent's own signature checks through the proven code path, and hold the post-quantum line honestly.
+
+                ## The Ratchet Rule
+
+                This course follows the same didactic contract as its companion book (*Verifying Cryptography with Lean 4*): **every load-bearing idea is worked at least twice** - once at napkin scale (trees of three leaves, toy claim cards you can score in your head) and once at real scale (the shipped R4 claim cards, real receipts, the real proven-path verifier), with nothing hidden in between. The napkin run teaches the moves; the real-size run proves the moves are the whole story. If a step ever feels like a leap, back up one cell: the smaller rung is there.
                 """
             ),
             md(
@@ -209,7 +217,7 @@ COURSE = {
 
                 For selected curve25519-dalek / Solana-Ed25519-family Rust code paths already transpiled into Lean, the verified repositories contain Lean-checked certificates for field arithmetic over `F_p`, `p = 2^255 - 19`, and complete twisted Edwards point-operation laws, under explicit invariants and backend constraints.
 
-                That is valuable. It is also not a full wallet proof, not full EdDSA verification, and not a proof of all Solana transaction behavior.
+                That is valuable. And since 2026-07-06 the corpus goes much further: all four ed25519 repositories carry a FOUR-TIER signature apex, button-enforced per fork, up to the full lift - the extracted verifier accepts iff the signature's R decompresses to a valid on-curve point equal to [k](-A)+[s]B. What it is still NOT: a wallet proof, a proof of SHA-512, a proof of the wire parsers (their outcomes are hypotheses), a signing-side proof, or a proof of all Solana transaction behavior. Naming both lists - what is proven and what is not - is the entire discipline of this course.
                 """
             ),
             md(
@@ -339,7 +347,7 @@ COURSE = {
                 - `R4`: End-to-end primitive proof covers public API, parsing/encoding, scalar arithmetic, hashing interface, signature equation, rejection rules, and implementation boundary.
                 - `R5`: R4 plus reproducible production builds, compiler/build assurance, side-channel analysis, hardware/KMS/MPC integration, and operational controls.
 
-                The expected first milestone for Ed25519 field plus Edwards arithmetic is R3 if certificates compile and the axiom audit is clean.
+                Ed25519 field plus Edwards arithmetic alone reaches R3. Since the corpus completed its four-tier signature apex (2026-07-06), the FULL configured certificate set - arithmetic, scalars, encoding/decoding, and the four apex tiers, each with its axiom cone pinned to the fork's documented boundary - reaches **R4**, always with explicit residual blockers (the SHA-512 oracle, hypothesis-parametric wire parses, translation faithfulness, and the missing side-channel/build assurance that gates R5).
                 """
             ),
             code(
@@ -398,7 +406,46 @@ COURSE = {
                 - `observed_axioms`: axioms reported by Lean.
                 - `expected_axioms`: allowed standard axioms for this profile.
 
-                A clean R3 result requires more than a theorem name. It requires a successful replay or trusted attestation, an expected axiom set, and no policy-blocking exclusions.
+                A clean result requires more than a theorem name. It requires a successful replay or trusted attestation, the RIGHT axiom set per certificate (standard-three below the apex, the fork's documented boundary at the apex tiers - deviation in either direction is dirty), and no policy-blocking exclusions.
+
+                ### The ratchet, run both ways
+
+                First the napkin: a two-certificate card you can score in your head. Then the real thing: the shipped R4 fixture with sixteen certificates and per-tier boundary axioms.
+                """
+            ),
+            code(
+                """
+                # NAPKIN: an arithmetic-only card. Two certificates, standard axioms.
+                from pacta.risk import score_claim_card
+
+                napkin_card = {
+                    "kind": "ed25519",
+                    "certificates": [
+                        {"name": "CurveFieldProofs.fieldImplementation", "status": "proven", "axiom_status": "clean"},
+                        {"name": "CurveFieldProofs.edwardsImplementation", "status": "proven", "axiom_status": "clean"},
+                    ],
+                    "exclusions": ["full EdDSA signature verification"],
+                    "meta": {"r4_requirements": []},
+                }
+                napkin = score_claim_card(napkin_card)
+                print(napkin.level, "-", napkin.rationale)
+                """
+            ),
+            code(
+                """
+                # REAL: the shipped R4 fixture - sixteen certificates, apex tiers carrying
+                # the dalek fork's documented boundary axioms. Same scoring function.
+                from pacta.yamlio import load_data
+
+                real_card = load_data(repo_root / "examples" / "dalek-ed25519.claims.yaml")
+                real = score_claim_card(real_card)
+                print(real.level)
+                print(real.rationale[:180], "...")
+                print("residual blockers:")
+                for blocker in real.blockers:
+                    print(" -", blocker)
+                apex = [c for c in real_card["certificates"] if c["name"].endswith("_decompress")][0]
+                print("full-lift tier expects:", apex["expected_axioms"])
                 """
             ),
             code(
@@ -965,12 +1012,55 @@ COURSE = {
             ),
             md(
                 """
+                ## Split Views: why a receipt is not enough
+
+                Everything above verifies ONE receipt against ONE signed tree head. A malicious provider can maintain TWO trees - one shown to you, one shown to the world - and both views verify perfectly in isolation. This is EQUIVOCATION, and the defense is memory: pin every tree head you accept, and demand that every later tree head be CONSISTENT with your pin (same size -> same root; larger size -> a verified consistency proof from your pinned size; smaller size -> rollback, reject forever).
+
+                pacta implements this as a local STH pin store. Run the whole attack and its detection, napkin-size:
+                """
+            ),
+            code(
+                """
+                # NAPKIN: pin a 2-leaf view, then let the log grow honestly - and then
+                # let a SPLIT VIEW present a different root at the pinned size.
+                import tempfile
+                from pathlib import Path as _P
+                from pacta.sthstore import check_sth_against_store
+                from pacta.transparency import consistency_proof, merkle_root, proof_to_hex
+
+                honest = [b"attestation-A", b"attestation-B", b"attestation-C"]
+                evil = [b"attestation-A", b"attestation-EVIL", b"attestation-C"]
+
+                with tempfile.TemporaryDirectory() as tmp:
+                    store = _P(tmp) / "sth-store.json"
+                    sth = lambda size, leaves: {
+                        "log_id": "demo-log", "tree_size": size,
+                        "root_hash": merkle_root(leaves[:size]).hex(),
+                        "timestamp": "2026-07-06T00:00:00Z",
+                    }
+                    print("pin:     ", check_sth_against_store(sth(2, honest), store).diagnostics[0])
+                    grown = check_sth_against_store(
+                        sth(3, honest), store,
+                        consistency_proof_hex=proof_to_hex(consistency_proof(honest, 2)),
+                    )
+                    print("grow:    ", grown.diagnostics[0])
+                    attack = check_sth_against_store(sth(3, evil), store)
+                    print("attack ok?", attack.ok)
+                    print("verdict: ", attack.diagnostics[0][:120], "...")
+                """
+            ),
+            md(
+                """
+                At real scale the same check runs on every `pacta receipt-verify --sth-store ...` and `pacta agent --sth-store ...` invocation; receipts embed a consistency anchor from the previous tree size, the provider serves proofs from arbitrary pinned sizes (`pacta_provider log-consistency --from-size N`), and `pacta_provider log-audit` is the monitor's self-check. A freshness policy (`--max-sth-age-seconds`) closes the stale-root hole: an old-but-valid tree head could hide later entries.
+
                 ## Exercises
 
                 - Tamper with one leaf and show that inclusion verification fails.
                 - Explain why the tree head signature must cover tree size as well as root hash.
+                - Napkin, then real: run the split-view drill above; then initialize a real provider log (`pacta_provider log-init`), append two attestations, and verify the second receipt with `--sth-store` - watch the pin advance with a verified consistency proof.
+                - Why must the consistency anchor's ROOT (not just its size) be checked against the pin? Construct the lie that a size-only check would miss.
                 - Write a policy for when an autonomous agent should require `both` signatures.
-                - Research checkpoint: compare PACTA's local prototype to production Certificate Transparency monitor/gossip requirements.
+                - Research checkpoint: compare PACTA's pin store to production Certificate Transparency monitor/gossip requirements - what does gossip add that a single pin store cannot?
                 """
             ),
         ]
@@ -992,6 +1082,7 @@ COURSE = {
                 - Run a dry-run agent action.
                 - Understand the generated Rust capsule.
                 - Explain why R3 permits lower-layer use but denies wallet demos.
+                - Run the gate both ways: a partial (arithmetic-only) card is denied; the full four-tier card is allowed.
                 - Connect transparency receipts to build authorization.
                 """
             ),
@@ -1002,7 +1093,7 @@ COURSE = {
                 Current actions:
 
                 - `build-library`: default threshold R3. Produces a proof-gated component capsule.
-                - `build-wallet-demo`: threshold R4. Writes a denial artifact below R4.
+                - `build-wallet-demo`: threshold R4. Writes a denial artifact below R4 - and since the corpus completed its four-tier apex, R4 evidence EXISTS, so this gate can now legitimately open. Watch it swing both ways below.
 
                 This is deliberately conservative. The theorem boundary for Ed25519 field plus Edwards arithmetic is valuable, but it does not cover key custody, encoding, hashing, scalar arithmetic completeness, signature verification, transaction construction, or market decisions.
                 """
@@ -1028,6 +1119,50 @@ COURSE = {
                 wallet_decision = run_agent_action(card, "build-wallet-demo", repo_root / "artifacts-notebook", dry_run=True)
                 print(library_decision.to_dict())
                 print(wallet_decision.to_dict())
+                """
+            ),
+            code(
+                """
+                # NAPKIN: an arithmetic-only card faces the wallet gate - DENIED.
+                from pathlib import Path
+                import sys, tempfile
+
+                repo_root = Path.cwd()
+                if not (repo_root / "src" / "pacta").exists():
+                    repo_root = repo_root.parent
+                sys.path.insert(0, str(repo_root / "src"))
+
+                from pacta.agent import run_agent_action
+                from pacta.risk import score_claim_card
+
+                partial = {
+                    "component": "napkin-arithmetic-only",
+                    "kind": "ed25519",
+                    "certificates": [
+                        {"name": "CurveFieldProofs.fieldImplementation", "status": "proven", "axiom_status": "clean"},
+                        {"name": "CurveFieldProofs.edwardsImplementation", "status": "proven", "axiom_status": "clean"},
+                    ],
+                    "exclusions": ["full EdDSA signature verification"],
+                    "meta": {"r4_requirements": []},
+                }
+                partial["risk"] = score_claim_card(partial).to_dict()
+                with tempfile.TemporaryDirectory() as tmp:
+                    decision = run_agent_action(partial, "build-wallet-demo", tmp, dry_run=True)
+                    print("allowed:", decision.allowed, "at", decision.risk_level)
+                    print(decision.rationale)
+                """
+            ),
+            code(
+                """
+                # REAL: the shipped four-tier R4 card faces the same gate - ALLOWED
+                # (a demo scaffold only; the residual blockers ride along in the card).
+                from pacta.yamlio import load_data
+
+                full = load_data(repo_root / "examples" / "dalek-ed25519.claims.yaml")
+                with tempfile.TemporaryDirectory() as tmp:
+                    decision = run_agent_action(full, "build-wallet-demo", tmp, dry_run=True)
+                    print("allowed:", decision.allowed, "at", decision.risk_level)
+                    print(decision.rationale)
                 """
             ),
             md(
@@ -1108,6 +1243,133 @@ COURSE = {
             ),
         ]
     ),
+    "09_dogfood_verified_crypto.ipynb": notebook(
+        [
+            md(
+                """
+                # Lecture 9: Eat Your Own Dogfood - Verified Crypto in the Agent's Own Loop
+
+                Every lecture so far had the agent consume EVIDENCE about a verified Ed25519 implementation while checking that evidence's signatures with OpenSSL - an unverified implementation of the very primitive the evidence is about. That is a defensible bootstrap, but it leaves an ironic gap. This lecture closes it: pacta can build a verifier binary from the PINNED, PROVEN source workspace - the exact commit the dalek certificates pin, serial backend pinned exactly as the verified extraction pins it - and route its own signature checks through it.
+                """
+            ),
+            md(
+                """
+                ## Learning Objectives
+
+                - State precisely which parts of the dogfood verifier are certificate-covered and which are its trusted base.
+                - Extract a raw Ed25519 key from an OpenSSL PEM by hand (napkin) and mechanically (real).
+                - Demonstrate backend dispatch and the fail-closed `--require-verified-verifier` policy.
+                - Defend the hybrid post-quantum posture: one proven-classical signature plus one required-but-honest ML-DSA slot.
+                """
+            ),
+            md(
+                """
+                ## What "verified" means here - the honest ledger
+
+                The binary calls `ed25519_dalek::VerifyingKey::verify` in the pinned workspace. The certificates cover `verify_sha512`, the extraction-refactored image of that same path (the delta is the documented hash-wrapper refactor in the pinned source). Certificate-covered: field arithmetic, the group law, scalars, encoding/decoding, constructive decompression, and the four-tier acceptance criterion. Trusted base: SHA-512 (an oracle in the theorems - the proofs hold for whatever bytes it produces), roughly fifteen lines of wire glue, rustc, and the extraction pipeline. The provenance sidecar written at build time records the source commit, the backend cfg, and this exact coverage note - the dogfood claim is itself a claim card.
+                """
+            ),
+            md(
+                """
+                ## Napkin: read a PEM with your eyes
+
+                An OpenSSL Ed25519 public key PEM is a base64-wrapped DER SubjectPublicKeyInfo (RFC 8410), and for this one algorithm the DER is FIXED: twelve prefix bytes `302a300506032b6570032100`, then the raw 32-byte key. Decode one by hand:
+                """
+            ),
+            code(
+                """
+                from pathlib import Path
+                import base64, subprocess, sys, tempfile
+
+                repo_root = Path.cwd()
+                if not (repo_root / "src" / "pacta").exists():
+                    repo_root = repo_root.parent
+                sys.path.insert(0, str(repo_root / "src"))
+
+                from pacta.signing import generate_ed25519_keypair
+
+                tmp = Path(tempfile.mkdtemp(prefix="dogfood-lecture-"))
+                generate_ed25519_keypair(tmp / "k.key", tmp / "k.pub")
+                pem = (tmp / "k.pub").read_text()
+                print(pem)
+                body = "".join(line for line in pem.splitlines() if "-----" not in line)
+                der = base64.b64decode(body)
+                print("DER length:", len(der), "(should be 12 + 32 = 44)")
+                print("prefix:    ", der[:12].hex(), "(the fixed Ed25519 SPKI header)")
+                print("raw key:   ", der[12:].hex())
+                """
+            ),
+            code(
+                """
+                # REAL: the same extraction, mechanically, with validation - and the
+                # dispatch that prefers the proven-path binary when it exists.
+                from pacta.dogfood import locate_verifier, pem_public_key_to_raw
+                from pacta.signing import sign_payload_ed25519, verify_payload_ed25519_detailed
+
+                raw = pem_public_key_to_raw(tmp / "k.pub")
+                assert raw == der[12:]
+                print("mechanical extraction matches the napkin:", raw.hex()[:16], "...")
+
+                payload = b"the agent checks its own evidence"
+                signature = sign_payload_ed25519(payload, tmp / "k.key")
+                ok, error, backend = verify_payload_ed25519_detailed(payload, signature, tmp / "k.pub")
+                print("valid:", ok, "| backend:", backend)
+                binary = locate_verifier()
+                print("dogfood binary:", binary or "not built (OpenSSL fallback in effect - a recorded downgrade)")
+                """
+            ),
+            md(
+                """
+                Build the proven-path verifier once per machine (it needs a local checkout of the pinned source workspace and cargo):
+
+                ```bash
+                pacta dogfood-build --source ~/GitClone/FormalVerification/sources/curve25519-dalek-source
+                pacta dogfood-status
+                ```
+
+                With the binary in place, every receipt and attestation check reports `ed25519_backend: verified-dalek-serial`, and policies can DEMAND it:
+
+                ```bash
+                pacta receipt-verify ... --require-verified-verifier   # fails closed on OpenSSL fallback
+                pacta agent ... --require-verified-verifier ...
+                ```
+                """
+            ),
+            md(
+                """
+                ## The post-quantum line, held honestly
+
+                The dogfood loop deliberately does NOT extend to ML-DSA. There is no formally verified ML-DSA implementation in this corpus, and pretending otherwise would poison the whole posture. The hybrid strategy is therefore asymmetric on purpose:
+
+                - **Ed25519 (classical): proven path.** The signature everyone can check today runs on certificate-covered code.
+                - **ML-DSA-65 (post-quantum): required, honest, unavailable-until-real.** The tree-head slot exists in every signed structure; `--require-signatures both` fails CLOSED on hosts without a real FIPS 204 backend; and when a real backend lands, the policy flips on without a schema change.
+
+                A migration strategy that records "we cannot do this yet" as a deployment blocker is strictly stronger than one that ships a placeholder. Blockers get fixed; placeholders get trusted.
+                """
+            ),
+            code(
+                """
+                from pacta.postquantum import detect_ml_dsa
+
+                capability = detect_ml_dsa()
+                print("ml-dsa available:", capability.available)
+                print("reason:", capability.reason)
+                print("slot as recorded in every STH:", capability.to_signature_slot())
+                """
+            ),
+            md(
+                """
+                ## Exercises
+
+                - Flip one byte of a signature and verify through both backends; confirm both reject and that the BACKEND that rejected is recorded.
+                - The dogfood binary's trusted base includes rustc. The certificates' trusted base includes Charon/Aeneas. Draw the two trust diagrams side by side; which assumptions are shared?
+                - Napkin, then real: decode a second PEM by hand; then corrupt its DER prefix and confirm `pem_public_key_to_raw` rejects it.
+                - Policy design: when should an agent REFUSE to fall back to OpenSSL? Write the deployment rule and its recovery path.
+                - Research checkpoint: what would a proof-carrying SHA-512 change about the coverage note in the provenance sidecar?
+                """
+            ),
+        ]
+    ),
     "08_capstone_research_program.ipynb": notebook(
         [
             md(
@@ -1130,20 +1392,16 @@ COURSE = {
             ),
             md(
                 """
-                ## From R3 to R4
+                ## R4, achieved - read it like an auditor
 
-                R3 is lower-layer implementation evidence. Moving toward R4 requires end-to-end primitive coverage:
+                When this course was first drafted, R4 was the roadmap. The corpus then delivered it (2026-07-06): scalar arithmetic, encoding/decoding canonicality, constructive decompression, and the four-tier signature apex, every certificate's axiom cone pinned to its documented boundary by each repository's own check script. The composition lesson stands: the hard part was never one theorem - it was composing coverage without smuggling assumptions, which is why the apex tiers are hypothesis-parametric (parser outcomes stay hypotheses) and why the boundary is enforced per certificate, in both directions.
 
-                - public API boundary,
-                - parsing and encoding,
-                - canonicality and rejection rules,
-                - scalar arithmetic,
-                - hash interface,
-                - signature equation,
-                - implementation boundary,
-                - connection from theorem names to actual deployed code paths.
+                Your first capstone exercise is therefore no longer "design R4" but "audit R4": take the shipped claim card, list what each of the four tiers states, and name the exact residual trusted base. Then design the discharge plan:
 
-                The hard part is not one theorem. The hard part is composing theorem coverage without smuggling in unreviewed assumptions.
+                - byte-level specs for the wire parsers and legacy filters (turn the parse hypotheses into theorems),
+                - a verified SHA-512 or a proof-carrying hash oracle (shrink the boundary),
+                - signing-side coverage (nonce derivation, signer correctness),
+                - the production-path mapping per fork (anza's default verify() is NOT the verified path - what would it take to cover it?).
                 """
             ),
             md(
@@ -1258,8 +1516,10 @@ The course teaches:
 - proof hygiene,
 - third-party proof-check provider trust,
 - RFC 9162-style Merkle transparency logs,
-- receipt-gated agent consequences,
-- research roadmaps from R3 evidence toward R4/R5 assurance.
+- receipt-gated agent consequences (including the R4 wallet gate, now reachable),
+- split-view defense: STH pinning, consistency enforcement, freshness, monitoring,
+- dogfood verified cryptography and the honest hybrid post-quantum posture,
+- research roadmaps from R4 evidence toward R5 assurance.
 
 This curriculum is not financial advice, not a trading bot, and not a wallet-building guide. It is a training path for engineers and researchers who need to evaluate formal-verification-enhanced cryptographic tooling without overclaiming.
 """

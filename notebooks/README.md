@@ -12,7 +12,9 @@ The course teaches:
 - proof hygiene,
 - third-party proof-check provider trust,
 - RFC 9162-style Merkle transparency logs,
-- receipt-gated agent consequences,
-- research roadmaps from R3 evidence toward R4/R5 assurance.
+- receipt-gated agent consequences (including the R4 wallet gate, now reachable),
+- split-view defense: STH pinning, consistency enforcement, freshness, monitoring,
+- dogfood verified cryptography and the honest hybrid post-quantum posture,
+- research roadmaps from R4 evidence toward R5 assurance.
 
 This curriculum is not financial advice, not a trading bot, and not a wallet-building guide. It is a training path for engineers and researchers who need to evaluate formal-verification-enhanced cryptographic tooling without overclaiming.
