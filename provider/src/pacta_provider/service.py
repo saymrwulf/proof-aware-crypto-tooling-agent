@@ -76,7 +76,9 @@ def build_attestation(
         "provider": provider,
         "issued_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "machine_protection": {
-            "lean_guard": lean_guard or "UNGUARDED",
+            # privacy: record the guard REPO-RELATIVE - attestations are
+            # published leaves and must not leak provider-machine paths.
+            "lean_guard": (str(Path(lean_guard).relative_to(path.resolve())) if lean_guard and Path(lean_guard).is_relative_to(path.resolve()) else ("configured" if lean_guard else "UNGUARDED")),
             "note": "All Lean compiles route through the repo's lean-guard (memory cap, core pinning, timeout, single-flight lock) when configured.",
         },
         "subject": {
@@ -91,7 +93,9 @@ def build_attestation(
             "lean_version": lean_version,
             "lake_version": lake_version,
             "env_script": str(env_script or repo.env_script or ""),
-            "lean_project_dir": str(project_dir or lean_project_dir or repo.lean_project_dir or ""),
+            # privacy: record the CONFIGURED value (env-var form), never the
+            # machine-resolved absolute path - attestations are published.
+            "lean_project_dir": str(lean_project_dir or repo.lean_project_dir or ""),
         },
         "replay": {
             "check_attempted": check.attempted,

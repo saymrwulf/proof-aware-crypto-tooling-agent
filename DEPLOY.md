@@ -1,8 +1,9 @@
 # Deploying the online log at zkdefi.org/lean-transparency-log
 
-Everything below is prepared to run on the DigitalOcean host (the one
-running Forgejo). Nothing here needs to run on the development machine —
-this file is the checklist for the server session.
+Checklist for the server session. Deliberately generic about the host:
+this file is public, so it names only what customers must know anyway
+(the service URL) and standard software layouts - no provider inventory,
+no credentials, nothing an attacker couldn't already get from public DNS.
 
 ## What gets deployed
 
@@ -72,31 +73,51 @@ curl -s http://127.0.0.1:8461/lean-transparency-log/healthz
 
 ## 3. Reverse proxy on zkdefi.org
 
-nginx (add inside the existing zkdefi.org server block, alongside Forgejo):
+Caddy (inside the existing `zkdefi.org` site block):
 
-```nginx
-location /lean-transparency-log/ {
-    proxy_pass http://127.0.0.1:8461/lean-transparency-log/;
-    proxy_set_header Host $host;
-}
-location = /lean-transparency-log {
-    return 301 /lean-transparency-log/docs;
+```caddy
+redir /lean-transparency-log /lean-transparency-log/docs
+route /lean-transparency-log/* {
+    reverse_proxy 127.0.0.1:8461 {
+        transport http {
+            response_header_timeout 15s
+        }
+    }
 }
 ```
 
-(Caddy equivalent: `handle_path` not needed — `reverse_proxy 127.0.0.1:8461`
-under `route /lean-transparency-log*`.)
+nginx equivalent, with basic rate limiting (the backend is a stdlib
+threading server - let the proxy absorb abuse):
+
+```nginx
+limit_req_zone $binary_remote_addr zone=pactalog:1m rate=20r/s;
+location /lean-transparency-log/ {
+    limit_req zone=pactalog burst=40 nodelay;
+    proxy_read_timeout 15s;
+    proxy_pass http://127.0.0.1:8461/lean-transparency-log/;
+    proxy_set_header Host $host;
+}
+location = /lean-transparency-log { return 301 /lean-transparency-log/docs; }
+```
 
 Check: `https://zkdefi.org/lean-transparency-log/docs` renders the customer
 documentation; `/v1/sth` returns the dogfood-signed head.
 
-## 4. Forgejo mirror
+## 4. Second mirror (any Forgejo/Gitea/GitLab you operate)
 
-In Forgejo: create migration/mirror of
-`https://github.com/saymrwulf/lean-transparency-log` (and optionally the
-pacta repo) with periodic sync. The published repo is the witness channel;
-having it on BOTH GitHub and Forgejo means witnesses on two independent
-hosts — exactly the point.
+Create a periodic pull-mirror of
+`https://github.com/saymrwulf/lean-transparency-log` on a second,
+independently-operated git host. The published repo is the witness
+channel; two independent mirrors mean split-view lies must fool two
+infrastructures at once — exactly the point.
+
+## 4b. Key hygiene (non-negotiable)
+
+The provider SIGNING key never touches this server. The service is
+read-only by construction and the systemd unit mounts the tree read-only;
+keep it that way. If the box is ever compromised, rotate nothing —
+there is nothing to rotate here; verify the published mirror with
+`verify.py --all` and redeploy.
 
 ## 5. Update cycle (provider machine → world)
 
@@ -106,7 +127,7 @@ After each new proof-check run on the provider machine:
 pacta_provider log-append ...                      # signs new head (offline, dogfood)
 pacta_provider log-publish --log-dir ... --git-dir <clone of lean-transparency-log> \
     --public-key provider/state/local-provider/provider.ed25519.pub
-cd <clone> && git add -A && git commit -m "log update" && git push   # GitHub + Forgejo sync
+cd <clone> && git add -A && git commit -m "log update" && git push   # mirrors sync from here
 # on the server: cd /srv/pacta/published && git pull && re-run step 1's reconstruction
 sudo systemctl restart pacta-log
 ```
