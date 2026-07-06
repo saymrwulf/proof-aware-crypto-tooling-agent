@@ -1,0 +1,340 @@
+{
+  "certificates": [
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.fieldImplementation",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.edwardsImplementation",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "ScalarProofs.scalarImplementation",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.verify_loop_full",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.to_bytes_spec",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.ed_compress_spec",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "ScalarProofs.from_bytes_mod_order_wide_spec",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.vartime_dsm_basepoint_spec",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.enc_point_inj",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.sqrt_ratio_i_sq_spec",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.from_bytes_spec",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "CurveFieldProofs.decompress_of_canonical",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "name": "CurveFieldProofs.verify_accepts_iff",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "name": "CurveFieldProofs.verify_accepts_iff_point",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "name": "CurveFieldProofs.verify_accepts_iff_point_eq",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "status": "proven"
+    },
+    {
+      "axiom_status": "clean",
+      "diagnostics": [],
+      "expected_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "name": "CurveFieldProofs.verify_accepts_iff_decompress",
+      "observed_axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound",
+        "ed25519.Signature",
+        "verifying.sha512_hash3",
+        "ed25519.Signature.to_bytes",
+        "signature.error.Error",
+        "signature.error.Error.new"
+      ],
+      "status": "proven"
+    }
+  ],
+  "environment": {
+    "env_script": "~/aeneas-toolchain/env.sh",
+    "lake_version": "Lake version 5.0.0-src+3dc1a08 (Lean version 4.30.0-rc2)",
+    "lean_project_dir": "/home/oho/aeneas-toolchain/aeneas/backends/lean",
+    "lean_version": "Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)"
+  },
+  "issued_at": "2026-07-06T12:51:28Z",
+  "machine_protection": {
+    "lean_guard": "/home/oho/GitClone/Claude/FormalVerification/betrusted-ed25519-verified/verification/lean-guard",
+    "note": "All Lean compiles route through the repo's lean-guard (memory cap, core pinning, timeout, single-flight lock) when configured."
+  },
+  "provider": "local-pacta-provider",
+  "replay": {
+    "axiom_attempted": true,
+    "axiom_diagnostics": [],
+    "axiom_log_path": "provider/out/logs/axiom-audit.log",
+    "axiom_ok": true,
+    "check_attempted": true,
+    "check_log_path": "provider/out/logs/lean-check.log",
+    "check_ok": true,
+    "checked_files": 63,
+    "diagnostics": [],
+    "failed_files": []
+  },
+  "schema_version": 1,
+  "signature": {
+    "payload_digest_sha256": "bb1226fa66ae0e51677ccc8c8361ba121ac5464911f1cb9e305ff7c76b7d2c57",
+    "public_key_fingerprint_sha256": "874c8a008a607021528b2493fa1caf059f9d5c123d29193dfabc09a6d1e7a56a",
+    "scheme": "openssl-ed25519",
+    "signature_base64": "Lsxje95BPXHfc7l3wxQrRvDgG/5tb7WNaO3wIDsfY/xg/WYRDFrWF3Bb6frs0Dmln00QxA99Gt43PMxLUHq0Ag==",
+    "status": "signed"
+  },
+  "subject": {
+    "component": "betrusted-ed25519-verified",
+    "kind": "ed25519",
+    "repo_commit": "81f614a3cbd26412c6af7f0a31c0f128121fbfa4",
+    "repo_url": "https://github.com/saymrwulf/betrusted-ed25519-verified.git",
+    "verification_dir": "verification",
+    "verified_backend": "serial/u64"
+  }
+}

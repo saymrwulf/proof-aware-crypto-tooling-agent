@@ -1,0 +1,47 @@
+{
+  "hash_algorithm": "RFC9162_SHA256",
+  "inclusion_proof": [
+    "33523f3ea6b6eab72696eead8534d0b7cac78feb60cc3907ac973a24f37adb95",
+    "3bb1e72abbc9c0b945dafde303acdab123996e41faeab49a35563886b1b41e96",
+    "04541cffd46cf5a97d7453ed8ae681b1a1fedb879eb8c7a262e05b3176159eed"
+  ],
+  "leaf_hash": "ca164b6cf11aec6a4c8de2d18c2c2fa04c9323657bd7daf4e7111869201bfec2",
+  "leaf_index": 4,
+  "log_id": "205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7",
+  "schema_version": 1,
+  "sth": {
+    "hash_algorithm": "RFC9162_SHA256",
+    "log_id": "205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7",
+    "root_hash": "9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283",
+    "schema_version": 1,
+    "signatures": {
+      "ed25519": {
+        "payload_digest_sha256": "c9a3c000d448ebd35e313fac0c9ce0e1dc88ff03540b0828e5246407c75e2a1a",
+        "public_key_fingerprint_sha256": "874c8a008a607021528b2493fa1caf059f9d5c123d29193dfabc09a6d1e7a56a",
+        "scheme": "openssl-ed25519",
+        "signature_base64": "P8M4gjB7BCZblUvRtvJnbjfaTYKU4oO0/2LZwzpHIgp9fmOXGZqkqi7UaP5Fn1Kx4+RJSgyI2nnnK1pLpkV8CQ==",
+        "signing_backend": "verified-dalek-serial",
+        "signing_provenance": {
+          "self_inclusion": "verified",
+          "signing_backend": "verified-dalek-serial",
+          "signing_library_certificates_proven": "16/16",
+          "signing_library_component": "dalek-ed25519-verified",
+          "signing_library_leaf_index": 4,
+          "signing_library_source_commit": "aa0f6abc327ba2a54a534b21608ca8996cf73682"
+        },
+        "status": "signed"
+      },
+      "ml_dsa": {
+        "reason": "A backend appears available, but no ML-DSA signing key was configured for this log.",
+        "scheme": "ML-DSA-65",
+        "standard": "FIPS 204",
+        "status": "not_configured"
+      }
+    },
+    "timestamp": "2026-07-06T13:59:16Z",
+    "tree_size": 8,
+    "type": "pacta.transparency.signed_tree_head.v1"
+  },
+  "tree_size": 8,
+  "type": "pacta.transparency.receipt.v1"
+}
