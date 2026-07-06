@@ -7,6 +7,7 @@ repos:
     apex_boundary: dalek-wrappers
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
+    lean_guard: verification/lean-guard
     known_exclusions:
       - SHA-512 implementation (opaque oracle in the apex theorems)
       - wire parser/filter byte-level specs (hypothesis-parametric)
@@ -23,6 +24,7 @@ repos:
     apex_boundary: anza
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
+    lean_guard: verification/lean-guard
     backend_warning: verified entry point is verify_sha512 = verify_dalek (canonical-R incl. legacy filters); the crate's default HEEA/Zebra verify() is a DIFFERENT acceptance criterion and is not covered
     known_exclusions:
       - Solana runtime semantics
@@ -38,6 +40,7 @@ repos:
     apex_boundary: hash3
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
+    lean_guard: verification/lean-guard
     backend_warning: pure Rust path only; do not treat zkVM accelerator/syscall path as verified
 
   - name: betrusted-ed25519-verified
@@ -48,6 +51,7 @@ repos:
     apex_boundary: hash3
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
+    lean_guard: verification/lean-guard
     backend_warning: pure Rust path only; do not treat Engine25519/hardware accelerator as verified
 
   - name: pasta-pallas-verified
@@ -56,6 +60,7 @@ repos:
     verification_dir: verification
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
+    lean_guard: verification/lean-guard
     known_status: foundation only unless aggregate field certificate is present
     known_exclusions:
       - full fieldImplementation certificate unless present and axiom-clean

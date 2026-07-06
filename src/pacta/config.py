@@ -27,6 +27,7 @@ class RepoConfig:
     certificate_axioms: dict[str, list[str]] = field(default_factory=dict)
     env_script: str | None = None
     lean_project_dir: str | None = None
+    lean_guard: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "RepoConfig":
@@ -51,6 +52,7 @@ class RepoConfig:
             },
             env_script=raw.get("env_script"),
             lean_project_dir=raw.get("lean_project_dir"),
+            lean_guard=raw.get("lean_guard"),
         )
 
 

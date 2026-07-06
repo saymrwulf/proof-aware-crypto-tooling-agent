@@ -11,7 +11,7 @@ from pacta.config import RepoConfig
 from pacta.lean import LeanCheckResult, build_lean_env, detect_tools, lean_check_files, resolve_lean_project_dir, run_axiom_audit
 from pacta.manifest import discover_layout
 from pacta.profiles import get_profile
-from pacta.repo import git_commit
+from pacta.repo import git_commit, resolve_lean_guard
 from pacta.signing import sign_attestation
 
 
@@ -29,6 +29,7 @@ def build_attestation(
     path = Path(repo_path)
     profile = get_profile(repo.kind, repo)
     layout = discover_layout(path, repo.verification_dir)
+    lean_guard = resolve_lean_guard(repo.lean_guard, path)
     check = lean_check_files(
         layout.compile_order,
         layout.verification_dir,
@@ -36,6 +37,7 @@ def build_attestation(
         log_dir=log_dir,
         env_script=env_script or repo.env_script,
         lean_project_dir=lean_project_dir or repo.lean_project_dir,
+        lean_guard=lean_guard,
     )
     axiom = None
     if check.attempted and check.ok:
@@ -49,6 +51,7 @@ def build_attestation(
             env_script=env_script or repo.env_script,
             lean_project_dir=lean_project_dir or repo.lean_project_dir,
             certificate_axioms=profile.certificate_axioms,
+            lean_guard=lean_guard,
         )
         certs = [
             {
@@ -72,6 +75,10 @@ def build_attestation(
         "schema_version": 1,
         "provider": provider,
         "issued_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "machine_protection": {
+            "lean_guard": lean_guard or "UNGUARDED",
+            "note": "All Lean compiles route through the repo's lean-guard (memory cap, core pinning, timeout, single-flight lock) when configured.",
+        },
         "subject": {
             "component": repo.name,
             "repo_url": repo.url,

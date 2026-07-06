@@ -99,7 +99,23 @@ def build_lean_invocation(
     use_lake_env: bool = False,
     output_path: str | Path | None = None,
     root_path: str | Path | None = None,
+    lean_guard: str | Path | None = None,
 ) -> list[str]:
+    if lean_guard:
+        # MACHINE PROTECTION: route the compile through the repo's lean-guard
+        # (hard memory cap via systemd scope + lean -M, core pinning, timeout,
+        # single-flight lock, free-RAM preflight with a retry ladder). The
+        # guard replaces the bare `lean` binary entirely and computes its own
+        # olean output path; caps are tuned via LEAN_MEM_MB, LEAN_MIN_FREE_MB,
+        # LEAN_MEM_WAIT_SEC, LEAN_TIMEOUT, LEAN_MAX_CORES in the environment.
+        guarded = [str(lean_guard), str(file_path)]
+        if root_path is not None:
+            # lean-guard forwards extra args to lean after the file; --root
+            # lets absolute file paths live outside the toolchain project dir.
+            guarded.append(f"--root={root_path}")
+        if use_lake_env and tools.lake:
+            return [tools.lake, "env", *guarded]
+        return guarded
     args = ["lean"]
     if root_path is not None:
         args.append(f"--root={root_path}")
@@ -120,6 +136,7 @@ def lean_check_files(
     log_dir: str | Path | None = None,
     env_script: str | Path | None = None,
     lean_project_dir: str | Path | None = None,
+    lean_guard: str | Path | None = None,
 ) -> LeanCheckResult:
     if not files:
         return LeanCheckResult(
@@ -172,6 +189,7 @@ def lean_check_files(
                 use_lake_env=use_lake_env,
                 output_path=path.with_suffix(".olean"),
                 root_path=_lean_root_for_file(path, verification),
+                lean_guard=lean_guard,
             )
             log.write("$ " + " ".join(cmd) + "\n")
             try:
@@ -218,6 +236,7 @@ def run_axiom_audit(
     env_script: str | Path | None = None,
     lean_project_dir: str | Path | None = None,
     certificate_axioms: dict[str, list[str]] | None = None,
+    lean_guard: str | Path | None = None,
 ) -> AxiomAuditResult:
     expected = expected_axioms or STANDARD_LEAN_AXIOMS
     per_cert = certificate_axioms or {}
@@ -251,7 +270,7 @@ def run_axiom_audit(
     with tempfile.TemporaryDirectory(prefix="pacta-axioms-") as tmp:
         audit_file = Path(tmp) / "AxiomAudit.lean"
         audit_file.write_text(f"{imports_text}\n\n{prints_text}\n", encoding="utf-8")
-        cmd = build_lean_invocation(audit_file, tools, use_lake_env=use_lake_env)
+        cmd = build_lean_invocation(audit_file, tools, use_lake_env=use_lake_env, lean_guard=lean_guard)
         try:
             completed = subprocess.run(
                 cmd,

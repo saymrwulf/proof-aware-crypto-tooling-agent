@@ -37,6 +37,17 @@ def status_for(repo: RepoConfig, base_dir: str | Path = "repos", explicit_path: 
     )
 
 
+def resolve_lean_guard(lean_guard: str | None, repo_path: str | Path) -> str | None:
+    """Resolve a repo-relative lean-guard path; None when unset or missing
+    (callers then run unguarded, which is only acceptable for tiny fixtures)."""
+    if not lean_guard:
+        return None
+    candidate = Path(lean_guard).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path(repo_path) / candidate
+    return str(candidate.resolve()) if candidate.exists() else None
+
+
 def git_commit(path: str | Path) -> str | None:
     git = shutil.which("git")
     if not git:
