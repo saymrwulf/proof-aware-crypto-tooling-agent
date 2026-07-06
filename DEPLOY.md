@@ -10,7 +10,7 @@ software layouts - no provider inventory, no credentials.
 The target host runs a compose stack; the LTL joined it as a read-only
 container instead of the host-systemd variant below:
 
-- app + published-log clones + reconstructed log dir under the compose
+- app (git clone of the now-public pacta repo) + published-log clone + reconstructed log dir under the compose
   project directory (`ltl/app`, `ltl/published`, `ltl/log`);
 - compose service: `python:3.12-alpine`, `read_only: true`, both volumes
   mounted `:ro`, NO published ports (reachable only on the compose
@@ -38,9 +38,9 @@ Update runbook (after each new proof-check run on the provider machine):
 pacta_provider log-append ...        # sign new head (offline, dogfood)
 pacta_provider log-publish --log-dir ... --git-dir <mirror clone> --public-key <pub>
 cd <mirror clone> && git add -A && git commit -m "log update" && git push
-tar czf /tmp/pacta-app.tgz --exclude=.git --exclude='provider/state' --exclude='provider/out'     --exclude='dogfood/state' --exclude='dogfood/*/target' --exclude='.venv'     --exclude='__pycache__' --exclude='artifacts*' --exclude='repos' .   # only when app code changed
-scp /tmp/pacta-app.tgz zkdefi-ltl:<compose-dir>/ltl/
-ssh zkdefi-ltl 'cd <compose-dir>/ltl && (cd published && git pull) && \
+# both app/ and published/ on the server are git clones of the now-public repos,
+# so the server-side update is pure git pull (no code shipping):
+ssh zkdefi-ltl 'cd <compose-dir>/ltl && (cd app && git pull -q) && (cd published && git pull -q) && \
   python3 reconstruct.py && cd .. && sudo docker compose restart ltl'
 ```
 
