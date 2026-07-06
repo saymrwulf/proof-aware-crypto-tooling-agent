@@ -1,0 +1,291 @@
+<title>warden — verified-custody wallet</title>
+<style>
+  :root{
+    --bg:#0b0e13; --panel:#111621; --panel2:#0d121b; --rule:#1e2635;
+    --ink:#e8ecf3; --muted:#8a93a5; --faint:#5c6576;
+    --proof:#5fd39b;      /* custody-grade / verified */
+    --proof-dim:#2c6b50;
+    --trust:#e0a458;      /* trusted base / honesty */
+    --alarm:#e0637a;      /* tamper / latch */
+    --wire:#6ea8ff;       /* links, data */
+    --mono:"SF Mono",ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:
+    radial-gradient(1100px 620px at 78% -8%, #15243a 0%, rgba(21,36,58,0) 60%),
+    radial-gradient(900px 520px at 5% 4%, #131a26 0%, rgba(19,26,38,0) 55%),
+    var(--bg);
+    color:var(--ink);font-family:var(--sans);line-height:1.62;
+    font-size:17px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:74rem;margin:0 auto;padding:clamp(2rem,5vw,4.5rem) clamp(1.1rem,4vw,2.5rem) 5rem}
+  a{color:var(--wire);text-decoration:none}
+  a:hover{text-decoration:underline}
+  h1,h2,h3{letter-spacing:-.02em;line-height:1.1;text-wrap:balance;margin:0}
+  code,.mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.28em;text-transform:uppercase;
+    color:var(--proof);margin:0 0 1.3rem}
+  /* hero */
+  .hero h1{font-size:clamp(2.5rem,6.5vw,4.6rem);font-weight:800}
+  .hero .lede{font-size:clamp(1.15rem,2.4vw,1.5rem);color:var(--ink);max-width:40ch;margin:1.4rem 0 0;font-weight:450}
+  .hero .sub{color:var(--muted);max-width:58ch;margin:1.1rem 0 0}
+  .apex{font-family:var(--mono);font-size:clamp(.82rem,1.9vw,1.05rem);color:var(--proof);
+    background:var(--panel2);border:1px solid var(--rule);border-left:3px solid var(--proof);
+    border-radius:9px;padding:1rem 1.15rem;margin:2.2rem 0 0;overflow-x:auto;white-space:nowrap}
+  .apex .m{color:var(--muted)}
+  .metastrip{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.9rem 0 0}
+  .chip{font-family:var(--mono);font-size:.72rem;letter-spacing:.02em;color:var(--muted);
+    border:1px solid var(--rule);border-radius:999px;padding:.32rem .72rem;background:#0e131d}
+  .chip b{color:var(--proof);font-weight:600}
+  .rule{height:1px;background:linear-gradient(90deg,var(--rule),transparent);margin:3.4rem 0}
+  section>h2{font-size:clamp(1.5rem,3vw,2.05rem);font-weight:750}
+  section>.kicker{font-family:var(--mono);font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--faint);margin:0 0 .7rem}
+  section>p.intro{color:var(--muted);max-width:64ch;margin:.7rem 0 0}
+  /* posture table */
+  .posture{margin:2rem 0 0;border:1px solid var(--rule);border-radius:13px;overflow:hidden;background:var(--panel)}
+  .prow{display:grid;grid-template-columns:1.5fr 1fr;gap:1rem;padding:.95rem 1.25rem;border-top:1px solid var(--rule);align-items:center}
+  .prow:first-child{border-top:0;background:#0d121b}
+  .prow .surface{font-weight:550}
+  .prow .surface small{display:block;color:var(--faint);font-weight:400;font-size:.8rem;margin-top:.15rem;font-family:var(--mono)}
+  .grade{font-family:var(--mono);font-size:.76rem;letter-spacing:.02em;justify-self:start;padding:.28rem .66rem;border-radius:7px;white-space:nowrap}
+  .g-custody{color:var(--proof);background:rgba(95,211,155,.09);border:1px solid var(--proof-dim)}
+  .g-trust{color:var(--trust);background:rgba(224,164,88,.09);border:1px solid #6c5228}
+  .g-out{color:var(--muted);background:#0e131d;border:1px solid var(--rule)}
+  .g-closed{color:var(--alarm);background:rgba(224,99,122,.08);border:1px solid #6b2f3a}
+  /* diagram */
+  .diagram{margin:2.2rem 0 0;background:var(--panel2);border:1px solid var(--rule);border-radius:13px;padding:1.4rem 1rem}
+  .diagram svg{width:100%;height:auto;display:block}
+  .caption{color:var(--faint);font-size:.85rem;text-align:center;margin:.9rem 0 0;font-family:var(--mono)}
+  /* products */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.15rem;margin:2rem 0 0}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}.prow{grid-template-columns:1fr;gap:.5rem}}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:1.5rem 1.5rem 1.35rem;
+    display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent,var(--proof))}
+  .card .no{font-family:var(--mono);font-size:.74rem;color:var(--faint);letter-spacing:.05em}
+  .card h3{font-size:1.32rem;margin:.5rem 0 0;font-weight:700}
+  .card h3 .em{color:var(--accent,var(--proof))}
+  .card .role{color:var(--muted);font-size:.92rem;margin:.7rem 0 0;flex:0 0 auto}
+  .card .scifi{margin:1.05rem 0 0;padding:.85rem 1rem;background:var(--panel2);border-radius:9px;
+    border:1px solid var(--rule);font-size:.9rem;color:var(--ink)}
+  .card .scifi b{color:var(--accent,var(--proof));font-weight:600;font-style:italic}
+  .card ul{margin:1.05rem 0 0;padding:0;list-style:none;font-size:.86rem}
+  .card li{position:relative;padding:.2rem 0 .2rem 1.2rem;color:var(--muted)}
+  .card li::before{content:"";position:absolute;left:0;top:.72rem;width:6px;height:6px;border-radius:50%;background:var(--accent,var(--proof))}
+  .card .status{margin-top:1.1rem;font-family:var(--mono);font-size:.72rem;letter-spacing:.02em;color:var(--faint)}
+  .card .status .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:.4rem;vertical-align:middle}
+  .live .dot{background:var(--proof);box-shadow:0 0 0 3px rgba(95,211,155,.15)}
+  .scaffold .dot{background:var(--trust);box-shadow:0 0 0 3px rgba(224,164,88,.13)}
+  /* honesty */
+  .honesty{margin:2rem 0 0;border:1px solid #4a3a1e;background:linear-gradient(180deg,rgba(224,164,88,.05),rgba(224,164,88,.01));
+    border-radius:13px;padding:1.5rem 1.6rem}
+  .honesty h2{color:var(--trust)}
+  .honesty ul{margin:1.1rem 0 0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.6rem}
+  @media(max-width:760px){.honesty ul{grid-template-columns:1fr}}
+  .honesty li{padding-left:1.5rem;position:relative;font-size:.9rem;color:var(--muted)}
+  .honesty li::before{content:"→";position:absolute;left:0;color:var(--trust)}
+  .honesty li b{color:var(--ink);font-weight:600}
+  /* footer */
+  .foot{margin-top:3.6rem;padding-top:1.6rem;border-top:1px solid var(--rule);
+    display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;align-items:center;color:var(--faint);font-size:.82rem;font-family:var(--mono)}
+  .foot a{color:var(--muted)}
+  .verified-seal{display:inline-flex;align-items:center;gap:.5rem;color:var(--proof);
+    border:1px solid var(--proof-dim);border-radius:999px;padding:.3rem .8rem;font-size:.74rem;font-family:var(--mono)}
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">warden · a pacta product</p>
+    <h1>Custody that checks its own math.</h1>
+    <p class="lede">A verified-custody Ed25519 wallet whose trust boundary is a quorum of four <em>independently proven</em> curve25519-dalek forks.</p>
+    <p class="sub">Inbound acceptance requires all four to agree. Every outbound signature must pass the same quorum — a firewall — before it is released. Because each fork is proven to decide the same equation, a disagreement isn't an opinion. It's a caught fault.</p>
+    <div class="apex">accept(A,m,R,s) <span class="m">&nbsp;⇔&nbsp;</span> decompress(R) = [k](−A) + [s]B</div>
+    <div class="metastrip">
+      <span class="chip"><b>4</b>&nbsp; proven forks</span>
+      <span class="chip"><b>R4</b>&nbsp; end-to-end coverage gate</span>
+      <span class="chip"><b>RFC 9162</b>&nbsp; transparency-logged evidence</span>
+      <span class="chip"><b>MCP</b>&nbsp; agent-native surface</span>
+      <span class="chip"><b>83</b>&nbsp; tests green</span>
+    </div>
+  </header>
+
+  <div class="rule"></div>
+
+  <section>
+    <p class="kicker">The trust posture — read before trusting it</p>
+    <h2>Strongest exactly where custody needs it. Honest everywhere else.</h2>
+    <p class="intro">The whole design is an asymmetry: the decision of whether an inbound authorization is <em>real</em> stands on machine-checked proofs; the weaker outbound edge is fenced by the same quorum acting as a firewall, and named as trusted base rather than dressed up.</p>
+    <div class="posture">
+      <div class="prow">
+        <div class="surface">Inbound verification<small>quorum of certificate-covered verify paths</small></div>
+        <div><span class="grade g-custody">custody-grade · proven</span></div>
+      </div>
+      <div class="prow">
+        <div class="surface">Outbound firewall<small>verify-after-sign, same quorum</small></div>
+        <div><span class="grade g-custody">custody-grade · proven</span></div>
+      </div>
+      <div class="prow">
+        <div class="surface">Outbound signing itself<small>the attested artifact, not a third implementation</small></div>
+        <div><span class="grade g-trust">trusted base · fenced</span></div>
+      </div>
+      <div class="prow">
+        <div class="surface">SHA-512 · wire parsers<small>oracle / hypotheses inside the theorems</small></div>
+        <div><span class="grade g-out">documented boundary</span></div>
+      </div>
+      <div class="prow">
+        <div class="surface">ML-DSA · post-quantum<small>no proven implementation exists</small></div>
+        <div><span class="grade g-closed">fail-closed</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="rule"></div>
+
+  <section>
+    <p class="kicker">How the boundary works</p>
+    <h2>Four proofs vote. Unanimity releases. Dissent latches.</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Signing request flows through intent binding, signer, then a four-member quorum firewall; unanimity releases, dissent quarantines and latches.">
+        <defs>
+          <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#6ea8ff"/>
+          </marker>
+          <marker id="arg" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#5fd39b"/>
+          </marker>
+          <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#e0637a"/>
+          </marker>
+        </defs>
+        <!-- stages -->
+        <g font-family="var(--mono)" font-size="13">
+          <rect x="18" y="118" width="118" height="64" rx="9" fill="#0d121b" stroke="#2a3346"/>
+          <text x="77" y="145" text-anchor="middle" fill="#e8ecf3">intent</text>
+          <text x="77" y="164" text-anchor="middle" fill="#5c6576" font-size="11">purpose+bytes</text>
+
+          <rect x="176" y="118" width="118" height="64" rx="9" fill="#0d121b" stroke="#2a3346"/>
+          <text x="235" y="145" text-anchor="middle" fill="#e8ecf3">sign</text>
+          <text x="235" y="164" text-anchor="middle" fill="#e0a458" font-size="11">trusted base</text>
+
+          <!-- quorum firewall -->
+          <rect x="352" y="42" width="228" height="216" rx="13" fill="#101725" stroke="#2c6b50"/>
+          <text x="466" y="70" text-anchor="middle" fill="#5fd39b" font-size="12" letter-spacing="1.5">QUORUM FIREWALL</text>
+          <g>
+            <rect x="372" y="86" width="88" height="34" rx="7" fill="#0d121b" stroke="#2c6b50"/>
+            <text x="416" y="108" text-anchor="middle" fill="#e8ecf3" font-size="12">dalek</text>
+            <rect x="472" y="86" width="88" height="34" rx="7" fill="#0d121b" stroke="#2c6b50"/>
+            <text x="516" y="108" text-anchor="middle" fill="#e8ecf3" font-size="12">anza</text>
+            <rect x="372" y="128" width="88" height="34" rx="7" fill="#0d121b" stroke="#2c6b50"/>
+            <text x="416" y="150" text-anchor="middle" fill="#e8ecf3" font-size="12">risc0</text>
+            <rect x="472" y="128" width="88" height="34" rx="7" fill="#0d121b" stroke="#2c6b50"/>
+            <text x="516" y="150" text-anchor="middle" fill="#e8ecf3" font-size="12">betrusted</text>
+          </g>
+          <text x="466" y="188" text-anchor="middle" fill="#8a93a5" font-size="11">all proven to decide the</text>
+          <text x="466" y="204" text-anchor="middle" fill="#8a93a5" font-size="11">same accept() predicate</text>
+          <text x="466" y="234" text-anchor="middle" fill="#5fd39b" font-size="12">unanimity required</text>
+
+          <!-- outcomes -->
+          <rect x="640" y="70" width="230" height="58" rx="9" fill="#0d1a14" stroke="#2c6b50"/>
+          <text x="755" y="94" text-anchor="middle" fill="#5fd39b" font-size="13">RELEASE</text>
+          <text x="755" y="113" text-anchor="middle" fill="#8a93a5" font-size="11">signature + quorum trail → ledger</text>
+
+          <rect x="640" y="172" width="230" height="58" rx="9" fill="#1a0e12" stroke="#6b2f3a"/>
+          <text x="755" y="196" text-anchor="middle" fill="#e0637a" font-size="13">QUARANTINE + LATCH</text>
+          <text x="755" y="215" text-anchor="middle" fill="#8a93a5" font-size="11">never returned · custody frozen</text>
+        </g>
+        <!-- flows -->
+        <line x1="136" y1="150" x2="170" y2="150" stroke="#6ea8ff" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="294" y1="150" x2="346" y2="150" stroke="#6ea8ff" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M580,120 C610,110 615,100 634,99" fill="none" stroke="#5fd39b" stroke-width="2" marker-end="url(#arg)"/>
+        <path d="M580,180 C610,190 615,200 634,201" fill="none" stroke="#e0637a" stroke-width="2" marker-end="url(#arr)"/>
+      </svg>
+      <p class="caption">intent → sign → firewall → release &nbsp;·&nbsp; a signature the wallet's own signer produced, rejected by the wallet's own quorum, never reaches the chain</p>
+    </div>
+  </section>
+
+  <div class="rule"></div>
+
+  <section>
+    <p class="kicker">The lineup</p>
+    <h2>One core. Four deployment profiles.</h2>
+    <p class="intro">Same tested core — quorum boundary, signing firewall, hash-chained ledger, MCP surface — wired into four situations. The trust posture above holds for all four without exception. What changes is where the boundary sits and what it's plugged into.</p>
+
+    <div class="grid">
+      <article class="card" style="--accent:#5fd39b">
+        <span class="no">01 · warden-solo</span>
+        <h3>The <span class="em">custody sidecar</span></h3>
+        <p class="role">For a single autonomous agent that owns a wallet and must not sign anything it would regret. Local signer, quorum firewall on every outbound, MCP next to the agent.</p>
+        <div class="scifi"><b>The agent gets a conscience it cannot bribe.</b> Refusal receipts make it portable — when warden says no, the agent can prove to its principal exactly what was refused, and why.</div>
+        <ul>
+          <li>local dogfood signer</li>
+          <li>intent-bound outbound + firewall</li>
+          <li>signed, machine-actionable refusals</li>
+        </ul>
+        <p class="status live"><span class="dot"></span>LIVE — the tested default path</p>
+      </article>
+
+      <article class="card" style="--accent:#6ea8ff">
+        <span class="no">02 · warden-airgap</span>
+        <h3>The <span class="em">signing firewall</span> for hardware</h3>
+        <p class="role">For custody where the key never touches the networked host — a Precursor/Betrusted device, an HSM, a phone in a drawer. Seed stays across the gap; the returned signature still faces the quorum.</p>
+        <div class="scifi"><b>Verify-after-sign, but the verifier is proven.</b> A glitched or substituted device signature is quarantined and latches custody — it never reaches the chain.</div>
+        <ul>
+          <li>outbox/inbox gap protocol</li>
+          <li>fault-injection countermeasure, machine-checked</li>
+          <li>leans on the proven betrusted fork</li>
+        </ul>
+        <p class="status live"><span class="dot"></span>LIVE — two-file exchange, park-then-complete tested</p>
+      </article>
+
+      <article class="card" style="--accent:#c88bff">
+        <span class="no">03 · warden-treasury</span>
+        <h3>Trust-minimized <span class="em">chain watching</span></h3>
+        <p class="role">For an agent that must believe on-chain state without trusting an RPC provider's word. Re-verify the signatures on treasury transactions with Solana's own proven verify path.</p>
+        <div class="scifi"><b>The treasury trusts mathematics, not middlemen.</b> A lying RPC can withhold data but cannot manufacture a signature the quorum will accept.</div>
+        <ul>
+          <li>anza member re-verifies locally</li>
+          <li>RPC demoted from oracle to bandwidth</li>
+          <li>observation-not-verdict, applied to chain data</li>
+        </ul>
+        <p class="status scaffold"><span class="dot"></span>PRODUCT-READY — one integration point: a tx adapter</p>
+      </article>
+
+      <article class="card" style="--accent:#e0a458">
+        <span class="no">04 · warden-choir</span>
+        <h3>Cross-witnessed <span class="em">custody</span></h3>
+        <p class="role">For operators who want no single warden able to rewrite its own history unobserved. N wardens gossip and countersign each other's ledger heads — the transparency-log witness pattern, turned inward.</p>
+        <div class="scifi"><b>A wallet that keeps the others honest.</b> Equivocation would have to survive every peer's memory of a countersigned head.</div>
+        <ul>
+          <li>hash-chained ledgers already exportable</li>
+          <li>heads carried in the posture attestation</li>
+          <li>custody becomes its own little transparency log</li>
+        </ul>
+        <p class="status scaffold"><span class="dot"></span>PRODUCT-READY — one net-new component: gossip transport</p>
+      </article>
+    </div>
+  </section>
+
+  <div class="rule"></div>
+
+  <section class="honesty">
+    <p class="kicker" style="color:var(--trust)">The part most products hide</p>
+    <h2>What a warden signature does <em>not</em> prove.</h2>
+    <ul>
+      <li><b>Signing is trusted base.</b> The proofs cover verification; the signing step is the attested artifact, fenced by the firewall — not a theorem.</li>
+      <li><b>SHA-512 is an oracle.</b> The apex theorems hold for whatever bytes the hash produces; the hash itself is unverified.</li>
+      <li><b>Wire parsers are hypotheses.</b> Byte-level parser specifications are not yet certified.</li>
+      <li><b>No reproducible builds, no side channels.</b> Those are the R5 frontier, and warden does not claim them.</li>
+      <li><b>ML-DSA fails closed.</b> There is no proven post-quantum implementation to put in the slot, so it reports unavailable rather than pretending.</li>
+      <li><b>Profiles 3 &amp; 4 name their one wire.</b> Product-ready on the tested core, each with exactly one documented integration point — stated, not blurred.</li>
+    </ul>
+  </section>
+
+  <div class="foot">
+    <span class="verified-seal">◆ evidence: <a href="https://ltl.zkdefi.org">ltl.zkdefi.org</a></span>
+    <span>the four forks' proofs are replay-attested in a public RFC 9162 log</span>
+    <span>· <a href="https://ltl.zkdefi.org/paper">the paper</a></span>
+    <span>· built on Fable 5</span>
+  </div>
+
+</div>
