@@ -58,22 +58,27 @@ def sign_attestation(attestation: dict[str, Any], private_key_path: str | Path, 
 
 
 def verify_attestation_signature(attestation: dict[str, Any], public_key_path: str | Path) -> tuple[bool, str | None]:
+    ok, error, _backend = verify_attestation_signature_detailed(attestation, public_key_path)
+    return ok, error
+
+
+def verify_attestation_signature_detailed(attestation: dict[str, Any], public_key_path: str | Path) -> tuple[bool, str | None, str]:
     signature = attestation.get("signature") or {}
     if signature.get("scheme") != "openssl-ed25519":
-        return False, f"Unsupported attestation signature scheme: {signature.get('scheme')}"
+        return False, f"Unsupported attestation signature scheme: {signature.get('scheme')}", "none"
     encoded = signature.get("signature_base64")
     if not encoded:
-        return False, "Attestation signature is missing signature_base64."
+        return False, "Attestation signature is missing signature_base64.", "none"
     expected_digest = signature.get("payload_digest_sha256")
     actual_digest = payload_digest(attestation)
     if expected_digest and expected_digest != actual_digest:
-        return False, "Attestation payload digest does not match signature metadata."
+        return False, "Attestation payload digest does not match signature metadata.", "none"
     expected_fingerprint = signature.get("public_key_fingerprint_sha256")
     if expected_fingerprint:
         actual_fingerprint = public_key_fingerprint(public_key_path)
         if expected_fingerprint != actual_fingerprint:
-            return False, "Attestation public key fingerprint does not match signature metadata."
-    return verify_payload_ed25519(canonical_attestation_payload(attestation), encoded, public_key_path)
+            return False, "Attestation public key fingerprint does not match signature metadata.", "none"
+    return verify_payload_ed25519_detailed(canonical_attestation_payload(attestation), encoded, public_key_path)
 
 
 def sign_payload_ed25519(payload: bytes, private_key_path: str | Path) -> str:
@@ -96,11 +101,37 @@ def sign_payload_ed25519(payload: bytes, private_key_path: str | Path) -> str:
 
 
 def verify_payload_ed25519(payload: bytes, signature_base64: str, public_key_path: str | Path) -> tuple[bool, str | None]:
-    openssl = _openssl()
+    ok, error, _backend = verify_payload_ed25519_detailed(payload, signature_base64, public_key_path)
+    return ok, error
+
+
+def verify_payload_ed25519_detailed(
+    payload: bytes,
+    signature_base64: str,
+    public_key_path: str | Path,
+) -> tuple[bool, str | None, str]:
+    """Verify an Ed25519 signature, preferring pacta's DOGFOOD verifier -
+    a binary built from the pinned, certificate-covered dalek source with
+    the serial backend pinned - and falling back to OpenSSL when the
+    dogfood binary is unavailable. The third element names the backend that
+    actually ran so callers can record (and policies can require) the
+    verified path."""
+    from .dogfood import BACKEND_OPENSSL, BACKEND_VERIFIED, locate_verifier, verify_payload_dogfood
+
     try:
         signature_bytes = base64.b64decode(signature_base64, validate=True)
     except ValueError as exc:
-        return False, f"Invalid base64 signature: {exc}"
+        return False, f"Invalid base64 signature: {exc}", "none"
+    binary = locate_verifier()
+    if binary is not None:
+        ok, error = verify_payload_dogfood(payload, signature_bytes, public_key_path, binary)
+        return ok, error, BACKEND_VERIFIED
+    ok, error = _verify_payload_openssl(payload, signature_bytes, public_key_path)
+    return ok, error, BACKEND_OPENSSL
+
+
+def _verify_payload_openssl(payload: bytes, signature_bytes: bytes, public_key_path: str | Path) -> tuple[bool, str | None]:
+    openssl = _openssl()
     with tempfile.TemporaryDirectory(prefix="pacta-verify-") as tmp:
         payload_path = Path(tmp) / "payload.bin"
         signature_path = Path(tmp) / "payload.sig"

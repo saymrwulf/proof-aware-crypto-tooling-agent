@@ -14,3 +14,7 @@ __pycache__/
 .lake/
 *.olean
 *.ilean
+dogfood/state/
+dogfood/pacta-verified-verify/target/
+dogfood/pacta-verified-verify/Cargo.toml
+dogfood/pacta-verified-verify/Cargo.lock

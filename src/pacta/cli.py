@@ -139,7 +139,16 @@ def build_parser() -> argparse.ArgumentParser:
     receipt_verify.add_argument("--sth-store", help="Path to the local STH pin store (split-view/rollback defense).")
     receipt_verify.add_argument("--consistency-proof", help="File with a hex consistency proof from the pinned tree size (provider: log-consistency).")
     receipt_verify.add_argument("--max-sth-age-seconds", type=int, help="Reject signed tree heads older than this (freshness policy).")
+    receipt_verify.add_argument("--require-verified-verifier", action="store_true", help="Fail closed unless Ed25519 verification ran on the dogfood (certificate-covered) verifier.")
     receipt_verify.set_defaults(func=cmd_receipt_verify)
+
+    dogfood_build = sub.add_parser("dogfood-build", help="Build the dogfood Ed25519 verifier from the pinned proven source workspace.")
+    dogfood_build.add_argument("--source", required=True, help="Local checkout of saymrwulf/curve25519-dalek-source (the pinned proven workspace).")
+    dogfood_build.add_argument("--timeout", type=int, default=900)
+    dogfood_build.set_defaults(func=cmd_dogfood_build)
+
+    dogfood_status = sub.add_parser("dogfood-status", help="Show which Ed25519 verification backend pacta will use, with provenance.")
+    dogfood_status.set_defaults(func=cmd_dogfood_status)
 
     agent = sub.add_parser("agent", help="Apply a policy-gated consequence to verification evidence.")
     agent.add_argument("--claims", help="Existing claim card to act on.")
@@ -169,6 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--sth-store", help="Path to the local STH pin store (split-view/rollback defense).")
     agent.add_argument("--consistency-proof", help="File with a hex consistency proof from the pinned tree size.")
     agent.add_argument("--max-sth-age-seconds", type=int, help="Reject signed tree heads older than this.")
+    agent.add_argument("--require-verified-verifier", action="store_true", help="Fail closed unless Ed25519 verification ran on the dogfood (certificate-covered) verifier.")
     agent.set_defaults(func=cmd_agent)
     return parser
 
@@ -385,6 +395,11 @@ def cmd_receipt_verify(args: argparse.Namespace) -> int:
         consistency_proof_path=args.consistency_proof,
         max_sth_age_seconds=args.max_sth_age_seconds,
     )
+    if args.require_verified_verifier and result.signatures.get("ed25519_backend") != "verified-dalek-serial":
+        accountability_diagnostics.append(
+            "Policy requires the dogfood (certificate-covered) Ed25519 verifier, but verification ran on backend "
+            f"'{result.signatures.get('ed25519_backend', 'none')}'."
+        )
     if accountability_diagnostics:
         result.accepted = False
         result.diagnostics.extend(accountability_diagnostics)
@@ -400,6 +415,38 @@ def cmd_receipt_verify(args: argparse.Namespace) -> int:
         for diagnostic in result.diagnostics:
             print(f"  - {diagnostic}")
     return 0 if result.accepted else 1
+
+
+def cmd_dogfood_build(args: argparse.Namespace) -> int:
+    from .dogfood import build_verifier
+
+    result = build_verifier(args.source, timeout=args.timeout)
+    for diagnostic in result.diagnostics:
+        print(diagnostic)
+    if not result.built:
+        print("dogfood verifier NOT built; Ed25519 verification falls back to OpenSSL (recorded as a downgrade).")
+        return 1
+    print(f"binary: {result.binary_path}")
+    for key in ("source_commit", "backend_cfg", "rustc_version"):
+        print(f"{key}: {result.provenance.get(key)}")
+    print("coverage: " + str(result.provenance.get("coverage_note")))
+    return 0
+
+
+def cmd_dogfood_status(args: argparse.Namespace) -> int:
+    from .dogfood import BACKEND_OPENSSL, BACKEND_VERIFIED, load_provenance, locate_verifier
+
+    binary = locate_verifier()
+    if binary is None:
+        print(f"backend: {BACKEND_OPENSSL} (fallback)")
+        print("dogfood verifier not built. Build with: pacta dogfood-build --source <pinned-workspace>")
+        return 1
+    print(f"backend: {BACKEND_VERIFIED}")
+    print(f"binary: {binary}")
+    provenance = load_provenance(binary)
+    for key in ("source_workspace", "source_commit", "backend_cfg", "rustc_version"):
+        print(f"{key}: {provenance.get(key)}")
+    return 0
 
 
 def _log_accountability_checks(
@@ -553,4 +600,5 @@ def _attestation_for_args(args: argparse.Namespace, repo: RepoConfig):
         sth_store_path=getattr(args, "sth_store", None),
         consistency_proof_path=getattr(args, "consistency_proof", None),
         max_sth_age_seconds=getattr(args, "max_sth_age_seconds", None),
+        require_verified_verifier=bool(getattr(args, "require_verified_verifier", False)),
     )

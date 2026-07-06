@@ -6,7 +6,7 @@ from typing import Any
 
 from .config import RepoConfig
 from .profiles import get_profile
-from .signing import verify_attestation_signature
+from .signing import verify_attestation_signature_detailed
 from .sthstore import check_sth_against_store, check_sth_freshness
 from .transparency import load_receipt, verify_receipt
 from .yamlio import load_data
@@ -45,6 +45,7 @@ def validate_attestation(
     sth_store_path: str | Path | None = None,
     consistency_proof_path: str | Path | None = None,
     max_sth_age_seconds: int | None = None,
+    require_verified_verifier: bool = False,
 ) -> AttestationResult:
     provider = raw.get("provider")
     subject = raw.get("subject") or {}
@@ -82,12 +83,18 @@ def validate_attestation(
     signature = raw.get("signature") or {}
     environment = raw.get("environment") or {}
     signature_status = signature.get("status", "not_checked")
+    signature_backend = "none"
     if public_key_path:
-        ok, error = verify_attestation_signature(raw, public_key_path)
+        ok, error, signature_backend = verify_attestation_signature_detailed(raw, public_key_path)
         if ok:
             signature_status = "verified"
         else:
             diagnostics.append(f"Attestation signature verification failed: {error}")
+        if require_verified_verifier and signature_backend != "verified-dalek-serial":
+            diagnostics.append(
+                "Policy requires the dogfood (certificate-covered) Ed25519 verifier, but verification ran on "
+                f"backend '{signature_backend}'. Build it with: pacta dogfood-build --source <pinned-workspace>."
+            )
     elif signature_status == "signed":
         diagnostics.append("Signed attestation requires --attestation-public-key.")
     elif signature_status == "not_implemented":
@@ -142,6 +149,7 @@ def validate_attestation(
         "attestation_provider": provider,
         "attestation_path": str(path) if path else None,
         "attestation_signature_status": signature_status,
+        "attestation_signature_backend": signature_backend,
         "attestation_log_url": raw.get("log_url") or signature.get("log_url"),
         "attestation_issued_at": raw.get("issued_at"),
         "check_log_path": (raw.get("replay") or {}).get("check_log_path"),

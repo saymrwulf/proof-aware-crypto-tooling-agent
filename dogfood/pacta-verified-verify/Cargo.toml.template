@@ -1,0 +1,14 @@
+# Rendered by `pacta dogfood-build` - the {{SOURCE}} placeholder is replaced
+# with the local checkout of the PINNED proven source workspace
+# (saymrwulf/curve25519-dalek-source). Committed as a template so the repo
+# never hardcodes a machine-specific path.
+[package]
+name = "pacta-verified-verify"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ed25519-dalek = { path = "{{SOURCE}}/ed25519-dalek", default-features = false, features = ["fast", "zeroize"] }
+
+[workspace]

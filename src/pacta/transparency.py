@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .postquantum import detect_ml_dsa
-from .signing import canonical_json, public_key_fingerprint, sign_payload_ed25519, verify_payload_ed25519
+from .signing import canonical_json, public_key_fingerprint, sign_payload_ed25519, verify_payload_ed25519_detailed
 from .yamlio import load_data
 
 HASH_ALGORITHM = "RFC9162_SHA256"
@@ -206,8 +206,9 @@ def verify_signed_tree_head(
                 diagnostics.append("Signed tree head Ed25519 public-key fingerprint mismatch.")
                 statuses["ed25519"] = "key_mismatch"
             else:
-                ok, error = verify_payload_ed25519(payload, str(ed25519.get("signature_base64") or ""), public_key_path)
+                ok, error, backend = verify_payload_ed25519_detailed(payload, str(ed25519.get("signature_base64") or ""), public_key_path)
                 statuses["ed25519"] = "verified" if ok else "failed"
+                statuses["ed25519_backend"] = backend
                 if not ok:
                     diagnostics.append(f"Signed tree head Ed25519 verification failed: {error}")
 
