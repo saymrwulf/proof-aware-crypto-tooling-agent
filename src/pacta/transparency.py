@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .postquantum import detect_ml_dsa
-from .signing import canonical_json, public_key_fingerprint, sign_payload_ed25519, verify_payload_ed25519_detailed
+from .signing import canonical_json, public_key_fingerprint, sign_payload_ed25519_detailed, verify_payload_ed25519_detailed
 from .yamlio import load_data
 
 HASH_ALGORITHM = "RFC9162_SHA256"
@@ -152,6 +152,7 @@ def make_signed_tree_head(
     timestamp: str,
     private_key_path: str | Path,
     public_key_path: str | Path,
+    signing_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     sth: dict[str, Any] = {
         "schema_version": 1,
@@ -163,13 +164,16 @@ def make_signed_tree_head(
         "hash_algorithm": HASH_ALGORITHM,
     }
     payload = signed_tree_head_payload(sth)
+    signature_base64, signing_backend = sign_payload_ed25519_detailed(payload, private_key_path)
     sth["signatures"] = {
         "ed25519": {
             "scheme": "openssl-ed25519",
+            "signing_backend": signing_backend,
             "status": "signed",
             "payload_digest_sha256": hashlib.sha256(payload).hexdigest(),
-            "signature_base64": sign_payload_ed25519(payload, private_key_path),
+            "signature_base64": signature_base64,
             "public_key_fingerprint_sha256": public_key_fingerprint(public_key_path),
+            **({"signing_provenance": signing_provenance} if signing_provenance else {}),
         },
         "ml_dsa": detect_ml_dsa().to_signature_slot(),
     }

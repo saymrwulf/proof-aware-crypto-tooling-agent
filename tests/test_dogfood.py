@@ -64,3 +64,27 @@ def test_real_dogfood_binary_if_built(tmp_path):
     # flip one payload byte: the proven path must reject
     ok, error, backend = verify_payload_ed25519_detailed(payload + b"x", signature, public_key)
     assert not ok and backend == BACKEND_VERIFIED
+
+
+def test_dogfood_signing_roundtrip_if_built(tmp_path):
+    import pytest
+
+    from pacta.dogfood import locate_verifier, pem_private_key_to_seed, sign_payload_dogfood
+    from pacta.signing import verify_payload_ed25519_detailed
+    import base64
+
+    binary = locate_verifier()
+    if binary is None or "fake" in str(binary):
+        pytest.skip("dogfood verifier not built on this host")
+    private_key = tmp_path / "k.key"
+    public_key = tmp_path / "k.pub"
+    from pacta.signing import generate_ed25519_keypair
+
+    generate_ed25519_keypair(private_key, public_key)
+    assert len(pem_private_key_to_seed(private_key)) == 32
+    payload = b"signed by the merkleized library"
+    signature = sign_payload_dogfood(payload, private_key, binary)
+    ok, error, backend = verify_payload_ed25519_detailed(
+        payload, base64.b64encode(signature).decode(), public_key
+    )
+    assert ok and backend == "verified-dalek-serial"

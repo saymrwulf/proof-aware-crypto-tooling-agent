@@ -44,10 +44,11 @@ def generate_ed25519_keypair(private_key_path: str | Path, public_key_path: str 
 
 def sign_attestation(attestation: dict[str, Any], private_key_path: str | Path, public_key_path: str | Path | None = None) -> dict[str, Any]:
     payload = canonical_attestation_payload(attestation)
-    signature_base64 = sign_payload_ed25519(payload, private_key_path)
+    signature_base64, signing_backend = sign_payload_ed25519_detailed(payload, private_key_path)
     signed = dict(attestation)
     signed["signature"] = {
         "scheme": "openssl-ed25519",
+        "signing_backend": signing_backend,
         "status": "signed",
         "payload_digest_sha256": hashlib.sha256(payload).hexdigest(),
         "signature_base64": signature_base64,
@@ -82,6 +83,25 @@ def verify_attestation_signature_detailed(attestation: dict[str, Any], public_ke
 
 
 def sign_payload_ed25519(payload: bytes, private_key_path: str | Path) -> str:
+    signature, _backend = sign_payload_ed25519_detailed(payload, private_key_path)
+    return signature
+
+
+def sign_payload_ed25519_detailed(payload: bytes, private_key_path: str | Path) -> tuple[str, str]:
+    """Sign, preferring the dogfood binary (the merkleized, attested dalek
+    library) and falling back to OpenSSL. Returns (base64 signature, the
+    backend that actually signed) - the backend is recorded next to every
+    signature so the provenance is never silent."""
+    from .dogfood import BACKEND_OPENSSL, BACKEND_VERIFIED, locate_verifier, sign_payload_dogfood
+
+    binary = locate_verifier()
+    if binary is not None:
+        signature_bytes = sign_payload_dogfood(payload, private_key_path, binary)
+        return base64.b64encode(signature_bytes).decode("ascii"), BACKEND_VERIFIED
+    return _sign_payload_openssl(payload, private_key_path), BACKEND_OPENSSL
+
+
+def _sign_payload_openssl(payload: bytes, private_key_path: str | Path) -> str:
     openssl = _openssl()
     with tempfile.TemporaryDirectory(prefix="pacta-sign-") as tmp:
         payload_path = Path(tmp) / "payload.bin"

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from pacta.dogfood import BACKEND_OPENSSL, BACKEND_VERIFIED, load_provenance, locate_verifier
 from pacta.signing import canonical_json
 from pacta.transparency import (
     HASH_ALGORITHM,
@@ -19,6 +20,7 @@ from pacta.transparency import (
     make_signed_tree_head,
     merkle_root,
     proof_to_hex,
+    verify_inclusion,
 )
 from pacta.yamlio import dump_data, load_data
 
@@ -95,7 +97,8 @@ class TransparencyLog:
         timestamp: str | None = None,
     ) -> dict[str, Any]:
         metadata = self.metadata()
-        leaves = [entry.leaf_bytes() for entry in self.entries()]
+        entries = self.entries()
+        leaves = [entry.leaf_bytes() for entry in entries]
         sth = make_signed_tree_head(
             metadata["log_id"],
             len(leaves),
@@ -103,6 +106,7 @@ class TransparencyLog:
             timestamp or _now(),
             private_key_path,
             public_key_path,
+            signing_provenance=self.signing_provenance(entries),
         )
         dump_data(sth, self.sth_path)
         return sth
@@ -144,6 +148,7 @@ class TransparencyLog:
             _now(),
             private_key_path,
             public_key_path,
+            signing_provenance=self.signing_provenance(entries),
         )
         dump_data(sth, self.sth_path)
         consistency = []
@@ -173,6 +178,45 @@ class TransparencyLog:
             dump_data(receipt, receipt_out)
         return receipt
 
+
+    def signing_provenance(self, entries: list[LogEntry], signing_library_component: str = "dalek-ed25519-verified") -> dict[str, Any]:
+        """THE PROVIDER EATS ITS OWN DOGFOOD: before signing a tree head,
+        verify that the attestation of the SIGNING LIBRARY ITSELF (the
+        merkleized dalek source whose build produced the signing binary) is
+        included in the very tree about to be signed - by running the same
+        Merkle inclusion verification an agent runs. The result is recorded
+        inside the signature block: a root signature that names the leaf
+        vouching for the code that produced it."""
+        binary = locate_verifier()
+        backend = BACKEND_VERIFIED if binary is not None else BACKEND_OPENSSL
+        provenance: dict[str, Any] = {
+            "signing_backend": backend,
+            "signing_library_component": signing_library_component,
+        }
+        if binary is not None:
+            build = load_provenance(binary)
+            if build.get("source_commit"):
+                provenance["signing_library_source_commit"] = build["source_commit"]
+        matches = [
+            entry
+            for entry in entries
+            if ((entry.leaf.get("attestation") or {}).get("subject") or {}).get("component") == signing_library_component
+        ]
+        if not matches:
+            provenance["self_inclusion"] = "library_not_in_log"
+            return provenance
+        newest = matches[-1]
+        leaves = [entry.leaf_bytes() for entry in entries]
+        proof = inclusion_proof(leaves, newest.index)
+        verified = verify_inclusion(
+            newest.leaf_bytes(), newest.index, len(leaves), proof, merkle_root(leaves)
+        )
+        provenance["self_inclusion"] = "verified" if verified else "FAILED"
+        provenance["signing_library_leaf_index"] = newest.index
+        attested = (newest.leaf.get("attestation") or {}).get("certificates") or []
+        clean = sum(1 for c in attested if c.get("status") == "proven" and c.get("axiom_status") == "clean")
+        provenance["signing_library_certificates_proven"] = f"{clean}/{len(attested)}"
+        return provenance
 
     def consistency_from(self, old_tree_size: int) -> dict[str, Any]:
         """Consistency proof from an arbitrary earlier tree size - what a

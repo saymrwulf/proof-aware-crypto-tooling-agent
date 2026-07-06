@@ -20,6 +20,9 @@ BACKEND_OPENSSL = "openssl"
 # the raw 32-byte key. Parsing by prefix is exact for this OID, not a
 # heuristic.
 _ED25519_SPKI_PREFIX = bytes.fromhex("302a300506032b6570032100")
+# Ed25519 PKCS#8 private key (RFC 8410): fixed 16-byte DER prefix then the
+# 32-byte seed wrapped as an OCTET STRING.
+_ED25519_PKCS8_PREFIX = bytes.fromhex("302e020100300506032b657004220420")
 
 
 @dataclass(slots=True)
@@ -48,6 +51,49 @@ def pem_public_key_to_raw(public_key_path: str | Path) -> bytes:
             f"(got {len(der)} DER bytes)"
         )
     return der[len(_ED25519_SPKI_PREFIX):]
+
+
+def pem_private_key_to_seed(private_key_path: str | Path) -> bytes:
+    """Extract the raw 32-byte Ed25519 seed from an OpenSSL PKCS#8 PEM."""
+    text = Path(private_key_path).read_text(encoding="utf-8")
+    body = "".join(
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.startswith("-----")
+    )
+    try:
+        der = base64.b64decode(body, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(f"Not a PEM private key: {private_key_path}: {exc}") from exc
+    if not der.startswith(_ED25519_PKCS8_PREFIX) or len(der) != len(_ED25519_PKCS8_PREFIX) + 32:
+        raise ValueError(f"Not an Ed25519 PKCS#8 key: {private_key_path} ({len(der)} DER bytes)")
+    return der[len(_ED25519_PKCS8_PREFIX):]
+
+
+def sign_payload_dogfood(
+    payload: bytes,
+    private_key_path: str | Path,
+    binary: str | Path,
+    timeout: int = 30,
+) -> bytes:
+    """Sign via the dogfood binary (the merkleized, attested library). The
+    seed travels over STDIN, never argv. Honesty: the library's verify path
+    is certificate-covered; its signing path is declared trusted base - but
+    it is the ATTESTED artifact, not an un-attested third implementation."""
+    seed = pem_private_key_to_seed(private_key_path)
+    with tempfile.TemporaryDirectory(prefix="pacta-dogfood-sign-") as tmp:
+        payload_path = Path(tmp) / "payload.bin"
+        payload_path.write_bytes(payload)
+        completed = subprocess.run(
+            [str(binary), "sign", str(payload_path)],
+            input=seed.hex(),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    if completed.returncode != 0:
+        raise RuntimeError((completed.stderr or "dogfood signing failed").strip())
+    return bytes.fromhex(completed.stdout.strip())
 
 
 def default_binary_path(state_dir: str | Path | None = None) -> Path:

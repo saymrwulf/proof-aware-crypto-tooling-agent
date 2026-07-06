@@ -21,16 +21,24 @@ sth:
   type: pacta.transparency.signed_tree_head.v1
   log_id: 205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7
   tree_size: 8
-  timestamp: '2026-07-06T12:53:08Z'
+  timestamp: '2026-07-06T13:20:39Z'
   root_hash: 9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283
   hash_algorithm: RFC9162_SHA256
   signatures:
     ed25519:
       scheme: openssl-ed25519
+      signing_backend: verified-dalek-serial
       status: signed
-      payload_digest_sha256: d783b70d6124bd2206bed6671ce83e9b292dec41761527326695d5e23b12eb8b
-      signature_base64: 0Si0Mb46p5xmPu8EJp9wm/Cle3xClHYYRLBFksjnygVci8U+RE4uBNydU0dSQT7FrnJB+xdwCn5NBRnUnjaECg==
+      payload_digest_sha256: d915e3fd22b755768bc91e088259f42e6011e8fb98910aaa6ae4b93ce793255b
+      signature_base64: 30Dz9i50AsM9L44fQCGQJcnk84fzpIUuJznbJiumQuREZ2QdAfsY9EpnXiC+uHcTnN8yJ928WIeBcarsKebXBw==
       public_key_fingerprint_sha256: 874c8a008a607021528b2493fa1caf059f9d5c123d29193dfabc09a6d1e7a56a
+      signing_provenance:
+        signing_backend: verified-dalek-serial
+        signing_library_component: dalek-ed25519-verified
+        signing_library_source_commit: aa0f6abc327ba2a54a534b21608ca8996cf73682
+        self_inclusion: verified
+        signing_library_leaf_index: 4
+        signing_library_certificates_proven: 16/16
     ml_dsa:
       scheme: ML-DSA-65
       standard: FIPS 204
