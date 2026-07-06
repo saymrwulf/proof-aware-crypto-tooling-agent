@@ -35,6 +35,7 @@ def test_provider_builds_signed_attestation_for_fixture(tmp_path):
         verification_dir="verification",
         verified_backend="serial/u64",
         certificates=["CurveFieldProofs.fieldImplementation", "CurveFieldProofs.edwardsImplementation"],
+        axiom_imports=["Proofs.FieldMain", "Proofs.EdMain"],
         expected_axioms=[],
     )
     attestation = build_attestation(

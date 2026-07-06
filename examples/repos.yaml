@@ -4,20 +4,13 @@ repos:
     kind: ed25519
     verification_dir: verification
     verified_backend: serial/u64
+    apex_boundary: dalek-wrappers
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
-    certificates:
-      - CurveFieldProofs.fieldImplementation
-      - CurveFieldProofs.edwardsImplementation
-    expected_axioms:
-      - propext
-      - Classical.choice
-      - Quot.sound
     known_exclusions:
-      - full EdDSA verification
-      - Scalar52 arithmetic completeness
-      - SHA-512
-      - encoding/canonicality unless separately proven
+      - SHA-512 implementation (opaque oracle in the apex theorems)
+      - wire parser/filter byte-level specs (hypothesis-parametric)
+      - signing-side correctness
       - side-channel resistance
       - compiler correctness
       - SIMD/AVX/accelerator paths
@@ -27,19 +20,14 @@ repos:
     kind: ed25519
     verification_dir: verification
     verified_backend: serial/u64
+    apex_boundary: anza
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
-    certificates:
-      - CurveFieldProofs.fieldImplementation
-      - CurveFieldProofs.edwardsImplementation
-    expected_axioms:
-      - propext
-      - Classical.choice
-      - Quot.sound
+    backend_warning: verified entry point is verify_sha512 = verify_dalek (canonical-R incl. legacy filters); the crate's default HEEA/Zebra verify() is a DIFFERENT acceptance criterion and is not covered
     known_exclusions:
       - Solana runtime semantics
       - Solana transaction construction
-      - full EdDSA verification unless separately proven
+      - the default HEEA/Zebra verify() path
       - accelerator paths
 
   - name: risc0-ed25519-verified
@@ -47,24 +35,20 @@ repos:
     kind: ed25519
     verification_dir: verification
     verified_backend: serial/u64
+    apex_boundary: hash3
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
     backend_warning: pure Rust path only; do not treat zkVM accelerator/syscall path as verified
-    certificates:
-      - CurveFieldProofs.fieldImplementation
-      - CurveFieldProofs.edwardsImplementation
 
   - name: betrusted-ed25519-verified
     url: https://github.com/saymrwulf/betrusted-ed25519-verified.git
     kind: ed25519
     verification_dir: verification
     verified_backend: serial/u64
+    apex_boundary: hash3
     env_script: ~/aeneas-toolchain/env.sh
     lean_project_dir: $AENEAS_HOME/backends/lean
     backend_warning: pure Rust path only; do not treat Engine25519/hardware accelerator as verified
-    certificates:
-      - CurveFieldProofs.fieldImplementation
-      - CurveFieldProofs.edwardsImplementation
 
   - name: pasta-pallas-verified
     url: https://github.com/saymrwulf/pasta-pallas-verified.git

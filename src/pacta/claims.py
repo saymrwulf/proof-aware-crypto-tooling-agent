@@ -76,6 +76,7 @@ def build_claim_card(
         },
         "meta": {
             "profile_axiom_imports": profile.axiom_imports,
+            "r4_requirements": profile.r4_requirements,
             "what_would_invalidate_this_evidence": profile.invalidation_conditions,
             "next_proof_milestones": profile.next_milestones,
         },
@@ -101,23 +102,25 @@ def _certificate_claims(
             CertificateClaim(
                 name=name,
                 status=str(by_name.get(name, {}).get("status", "missing")),
+                # axiom_status was re-derived against LOCAL policy in
+                # attestation._normalize_certificate; use it verbatim.
                 axiom_status=str(by_name.get(name, {}).get("axiom_status", "not_checked")),
                 observed_axioms=list(by_name.get(name, {}).get("observed_axioms") or []),
-                expected_axioms=list(by_name.get(name, {}).get("expected_axioms") or profile.expected_axioms),
+                expected_axioms=list(profile.expected_axioms_for(name)),
             )
             for name in names
         ]
     if axiom_audit:
         by_name = {cert.name: cert for cert in axiom_audit.certificates}
-        return [_from_axiom_result(name, by_name.get(name), profile.expected_axioms) for name in names]
+        return [_from_axiom_result(name, by_name.get(name), profile.expected_axioms_for(name)) for name in names]
     if offline_fixture:
         return [
             CertificateClaim(
                 name=name,
                 status="proven",
                 axiom_status="clean",
-                observed_axioms=list(profile.expected_axioms),
-                expected_axioms=list(profile.expected_axioms),
+                observed_axioms=list(profile.expected_axioms_for(name)),
+                expected_axioms=list(profile.expected_axioms_for(name)),
             )
             for name in names
         ]
@@ -127,7 +130,7 @@ def _certificate_claims(
             status="unknown",
             axiom_status="not_checked",
             observed_axioms=[],
-            expected_axioms=list(profile.expected_axioms),
+            expected_axioms=list(profile.expected_axioms_for(name)),
         )
         for name in names
     ]

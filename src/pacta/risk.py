@@ -89,23 +89,44 @@ def score_claim_card(card: dict[str, Any]) -> RiskAssessment:
 
     if kind == "ed25519":
         names = {cert.get("name") for cert in clean_proven}
-        required = {"CurveFieldProofs.fieldImplementation", "CurveFieldProofs.edwardsImplementation"}
-        if required.issubset(names):
+        r3_required = {"CurveFieldProofs.fieldImplementation", "CurveFieldProofs.edwardsImplementation"}
+        r4_required = list((card.get("meta") or {}).get("r4_requirements") or [])
+        via = ""
+        if attested:
+            provider = evidence.get("attestation_provider") or "unknown provider"
+            via = f" (evidence via trusted third-party provider {provider})"
+
+        if r4_required and set(r4_required).issubset(names):
             blockers.extend(f"Missing or unchecked certificate: {name}" for name in missing)
-            full_eddsa_excluded = any("eddsa" in item or "signature" in item for item in exclusions)
-            if not full_eddsa_excluded:
+            r4_residuals = [
+                "SHA-512 enters the apex theorems as an opaque oracle; the hash implementation itself is unverified.",
+                "Wire parse/filter outcomes are hypothesis-parametric; parser byte-level specs are not yet certified.",
+                "Charon/Aeneas translation faithfulness and the production-path-to-verified-path mapping remain trusted base.",
+                "No side-channel, reproducible-build, or operational assurance (those gate R5).",
+            ]
+            return RiskAssessment(
+                "R4",
+                "The full four-tier signature apex (byte apex, half-lift, point equation, full decompress lift) plus the "
+                "constructive encoding/decoding chain and scalar arithmetic are proven with every certificate's axiom cone "
+                "pinned to its documented boundary" + via + ". Residual R5 gaps are listed as blockers.",
+                blockers + r4_residuals,
+                constraints,
+            )
+
+        if r3_required.issubset(names):
+            blockers.extend(f"Missing or unchecked certificate: {name}" for name in missing)
+            full_eddsa_excluded = any("eddsa" in item or "signature" in item or "signing" in item for item in exclusions)
+            if not full_eddsa_excluded and not r4_required:
                 blockers.append("Full EdDSA boundary is not explicitly excluded in the claim card.")
-            if attested:
-                provider = evidence.get("attestation_provider") or "unknown provider"
-                return RiskAssessment(
-                    "R3",
-                    f"Trusted third-party provider {provider} attests that configured field and Edwards certificates are proven and axiom-clean for a specific lower-layer backend boundary.",
-                    blockers,
-                    constraints,
+            if r4_required:
+                absent = sorted(set(r4_required) - names)
+                blockers.append(
+                    "R4 requires the full apex tier set; not proven-and-boundary-clean here: " + ", ".join(absent)
                 )
             return RiskAssessment(
                 "R3",
-                "Configured field and Edwards implementation certificates are proven and axiom-clean for a specific lower-layer backend boundary.",
+                "Configured field and Edwards implementation certificates are proven and axiom-clean for a specific "
+                "lower-layer backend boundary" + via + ".",
                 blockers,
                 constraints,
             )

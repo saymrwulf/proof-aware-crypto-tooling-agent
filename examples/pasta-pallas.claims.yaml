@@ -1,27 +1,59 @@
-{
-  "component": "pasta-pallas-verified",
-  "repo_url": "https://github.com/saymrwulf/pasta-pallas-verified.git",
-  "local_path": "repos/pasta-pallas-verified",
-  "repo_commit": null,
-  "verification_dir": "verification",
-  "kind": "pasta_pallas",
-  "verified_backend": null,
-  "certificates": [],
-  "guarantees": ["Foundation evidence only unless aggregate certificates are present."],
-  "preconditions": ["Require add/mul/reduce/square/invert and aggregate fieldImplementation coverage."],
-  "exclusions": ["production-ready Pallas arithmetic unless add/mul/reduce/square/invert are proven"],
-  "trusted_base": [],
-  "evidence": {
-    "lean_version": null,
-    "lake_version": null,
-    "check_log_path": null,
-    "axiom_log_path": null,
-    "scanned_files": []
-  },
-  "risk": {
-    "level": "R2",
-    "rationale": "Foundation work without aggregate production field certificate.",
-    "blockers": ["No aggregate fieldImplementation-style certificate."],
-    "deployment_constraints": ["Do not classify as complete production field implementation."]
-  }
-}
+component: pasta-pallas-verified
+repo_url: https://github.com/saymrwulf/pasta-pallas-verified.git
+local_path: repos/pasta-pallas-verified
+repo_commit: null
+verification_dir: verification
+kind: pasta_pallas
+verified_backend: null
+certificates: []
+guarantees:
+- No configured certificate was replayed and axiom-clean in this run.
+preconditions:
+- Require explicit add, mul, reduce, square, and invert proof coverage before production
+  field claims.
+- Require an aggregate fieldImplementation-style theorem before classifying the field
+  implementation as complete.
+exclusions:
+- Production-ready Pallas arithmetic is not assumed unless shipped certificates prove
+  it.
+- Full protocol, wallet, proof-system, or transaction safety is out of scope.
+- Compiler correctness, translation faithfulness, and side-channel resistance are
+  out of scope.
+- full fieldImplementation certificate unless present and axiom-clean
+- production-ready Pallas arithmetic unless add/mul/reduce/square/invert are proven
+trusted_base:
+- Lean kernel and standard library axioms.
+- Correctness of the shipped translation artifact.
+- Correct mapping from production code to checked routines.
+evidence:
+  lean_version: Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc,
+    Release)
+  lake_version: Lake version 5.0.0-src+3dc1a08 (Lean version 4.30.0-rc2)
+  check_log_path: null
+  axiom_log_path: null
+  replay_blockers: []
+  scanned_files: []
+  evidence_mode: local_or_fixture
+risk:
+  level: R2
+  rationale: Pallas/Pasta foundation profile exists, but no aggregate production field
+    certificate was configured.
+  blockers:
+  - No configured aggregate certificate.
+  deployment_constraints:
+  - Do not classify as a complete production field implementation without aggregate
+    field coverage.
+  - Keep downstream protocol use behind independent tests and audits.
+  - foundation only unless aggregate field certificate is present
+meta:
+  profile_axiom_imports:
+  - Proofs.FieldMain
+  r4_requirements: []
+  what_would_invalidate_this_evidence:
+  - Expected operation certificates are absent or fail replay.
+  - Unexpected axioms appear in certificate audits.
+  - Production code uses routines not covered by the shipped proof artifact.
+  next_proof_milestones:
+  - Prove add, mul, reduce, square, and invert.
+  - Add an aggregate fieldImplementation-style theorem.
+  - Map the checked theorem boundary to public production APIs.

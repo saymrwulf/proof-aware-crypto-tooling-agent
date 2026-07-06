@@ -1,0 +1,258 @@
+schema_version: 1
+provider: example-proof-checker.invalid
+issued_at: '2026-07-06T00:00:00Z'
+subject:
+  component: dalek-ed25519-verified
+  repo_url: https://github.com/saymrwulf/dalek-ed25519-verified.git
+  repo_commit: example-attested-commit
+  verification_dir: verification
+  kind: ed25519
+  verified_backend: serial/u64
+environment:
+  lean_version: Lean v4.30.0-rc2
+  lake_version: pinned provider environment
+certificates:
+- name: CurveFieldProofs.fieldImplementation
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.edwardsImplementation
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: ScalarProofs.scalarImplementation
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.verify_loop_full
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.to_bytes_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.ed_compress_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: ScalarProofs.from_bytes_mod_order_wide_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.vartime_dsm_basepoint_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.enc_point_inj
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.sqrt_ratio_i_sq_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.from_bytes_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.decompress_of_canonical
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.verify_accepts_iff
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+- name: CurveFieldProofs.verify_accepts_iff_point
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+- name: CurveFieldProofs.verify_accepts_iff_point_eq
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+- name: CurveFieldProofs.verify_accepts_iff_decompress
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - sha2.Sha512
+  - verifying.sha512_new
+  - verifying.sha512_update
+  - verifying.sha512_finalize_bytes
+  - ed25519.Signature.to_bytes
+  - signature.error.Error
+  - signature.error.Error.new
+signature:
+  status: not_implemented
+  identity: example schema only; a real provider signs with its Ed25519 key
+  log_url: https://example.invalid/proof-checks/dalek-ed25519

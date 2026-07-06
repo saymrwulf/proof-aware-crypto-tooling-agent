@@ -26,7 +26,7 @@ def test_trusted_attestation_can_drive_r3_claim(tmp_path):
     card = build_claim_card(_repo(), tmp_path, attestation=result)
     assert result.accepted
     assert card["risk"]["level"] == "R3"
-    assert "Trusted third-party provider" in card["risk"]["rationale"]
+    assert "trusted third-party provider" in card["risk"]["rationale"]
     assert card["evidence"]["evidence_mode"] == "third_party_attestation"
     assert any("Third-party proof-checking" in item for item in card["trusted_base"])
 

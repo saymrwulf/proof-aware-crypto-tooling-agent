@@ -217,12 +217,17 @@ def run_axiom_audit(
     log_dir: str | Path | None = None,
     env_script: str | Path | None = None,
     lean_project_dir: str | Path | None = None,
+    certificate_axioms: dict[str, list[str]] | None = None,
 ) -> AxiomAuditResult:
     expected = expected_axioms or STANDARD_LEAN_AXIOMS
+    per_cert = certificate_axioms or {}
+
+    def expected_for(cert: str) -> list[str]:
+        return list(per_cert.get(cert, expected))
     ok_env, env_error = env_script_available(env_script)
     if not ok_env:
         cert_results = [
-            CertificateAxiomResult(cert, "unknown", "not_checked", [], expected, [env_error or "Verifier environment unavailable."])
+            CertificateAxiomResult(cert, "unknown", "not_checked", [], expected_for(cert), [env_error or "Verifier environment unavailable."])
             for cert in certificates
         ]
         return AxiomAuditResult(False, False, "env_script", cert_results, None, [env_error or "Verifier environment unavailable."])
@@ -230,7 +235,7 @@ def run_axiom_audit(
     tools = detect_tools(env)
     if not tools.lean and not tools.lake:
         cert_results = [
-            CertificateAxiomResult(cert, "unknown", "not_checked", [], expected, ["Neither lean nor lake was found on PATH."])
+            CertificateAxiomResult(cert, "unknown", "not_checked", [], expected_for(cert), ["Neither lean nor lake was found on PATH."])
             for cert in certificates
         ]
         return AxiomAuditResult(False, False, "lean", cert_results, None, ["Neither lean nor lake was found on PATH."])
@@ -272,8 +277,8 @@ def run_axiom_audit(
             axiom_status = "not_checked"
         else:
             status = "proven" if observed or _mentions_no_axioms(output) else "unknown"
-            axiom_status = "clean" if sorted(observed) == sorted(expected) else "dirty"
-        cert_results.append(CertificateAxiomResult(cert, status, axiom_status, observed, expected))
+            axiom_status = "clean" if sorted(observed) == sorted(expected_for(cert)) else "dirty"
+        cert_results.append(CertificateAxiomResult(cert, status, axiom_status, observed, expected_for(cert)))
     return AxiomAuditResult(
         attempted=True,
         ok=return_code == 0 and all(cert.axiom_status == "clean" for cert in cert_results),

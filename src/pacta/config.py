@@ -23,6 +23,8 @@ class RepoConfig:
     expected_axioms: list[str] = field(default_factory=lambda: STANDARD_LEAN_AXIOMS.copy())
     known_exclusions: list[str] = field(default_factory=list)
     axiom_imports: list[str] = field(default_factory=list)
+    apex_boundary: str | None = None
+    certificate_axioms: dict[str, list[str]] = field(default_factory=dict)
     env_script: str | None = None
     lean_project_dir: str | None = None
 
@@ -42,6 +44,11 @@ class RepoConfig:
             expected_axioms=list(raw.get("expected_axioms") or STANDARD_LEAN_AXIOMS),
             known_exclusions=list(raw.get("known_exclusions") or []),
             axiom_imports=list(raw.get("axiom_imports") or []),
+            apex_boundary=raw.get("apex_boundary"),
+            certificate_axioms={
+                str(name): [str(a) for a in axioms]
+                for name, axioms in (raw.get("certificate_axioms") or {}).items()
+            },
             env_script=raw.get("env_script"),
             lean_project_dir=raw.get("lean_project_dir"),
         )

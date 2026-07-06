@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import RepoConfig
+from .profiles import get_profile
 from .signing import verify_attestation_signature
 from .transparency import load_receipt, verify_receipt
 from .yamlio import load_data
@@ -19,6 +20,7 @@ class AttestationResult:
     evidence: dict[str, Any] = field(default_factory=dict)
     trusted_base: list[str] = field(default_factory=list)
     repo_commit: str | None = None
+    coverage_warnings: list[str] = field(default_factory=list)
 
 
 def load_attestation(path: str | Path) -> dict[str, Any]:
@@ -60,11 +62,18 @@ def validate_attestation(
     if not isinstance(certs, list) or not certs:
         diagnostics.append("Attestation contains no certificate results.")
         certs = []
-    expected_names = set(repo.certificates)
+    profile = get_profile(repo.kind, repo)
+    expected_names = set(repo.certificates or profile.default_certificates)
     observed_names = {str(cert.get("name")) for cert in certs if isinstance(cert, dict)}
     missing = sorted(expected_names - observed_names)
+    coverage_warnings: list[str] = []
     if missing:
-        diagnostics.append("Attestation is missing configured certificate(s): " + ", ".join(missing))
+        # Partial coverage is NOT a rejection: the uncovered certificates
+        # simply stay unproven in the claim card and the risk score degrades
+        # accordingly (e.g. an arithmetic-only attestation caps at R3).
+        coverage_warnings.append(
+            "Attestation does not cover configured certificate(s): " + ", ".join(missing)
+        )
 
     signature = raw.get("signature") or {}
     environment = raw.get("environment") or {}
@@ -116,6 +125,7 @@ def validate_attestation(
         "axiom_log_path": (raw.get("replay") or {}).get("axiom_log_path"),
         "lean_version": environment.get("lean_version"),
         "lake_version": environment.get("lake_version"),
+        "attestation_coverage_warnings": coverage_warnings,
         **transparency_evidence,
     }
     trusted_base = []
@@ -128,18 +138,40 @@ def validate_attestation(
         accepted=accepted,
         provider=str(provider) if provider else None,
         diagnostics=diagnostics,
-        certificates=[_normalize_certificate(cert, repo.expected_axioms) for cert in certs if isinstance(cert, dict)],
+        certificates=[_normalize_certificate(cert, profile) for cert in certs if isinstance(cert, dict)],
         evidence=evidence,
         trusted_base=trusted_base,
         repo_commit=subject.get("repo_commit"),
+        coverage_warnings=coverage_warnings,
     )
 
 
-def _normalize_certificate(cert: dict[str, Any], expected_axioms: list[str]) -> dict[str, Any]:
+def _normalize_certificate(cert: dict[str, Any], profile: Any) -> dict[str, Any]:
+    """Normalize a provider-reported certificate against LOCAL policy.
+
+    The provider is trusted for its OBSERVATION (which axioms #print axioms
+    reported); it is never trusted for the VERDICT. axiom_status is re-derived
+    here by comparing the observed axioms against this agent's own allowed
+    set for the certificate - a provider that labels a dirty cone "clean"
+    gains nothing.
+    """
+    name = str(cert.get("name") or "")
+    status = str(cert.get("status") or "unknown")
+    observed = [str(a) for a in (cert.get("observed_axioms") or [])]
+    expected = profile.expected_axioms_for(name)
+    if status == "proven" and observed:
+        axiom_status = "clean" if sorted(observed) == sorted(expected) else "dirty"
+    elif status == "proven":
+        # proven with no observed axioms reported: cannot re-derive; distrust.
+        axiom_status = "unverifiable"
+    else:
+        axiom_status = str(cert.get("axiom_status") or "not_checked")
+    provider_verdict = str(cert.get("axiom_status") or "not_stated")
     return {
-        "name": str(cert.get("name") or ""),
-        "status": str(cert.get("status") or "unknown"),
-        "axiom_status": str(cert.get("axiom_status") or "not_checked"),
-        "observed_axioms": list(cert.get("observed_axioms") or []),
-        "expected_axioms": list(cert.get("expected_axioms") or expected_axioms),
+        "name": name,
+        "status": status,
+        "axiom_status": axiom_status,
+        "observed_axioms": observed,
+        "expected_axioms": list(expected),
+        "provider_axiom_verdict": provider_verdict,
     }

@@ -273,6 +273,7 @@ def cmd_axioms(args: argparse.Namespace) -> int:
         log_dir=args.log_dir,
         env_script=env_script,
         lean_project_dir=lean_project_dir,
+        certificate_axioms=profile.certificate_axioms,
     )
     for cert in result.certificates:
         print(f"{cert.name}: {cert.status}, axioms={cert.axiom_status}, observed={cert.observed_axioms}")
@@ -315,6 +316,7 @@ def cmd_claims(args: argparse.Namespace) -> int:
             log_dir=args.log_dir,
             env_script=env_script,
             lean_project_dir=lean_project_dir,
+            certificate_axioms=profile.certificate_axioms,
         )
     attestation = _attestation_for_args(args, repo)
     card = build_claim_card(
@@ -450,6 +452,7 @@ def _card_for_agent(args: argparse.Namespace) -> dict[str, Any]:
             log_dir=args.log_dir,
             env_script=env_script,
             lean_project_dir=lean_project_dir,
+            certificate_axioms=profile.certificate_axioms,
         )
     attestation = _attestation_for_args(args, repo)
     return build_claim_card(

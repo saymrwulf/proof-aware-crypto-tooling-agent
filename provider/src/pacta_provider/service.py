@@ -48,6 +48,7 @@ def build_attestation(
             log_dir=log_dir,
             env_script=env_script or repo.env_script,
             lean_project_dir=lean_project_dir or repo.lean_project_dir,
+            certificate_axioms=profile.certificate_axioms,
         )
         certs = [
             {

@@ -1,42 +1,348 @@
-{
-  "component": "anza-ed25519-verified",
-  "repo_url": "https://github.com/saymrwulf/anza-ed25519-verified.git",
-  "local_path": "repos/anza-ed25519-verified",
-  "repo_commit": null,
-  "verification_dir": "verification",
-  "kind": "ed25519",
-  "verified_backend": "serial/u64",
-  "certificates": [
-    {
-      "name": "CurveFieldProofs.fieldImplementation",
-      "status": "proven",
-      "axiom_status": "clean",
-      "observed_axioms": ["propext", "Classical.choice", "Quot.sound"],
-      "expected_axioms": ["propext", "Classical.choice", "Quot.sound"]
-    },
-    {
-      "name": "CurveFieldProofs.edwardsImplementation",
-      "status": "proven",
-      "axiom_status": "clean",
-      "observed_axioms": ["propext", "Classical.choice", "Quot.sound"],
-      "expected_axioms": ["propext", "Classical.choice", "Quot.sound"]
-    }
-  ],
-  "guarantees": [],
-  "preconditions": [],
-  "exclusions": ["Solana runtime semantics", "Solana transaction construction", "full EdDSA verification unless separately proven"],
-  "trusted_base": [],
-  "evidence": {
-    "lean_version": null,
-    "lake_version": null,
-    "check_log_path": null,
-    "axiom_log_path": null,
-    "scanned_files": []
-  },
-  "risk": {
-    "level": "R3",
-    "rationale": "Example fixture for Solana-relevant lower-layer arithmetic evidence.",
-    "blockers": [],
-    "deployment_constraints": ["Do not claim Solana transaction or runtime semantics are verified."]
-  }
-}
+component: anza-ed25519-verified
+repo_url: https://github.com/saymrwulf/anza-ed25519-verified.git
+local_path: repos/anza-ed25519-verified
+repo_commit: null
+verification_dir: verification
+kind: ed25519
+verified_backend: serial/u64
+certificates:
+- name: CurveFieldProofs.fieldImplementation
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.edwardsImplementation
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: ScalarProofs.scalarImplementation
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.verify_loop_full
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.to_bytes_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.ed_compress_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: ScalarProofs.from_bytes_mod_order_wide_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.vartime_dsm_basepoint_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.enc_point_inj
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.sqrt_ratio_i_sq_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.from_bytes_spec
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.decompress_of_canonical
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+- name: CurveFieldProofs.verify_accepts_iff
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+- name: CurveFieldProofs.verify_accepts_iff_point
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+- name: CurveFieldProofs.verify_accepts_iff_point_eq
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+- name: CurveFieldProofs.verify_accepts_iff_decompress
+  status: proven
+  axiom_status: clean
+  observed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+  expected_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+  - ed25519.Signature
+  - ed_sigs.sha512_hash3
+  - ed25519.Signature.r_bytes
+  - ed25519.Signature.s_bytes
+guarantees:
+- FieldElement51 arithmetic is checked through denotation over F_p, p = 2^255 - 19,
+  for the configured backend.
+- Complete twisted Edwards point-operation laws are checked under ExtValid and OnCurveExt
+  invariants.
+- Scalar arithmetic mod l (add, sub, Montgomery mul, wide hash-to-scalar reduction)
+  is checked through denotation.
+- Point compression emits the canonical encoding (to_bytes canonicity + compress semantics
+  are certified).
+- 'Point decompression is constructively certified: canonical encodings of valid on-curve
+  points decompress to them (from_bytes exactness, sqrt_ratio_i even root, sign-bit
+  selection).'
+- 'THE SIGNATURE APEX, four button-enforced tiers: the extracted verifier accepts
+  iff compress([s]B - [k]A) = R byte-for-byte, iff R is the canonical encoding of
+  [k](-A) + [s]B, iff any point canonically encoded by R equals it, and iff R decompresses
+  to a valid on-curve point equal to it.'
+- Each apex tier's axiom cone is pinned to EXACTLY the fork's documented SHA-512/wire-format
+  boundary by the repo's own check script.
+- Panic and overflow freedom evidence applies under the stated limb-bound preconditions.
+preconditions:
+- Use the exact pinned source or a reviewed diff against the checked artifact.
+- Use the configured serial/u64 backend unless another backend has its own certificate.
+- Maintain limb bounds and representation invariants required by the Lean statements.
+- Treat Charon/Aeneas translation faithfulness as trusted base, not as proven by this
+  tool.
+- 'Map the production entry point to the verified path explicitly (on anza: verify_sha512
+  = verify_dalek, NOT the default HEEA/Zebra verify()).'
+exclusions:
+- SHA-512 itself is not verified; it enters the apex theorems as an opaque oracle
+  with NO assumed properties (the theorems hold for whatever bytes it produces).
+- 'Signature parse/filter outcomes are hypothesis-parametric: the apex tiers assume
+  the wire parse succeeded; the parsers'' own byte-level specs are separate work.'
+- Signing (key generation, nonce derivation, the signer) is out of scope; only verification
+  is certified.
+- Rust compiler correctness is out of scope.
+- Charon/Aeneas translation faithfulness is out of scope.
+- Side-channel resistance is out of scope.
+- SIMD, AVX, hardware, zkVM, accelerator, and syscall paths are out of scope (extraction
+  pins the serial path).
+- Wallet policy, transaction construction, RPC, oracle, market, and LLM decision safety
+  are out of scope.
+- Solana runtime semantics
+- Solana transaction construction
+- the default HEEA/Zebra verify() path
+- accelerator paths
+trusted_base:
+- Lean kernel and standard library axioms.
+- Lake/Lean package resolution used for replay.
+- Correctness of the shipped Rust-to-Lean translation artifact.
+- Correct mapping from the production code path to the checked backend.
+- 'The fork''s documented apex boundary: the SHA-512 oracle and opaque wire-format
+  types (enforced per certificate by the repo''s check script).'
+- Operating system, filesystem, and subprocess execution environment.
+evidence:
+  lean_version: Lean (version 4.30.0-rc2, x86_64-unknown-linux-gnu, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc,
+    Release)
+  lake_version: Lake version 5.0.0-src+3dc1a08 (Lean version 4.30.0-rc2)
+  check_log_path: null
+  axiom_log_path: null
+  replay_blockers: []
+  scanned_files: []
+  evidence_mode: local_or_fixture
+risk:
+  level: R4
+  rationale: The full four-tier signature apex (byte apex, half-lift, point equation,
+    full decompress lift) plus the constructive encoding/decoding chain and scalar
+    arithmetic are proven with every certificate's axiom cone pinned to its documented
+    boundary. Residual R5 gaps are listed as blockers.
+  blockers:
+  - SHA-512 enters the apex theorems as an opaque oracle; the hash implementation
+    itself is unverified.
+  - Wire parse/filter outcomes are hypothesis-parametric; parser byte-level specs
+    are not yet certified.
+  - Charon/Aeneas translation faithfulness and the production-path-to-verified-path
+    mapping remain trusted base.
+  - No side-channel, reproducible-build, or operational assurance (those gate R5).
+  deployment_constraints:
+  - Use exact pinned source or reviewed diff.
+  - Use verified serial/u64 backend only.
+  - Disable accelerator, syscall, hardware, SIMD, and AVX paths unless separately
+    certified.
+  - 'Verification-side evidence only: keep signing/key custody behind HSM, MPC, or
+    policy firewall.'
+  - SHA-512 remains an unverified dependency; pin and monitor the hash implementation.
+  - Use ordinary tests and fuzzing at wire-parse, API, and transaction boundaries
+    (parse specs are hypothesis-parametric).
+  - verified entry point is verify_sha512 = verify_dalek (canonical-R incl. legacy
+    filters); the crate's default HEEA/Zebra verify() is a DIFFERENT acceptance criterion
+    and is not covered
+meta:
+  profile_axiom_imports:
+  - Proofs.FieldMain
+  - Proofs.EdMain
+  - Proofs.ScalarMain
+  - Proofs.ToBytesSpec
+  - Proofs.CompressSpec
+  - Proofs.ScalarPackSpec
+  - Proofs.DsmMulSpec
+  - Proofs.SigApexSpec
+  - Proofs.PointLiftSpec
+  - Proofs.PointEqSpec
+  - Proofs.DecompressSpec
+  - Proofs.FromBytesSpec
+  - Proofs.DecompressMain
+  r4_requirements:
+  - CurveFieldProofs.fieldImplementation
+  - CurveFieldProofs.edwardsImplementation
+  - ScalarProofs.scalarImplementation
+  - CurveFieldProofs.to_bytes_spec
+  - CurveFieldProofs.ed_compress_spec
+  - ScalarProofs.from_bytes_mod_order_wide_spec
+  - CurveFieldProofs.decompress_of_canonical
+  - CurveFieldProofs.verify_accepts_iff
+  - CurveFieldProofs.verify_accepts_iff_point
+  - CurveFieldProofs.verify_accepts_iff_point_eq
+  - CurveFieldProofs.verify_accepts_iff_decompress
+  what_would_invalidate_this_evidence:
+  - The deployed code path differs from the checked backend or source revision.
+  - A certificate stops compiling under the pinned Lean environment.
+  - A certificate's axiom cone deviates from its documented allowed set in either
+    direction.
+  - Required invariants are not enforced before calling verified routines.
+  - The implementation uses accelerator or syscall paths not covered by the certificates.
+  - The production entry point stops mapping to the verified path (e.g. anza's default
+    verify() is used instead of verify_dalek).
+  next_proof_milestones:
+  - Byte-level specs for the wire parsers/filters (discharge the hypothesis-parametric
+    parse assumptions).
+  - A verified SHA-512 (or a proof-carrying hash oracle) to shrink the boundary.
+  - Reproducible production builds and compiler/build assurance (toward R5).
+  - Side-channel and backend-specific assurance evidence (toward R5).
+  - Signing-side verification (nonce derivation, signer correctness).

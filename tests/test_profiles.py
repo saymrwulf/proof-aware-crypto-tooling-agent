@@ -6,7 +6,13 @@ def test_ed25519_profile_defaults():
     profile = get_profile("ed25519")
     assert "Proofs.FieldMain" in profile.axiom_imports
     assert "CurveFieldProofs.fieldImplementation" in profile.default_certificates
-    assert any("Full EdDSA" in exclusion for exclusion in profile.exclusions)
+    # Since phase 2 landed in the corpus, EdDSA verification IS proven; the
+    # honest exclusions are the hash oracle, the parse hypotheses, and signing.
+    assert any("SHA-512" in exclusion for exclusion in profile.exclusions)
+    assert any("hypothesis-parametric" in exclusion for exclusion in profile.exclusions)
+    assert any("Signing" in exclusion for exclusion in profile.exclusions)
+    assert "CurveFieldProofs.verify_accepts_iff_decompress" in profile.default_certificates
+    assert "CurveFieldProofs.verify_accepts_iff_decompress" in profile.r4_requirements
 
 
 def test_repo_config_merges_backend_warning():
