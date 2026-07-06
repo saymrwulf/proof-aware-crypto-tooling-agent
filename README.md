@@ -64,6 +64,7 @@ The `notebooks/` directory contains a zero-to-hero teaching sequence for undergr
 - `04_proof_hygiene_and_boundaries.ipynb`: `sorry`, local axioms, trivial targets, manifest coverage.
 - `05_third_party_attestation_provider.ipynb`: provider trust transformation and signed attestations.
 - `06_merkle_transparency_logs.ipynb`: RFC 9162-style Merkle proofs, STHs, Ed25519/ML-DSA policy.
+- `06a_provider_build_the_log.ipynb` / `06b_agent_verify_inclusion.ipynb`: the MIRRORED PAIR - one provider (builds, Lean-verifies, signs with the merkleized library, self-checks its own inclusion), many agents (verify inclusion from scratch in ~25 lines, no Lean); the domain separation is the design and the lecture structure mirrors it.
 - `07_agent_consequences.ipynb`: receipt-gated artifact builds and wallet-denial policy.
 - `08_capstone_research_program.ipynb`: audit the shipped R4 evidence; design the R5 discharge plan.
 - `09_dogfood_verified_crypto.ipynb`: the proven-path verifier in the agent's own loop; hybrid-PQC posture.

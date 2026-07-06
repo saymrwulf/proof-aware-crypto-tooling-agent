@@ -139,7 +139,16 @@ COURSE = {
                 5. `05_third_party_attestation_provider.ipynb`
                    Learn how a proof-checking service can transform hard local verification into provider trust.
 
-                6. `06_merkle_transparency_logs.ipynb`
+                6. `06_merkle_transparency_logs.ipynb`, then the MIRRORED PAIR
+                   `06a_provider_build_the_log.ipynb` / `06b_agent_verify_inclusion.ipynb`
+
+                   The trust architecture has exactly two domains - ONE provider
+                   who builds and signs the authenticated structure (and pays the
+                   Lean bill), MANY agents who verify inclusion proofs in
+                   milliseconds. The course mirrors that split structurally: 6a is
+                   written entirely in the provider's voice, 6b entirely in the
+                   agent's. If you cannot say which notebook a step belongs to,
+                   you have not understood the step.
                    Build the Merkle accumulator intuition behind inclusion proofs, consistency proofs, and Signed Tree Heads.
 
                 7. `07_agent_consequences.ipynb`
@@ -1043,6 +1052,18 @@ COURSE = {
             ),
             md(
                 """
+                ## Two domains, two notebooks - by design
+
+                Everything above is the shared VOCABULARY. The system itself has
+                exactly two roles, and the next two notebooks separate them on
+                purpose: **6a - the provider** (a singleton: builds every leaf via
+                Lean replay, builds the tree, signs the root with the merkleized
+                library, and Merkle-verifies its own signing library's leaf before
+                signing), and **6b - the agent** (one of many: the provider's
+                public key, the evidence files, ~25 lines of hashing, and nothing
+                else - explicitly NO Lean). Keep the mirror in mind as you drill
+                the primitives below; each drill belongs to one side.
+
                 ## Split Views: why a receipt is not enough
 
                 Everything above verifies ONE receipt against ONE signed tree head. A malicious provider can maintain TWO trees - one shown to you, one shown to the world - and both views verify perfectly in isolation. This is EQUIVOCATION, and the defense is memory: pin every tree head you accept, and demand that every later tree head be CONSISTENT with your pin (same size -> same root; larger size -> a verified consistency proof from your pinned size; smaller size -> rollback, reject forever).
@@ -1119,6 +1140,421 @@ COURSE = {
                 - Why must the consistency anchor's ROOT (not just its size) be checked against the pin? Construct the lie that a size-only check would miss.
                 - Write a policy for when an autonomous agent should require `both` signatures.
                 - Research checkpoint: compare PACTA's pin store to production Certificate Transparency monitor/gossip requirements - what does gossip add that a single pin store cannot?
+                """
+            ),
+        ]
+    ),
+    "06a_provider_build_the_log.ipynb": notebook(
+        [
+            md(
+                """
+                # Lecture 6a: THE PROVIDER'S SIDE - Building the Authenticated Structure
+
+                > **DOMAIN BANNER - read this first.** In this notebook YOU ARE THE
+                > PROVIDER. There is exactly **one** of you per log. You hold the
+                > signing key. You own a Lean toolchain and hours of compute. You
+                > carry the append-only obligations. Nothing in this notebook is
+                > ever executed by an agent - and that asymmetry is not an
+                > implementation detail, it is the entire design (see the
+                > justification at the end).
+
+                The provider's job, end to end: **verify -> leaf -> tree -> sign ->
+                self-check**. Only the first step involves Lean; everything after
+                is hashing and one signature.
+                """
+            ),
+            md(
+                """
+                ## Learning Objectives
+
+                - Build the full authenticated data structure from real attestations: leaves, tree, Signed Tree Head.
+                - Place the Lean verification correctly: it is the LEAF-MAKING step, the only expensive one, and it never travels to the agent.
+                - Sign the root with the merkleized library and run the provider's own inclusion self-check ("the provider eats its own dogfood").
+                - Justify the singleton/many split as a design decision.
+                """
+            ),
+            md(
+                """
+                ## Step 1 - Verify (the expensive step, done ONCE)
+
+                The leaf content is a signed **attestation**: the outcome of replaying
+                every Lean proof of one repository under lean-guard (~30 minutes of
+                kernel re-checking per fork on the reference machine). This notebook
+                does NOT re-run that - the shipped `evidence/` attestations ARE that
+                step's output. What matters architecturally: **the Lean cost lives
+                here and only here.** No agent ever pays it again.
+                """
+            ),
+            code(
+                """
+                from pathlib import Path
+                import sys
+
+                repo_root = Path.cwd()
+                if not (repo_root / "src" / "pacta").exists():
+                    repo_root = repo_root.parent
+                sys.path.insert(0, str(repo_root / "src"))
+                sys.path.insert(0, str(repo_root / "provider" / "src"))
+
+                from pacta.yamlio import load_data
+
+                attestations = {
+                    fork: load_data(repo_root / "evidence" / f"{fork}-ed25519.attestation.yaml")
+                    for fork in ["dalek", "anza", "risc0", "betrusted"]
+                }
+                for fork, att in attestations.items():
+                    certs = att["certificates"]
+                    clean = sum(1 for c in certs if c["status"] == "proven" and c["axiom_status"] == "clean")
+                    print(f"{fork}: {clean}/{len(certs)} proven | commit {att['subject']['repo_commit'][:8]} | guard: {att['machine_protection']['lean_guard'].rsplit('/',1)[-1]}")
+                """
+            ),
+            md(
+                """
+                ## Steps 2+3 - Leaf and tree (cheap, mechanical)
+
+                Each attestation is wrapped, canonically serialized, and hashed with
+                the RFC 9162 leaf prefix `0x00`; pairs of nodes hash with prefix
+                `0x01`. Build a REAL provider log in a scratch directory - you are
+                the provider, so mint your own key first:
+                """
+            ),
+            code(
+                """
+                import tempfile
+                from pacta.signing import generate_ed25519_keypair
+                from pacta_provider.transparency_log import TransparencyLog
+
+                state = Path(tempfile.mkdtemp(prefix="provider-lecture-"))
+                generate_ed25519_keypair(state / "provider.key", state / "provider.pub")
+                log = TransparencyLog(state / "log")
+                log.init("lecture-provider", state / "provider.pub")
+
+                receipts = {}
+                for fork, att in attestations.items():
+                    att_path = state / f"{fork}.attestation.yaml"
+                    from pacta.yamlio import dump_data
+                    dump_data(att, att_path)
+                    receipts[fork] = log.append_attestation(att_path, state / "provider.key", state / "provider.pub")
+                print("tree size:", receipts["betrusted"]["tree_size"])
+                print("root:", receipts["betrusted"]["sth"]["root_hash"][:32], "…")
+                """
+            ),
+            md(
+                """
+                ## Steps 4+5 - Sign the root, then CHECK YOURSELF
+
+                The tree head is signed with the **merkleized library itself** (when
+                the dogfood binary is built): the Ed25519 code that signs this root
+                is the same pinned dalek source whose proof attestation is a leaf of
+                this very tree. Before signing, the provider runs the SAME Merkle
+                inclusion verification an agent would run - on its own signing
+                library's leaf, against the tree it is about to sign - and embeds
+                the verdict in the signature block. A root signature that names the
+                leaf vouching for the code that produced it:
+                """
+            ),
+            code(
+                """
+                import json
+
+                sth = receipts["betrusted"]["sth"]
+                ed = sth["signatures"]["ed25519"]
+                print("signing backend:", ed.get("signing_backend"))
+                print(json.dumps(ed.get("signing_provenance", {"note": "dogfood binary not built on this host - OpenSSL fallback, provenance omitted"}), indent=1))
+                """
+            ),
+            md(
+                """
+                ## The structure you just built, drawn from your own log
+                """
+            ),
+            code(
+                """
+                from pacta.transparency import leaf_hash, merkle_root, node_hash
+
+                def svg_merkle(leaf_hashes, highlight=None, title="", domain="PROVIDER: builds every box below", color="#1e7f4f"):
+                    n = len(leaf_hashes)
+                    width, lh, lv = 980, 108, 92
+                    levels = []
+                    level = [bytes.fromhex(h) if isinstance(h, str) else h for h in leaf_hashes]
+                    levels.append(level)
+                    while len(level) > 1:
+                        nxt = []
+                        for i in range(0, len(level) - 1, 2):
+                            nxt.append(node_hash(level[i], level[i + 1]))
+                        if len(level) % 2:
+                            nxt.append(level[-1])
+                        levels.append(nxt)
+                        level = nxt
+                    height = 130 + lv * len(levels) + 60
+                    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" font-family="monospace" font-size="11">']
+                    out.append(f'<rect x="4" y="4" width="{width-8}" height="{height-8}" fill="none" stroke="{color}" stroke-width="2" rx="8"/>')
+                    out.append(f'<text x="16" y="24" fill="{color}" font-size="13" font-weight="bold">{domain}</text>')
+                    out.append(f'<text x="16" y="42" fill="#555">{title}</text>')
+                    pos = {}
+                    for li, lvl in enumerate(levels):
+                        y = height - 70 - li * lv
+                        span = width / (len(lvl) + 1)
+                        for i, node in enumerate(lvl):
+                            x = span * (i + 1)
+                            pos[(li, i)] = (x, y)
+                            hl = highlight and li == 0 and i == highlight[0]
+                            sib = highlight and (li, i) in highlight[1]
+                            fill = "#fdf0da" if sib else ("#e2f2e9" if hl else "#f4f4f6")
+                            stroke = "#a86a10" if sib else ("#1e7f4f" if hl else "#999")
+                            out.append(f'<rect x="{x-52}" y="{y-16}" width="104" height="32" fill="{fill}" stroke="{stroke}" stroke-width="{2 if (hl or sib) else 1}" rx="4"/>')
+                            label = ("leaf %d" % i) if li == 0 else ("root" if li == len(levels) - 1 else "node")
+                            out.append(f'<text x="{x}" y="{y-3}" text-anchor="middle" fill="#333">{label}</text>')
+                            out.append(f'<text x="{x}" y="{y+11}" text-anchor="middle" fill="#777">{node.hex()[:10]}…</text>')
+                            if li > 0:
+                                for ci in (2 * i, 2 * i + 1):
+                                    if (li - 1, ci) in pos:
+                                        cx, cy = pos[(li - 1, ci)]
+                                        out.append(f'<line x1="{x}" y1="{y+16}" x2="{cx}" y2="{cy-16}" stroke="#bbb"/>')
+                    rx, ry = pos[(len(levels) - 1, 0)]
+                    out.append(f'<rect x="{rx-135}" y="{ry-62}" width="270" height="30" fill="#eef" stroke="#3b4d8f" rx="4"/>')
+                    out.append(f'<text x="{rx}" y="{ry-42}" text-anchor="middle" fill="#3b4d8f">Signed Tree Head: Ed25519(root) via merkleized library</text>')
+                    out.append(f'<line x1="{rx}" y1="{ry-32}" x2="{rx}" y2="{ry-16}" stroke="#3b4d8f"/>')
+                    out.append("</svg>")
+                    return "".join(out)
+
+                entries = log.entries()
+                leaf_hexes = [leaf_hash(e.leaf_bytes()).hex() for e in entries]
+                svg = svg_merkle(leaf_hexes, title=f"your lecture log: {len(entries)} attestation leaves, root {merkle_root([e.leaf_bytes() for e in entries]).hex()[:16]}…")
+                try:
+                    from IPython.display import SVG, display
+                    display(SVG(svg))
+                except Exception:
+                    print(svg[:200], "… (open in a notebook to render)")
+                """
+            ),
+            md(
+                """
+                ## Why a singleton? The design justification
+
+                | | Provider (this notebook) | Agent (next notebook) |
+                |---|---|---|
+                | How many | **exactly one** per log | unbounded |
+                | Owns | the signing key, the Lean toolchain, the full log | the provider's PUBLIC key, a pin file |
+                | Pays | hours of kernel time per repo, ONCE | milliseconds per check, forever |
+                | Obligations | append-only, sign every head, serve proofs, self-verify | pin every head, demand consistency |
+                | Can be wrong? | detectably: signatures + pins make lies attributable | fails closed |
+
+                The asymmetry is the product. If agents had to run Lean, the service
+                would add nothing; if the provider's claims weren't pinned and
+                signed, trust would be a rumor. Every artifact in this course lives
+                on exactly one side of this table - and the split between this
+                notebook and the next MIRRORS it on purpose: if you cannot say
+                which notebook a step belongs to, you have not understood the step.
+
+                ## Exercises
+
+                - Append a fifth attestation (edit one field of a copy) and watch the root change; which internal nodes changed and which did not? Explain from the tree shape.
+                - The self-inclusion check ran against the tree BEFORE your key existed in any leaf. What does `signing_provenance.self_inclusion` say, and why is recording that honest?
+                - Cost accounting: with 4 repos x 30 minutes of Lean and N agents x 5 ms of verification, at what N does the provider model beat every-agent-verifies-locally? (Hint: N=1.)
+                - Design question: what breaks if there are TWO providers with one key? With two keys and one log?
+                """
+            ),
+        ]
+    ),
+    "06b_agent_verify_inclusion.ipynb": notebook(
+        [
+            md(
+                """
+                # Lecture 6b: THE AGENT'S SIDE - Verifying Inclusion (one of many)
+
+                > **DOMAIN BANNER - read this first.** In this notebook YOU ARE AN
+                > AGENT. There are **many** of you. You possess exactly three
+                > things: the provider's public key, the evidence files, and about
+                > forty lines of hashing code. You do NOT possess Lean, a proof
+                > toolchain, or the provider's private key - and you never will
+                > need them. Everything below runs in milliseconds. If a cell in
+                > this notebook needed Lean, the design would have failed.
+
+                This is **Merkle proof verification, not Lean verification** - the
+                agent checks WHERE a statement sits, never re-derives WHY it is true.
+                """
+            ),
+            md(
+                """
+                ## Learning Objectives
+
+                - Implement the complete inclusion verifier from scratch - hashlib only, no pacta imports for the core.
+                - Verify a REAL receipt against the REAL signed tree head.
+                - See the inclusion path in the picture of the real 8-leaf log.
+                - Read the provider's self-check ("dogfood in both directions") from the signature block and say what it does and does not prove.
+                """
+            ),
+            md(
+                """
+                ## The whole verifier, from scratch
+
+                To make the cost asymmetry unmistakable, here is the ENTIRE core of
+                what an agent must implement - RFC 9162 inclusion verification in
+                ~25 lines of standard-library Python. Read every line; this is all
+                the cryptographic machinery your trust rests on (plus one Ed25519
+                signature check):
+                """
+            ),
+            code(
+                """
+                import hashlib
+
+                def leaf_hash(data: bytes) -> bytes:
+                    return hashlib.sha256(b"\\x00" + data).digest()
+
+                def node_hash(left: bytes, right: bytes) -> bytes:
+                    return hashlib.sha256(b"\\x01" + left + right).digest()
+
+                def verify_inclusion(leaf: bytes, index: int, size: int, proof: list, root: bytes) -> bool:
+                    if index >= size:
+                        return False
+                    fn, sn = index, size - 1
+                    node = leaf_hash(leaf)
+                    for sibling in proof:
+                        if sn == 0:
+                            return False
+                        if fn % 2 == 1 or fn == sn:
+                            node = node_hash(sibling, node)
+                            if fn % 2 == 0:
+                                while fn % 2 == 0 and fn != 0:
+                                    fn //= 2
+                                    sn //= 2
+                        else:
+                            node = node_hash(node, sibling)
+                        fn //= 2
+                        sn //= 2
+                    return sn == 0 and node == root
+
+                print("the agent's entire Merkle toolbox: 3 functions,", "no imports beyond hashlib")
+                """
+            ),
+            md(
+                """
+                ## Apply it to the REAL receipt
+                """
+            ),
+            code(
+                """
+                import json
+                from pathlib import Path
+                import sys
+
+                repo_root = Path.cwd()
+                if not (repo_root / "src" / "pacta").exists():
+                    repo_root = repo_root.parent
+                sys.path.insert(0, str(repo_root / "src"))
+                from pacta.yamlio import load_data
+                from pacta.signing import canonical_json
+
+                att = load_data(repo_root / "evidence" / "dalek-ed25519.attestation.yaml")
+                receipt = load_data(repo_root / "evidence" / "dalek-ed25519.receipt.yaml")
+
+                leaf_bytes = canonical_json({"schema_version": 1, "type": "pacta.transparency.attestation_leaf.v1", "attestation": att})
+                proof = [bytes.fromhex(h) for h in receipt["inclusion_proof"]]
+                root = bytes.fromhex(receipt["sth"]["root_hash"])
+
+                ok = verify_inclusion(leaf_bytes, receipt["leaf_index"], receipt["tree_size"], proof, root)
+                print(f"leaf {receipt['leaf_index']} of {receipt['tree_size']}, {len(proof)} siblings -> inclusion:", ok)
+                assert ok
+                """
+            ),
+            md(
+                """
+                ## One signature check completes the chain
+
+                Inclusion binds the attestation to a root; the signature binds the
+                root to the provider. Note what the AGENT learns from the signature
+                block's `signing_provenance`: the provider signed this root with the
+                merkleized library and Merkle-verified that library's own leaf first
+                - dogfood in both directions. The agent still re-checks inclusion
+                itself (above); the provenance is the provider's discipline made
+                visible, not a substitute for the agent's check.
+                """
+            ),
+            code(
+                """
+                from pacta.transparency import verify_signed_tree_head
+                from pacta.sthstore import check_sth_against_store
+                import tempfile
+
+                ok, diagnostics, statuses = verify_signed_tree_head(receipt["sth"], repo_root / "evidence" / "provider.ed25519.pub")
+                print("STH signature:", statuses.get("ed25519"), "| verified on backend:", statuses.get("ed25519_backend"))
+                print("provider's own discipline, as recorded in the signature block:")
+                print(json.dumps(receipt["sth"]["signatures"]["ed25519"].get("signing_provenance", {}), indent=1))
+                with tempfile.TemporaryDirectory() as tmp:
+                    pin = check_sth_against_store(receipt["sth"], Path(tmp) / "pins.json")
+                    print("pin store:", pin.action)
+                """
+            ),
+            md(
+                """
+                ## The picture: where your leaf sits in the real log
+                """
+            ),
+            code(
+                """
+                # reconstruct the on-path node hashes from the receipt alone - the
+                # agent never needs the other leaves, only the siblings.
+                def svg_inclusion(receipt, width=980):
+                    size, index = receipt["tree_size"], receipt["leaf_index"]
+                    proof = receipt["inclusion_proof"]
+                    rows = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="330" font-family="monospace" font-size="11">']
+                    rows.append(f'<rect x="4" y="4" width="{width-8}" height="322" fill="none" stroke="#3b4d8f" stroke-width="2" rx="8"/>')
+                    rows.append('<text x="16" y="24" fill="#3b4d8f" font-size="13" font-weight="bold">AGENT: verifies only the highlighted path - everything grey is somebody else&apos;s data</text>')
+                    span = width / (size + 1)
+                    for i in range(size):
+                        x = span * (i + 1)
+                        me = i == index
+                        fill = "#e2f2e9" if me else "#f4f4f6"
+                        stroke = "#1e7f4f" if me else "#bbb"
+                        rows.append(f'<rect x="{x-42}" y="250" width="84" height="30" fill="{fill}" stroke="{stroke}" stroke-width="{2 if me else 1}" rx="4"/>')
+                        label = "YOUR leaf" if me else f"leaf {i}"
+                        rows.append(f'<text x="{x}" y="269" text-anchor="middle" fill="{stroke}">{label}</text>')
+                    node = leaf_hash(leaf_bytes)
+                    y = 250
+                    x = span * (index + 1)
+                    for depth, sib in enumerate(proof):
+                        ny = y - 60
+                        nx = x  # visual simplification: path rises vertically
+                        rows.append(f'<rect x="{nx-52}" y="{ny-16}" width="104" height="30" fill="#fdf0da" stroke="#a86a10" rx="4"/>')
+                        rows.append(f'<text x="{nx}" y="{ny+3}" text-anchor="middle" fill="#a86a10">sibling {depth}: {sib[:10]}…</text>')
+                        rows.append(f'<line x1="{x}" y1="{y-16 if depth else 250}" x2="{nx}" y2="{ny+14}" stroke="#a86a10"/>')
+                        y = ny
+                    rows.append(f'<rect x="{x-135}" y="{y-70}" width="270" height="30" fill="#eef" stroke="#3b4d8f" rx="4"/>')
+                    rows.append(f'<text x="{x}" y="{y-50}" text-anchor="middle" fill="#3b4d8f">signed root {receipt["sth"]["root_hash"][:14]}… (dogfood-signed)</text>')
+                    rows.append(f'<line x1="{x}" y1="{y-16}" x2="{x}" y2="{y-40}" stroke="#3b4d8f"/>')
+                    rows.append("</svg>")
+                    return "".join(rows)
+
+                svg = svg_inclusion(receipt)
+                try:
+                    from IPython.display import SVG, display
+                    display(SVG(svg))
+                except Exception:
+                    print("(open in a notebook to render the figure)")
+                print(f"cost of everything in this notebook: ~{receipt['tree_size'].bit_length()} hashes + 1 signature check - milliseconds.")
+                """
+            ),
+            md(
+                """
+                ## Convinced - of what, exactly?
+
+                After these cells pass, the agent knows: *the provider whose key I
+                pinned states that the Lean proofs of repository X at commit Y check
+                out with exactly the documented assumptions, and that statement is
+                irrevocably part of the log every other agent sees.* The agent then
+                clones commit Y (the git hash IS the content hash) and builds it -
+                compiler and build remain declared trusted base until R5. Where a
+                claim lives (this notebook) and why it is true (the provider's Lean
+                replay, lecture 6a) never blur.
+
+                ## Exercises
+
+                - Flip one byte of the leaf and re-run: which of the ~25 lines catches it?
+                - Flip one byte of the ROOT instead: what fails now, inclusion or the signature?
+                - Your entire verifier fits in one cell. List everything it does NOT check (freshness? consistency with your previous pin? provider honesty about Lean?) and name the lecture that closes each gap.
+                - The provenance block says the provider checked itself. Why must the agent still run its own inclusion check rather than trust that field?
                 """
             ),
         ]

@@ -10,6 +10,8 @@ EXPECTED_NOTEBOOKS = [
     "04_proof_hygiene_and_boundaries.ipynb",
     "05_third_party_attestation_provider.ipynb",
     "06_merkle_transparency_logs.ipynb",
+    "06a_provider_build_the_log.ipynb",
+    "06b_agent_verify_inclusion.ipynb",
     "07_agent_consequences.ipynb",
     "08_capstone_research_program.ipynb",
     "09_dogfood_verified_crypto.ipynb",
