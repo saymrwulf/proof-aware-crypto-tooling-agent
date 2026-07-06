@@ -1,0 +1,4 @@
+tree_size: 8
+computed_root: 9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283
+stored_sth_root: 9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283
+ok: true

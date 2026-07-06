@@ -1,0 +1,14 @@
+{
+  "created_at": "2026-07-06T08:43:00Z",
+  "ed25519_public_key_fingerprint_sha256": "874c8a008a607021528b2493fa1caf059f9d5c123d29193dfabc09a6d1e7a56a",
+  "hash_algorithm": "RFC9162_SHA256",
+  "log_id": "205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7",
+  "provider": "local-pacta-provider",
+  "schema_version": 1,
+  "standards": [
+    "RFC 9162 Merkle tree hash and inclusion/consistency proof algorithms",
+    "RFC 8032 Ed25519 signature verification via OpenSSL",
+    "FIPS 204 ML-DSA signature slot; must be required by policy only when a backend is configured"
+  ],
+  "type": "pacta.transparency.log_metadata.v1"
+}

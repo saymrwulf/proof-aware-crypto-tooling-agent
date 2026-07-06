@@ -1,0 +1,39 @@
+schema_version: 1
+type: pacta.transparency.receipt.v1
+log_id: 205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7
+hash_algorithm: RFC9162_SHA256
+attestation_path: provider/out/betrusted-ed25519.attestation.yaml
+attestation_digest_sha256: 5bd2a597d712a6a80e6ba82baabcdbbbd54bc913e8a77375a6ae42e2cb7b1c57
+leaf_index: 7
+leaf_hash: 2791c352956ebc620a4fe12b20bfd6faa0813238c5bc0563fa4eb0130d829247
+tree_size: 8
+inclusion_proof:
+- bdde4e4b87cd263b5914dbbae0c85ceed468c3054596f6ca79121e54cc6a134e
+- f3724e66715b582c384cf49928d4705458475ea4293749989c483ab7fe9496ce
+- 04541cffd46cf5a97d7453ed8ae681b1a1fedb879eb8c7a262e05b3176159eed
+consistency:
+  from_tree_size: 8
+  from_root_hash: 9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283
+  proof: []
+  status: not_applicable
+sth:
+  schema_version: 1
+  type: pacta.transparency.signed_tree_head.v1
+  log_id: 205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7
+  tree_size: 8
+  timestamp: '2026-07-06T12:53:09Z'
+  root_hash: 9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283
+  hash_algorithm: RFC9162_SHA256
+  signatures:
+    ed25519:
+      scheme: openssl-ed25519
+      status: signed
+      payload_digest_sha256: d5d25db2c90f0246cc10d10f912085b81c60d2a324354b5abecfdbeb8bd17ee2
+      signature_base64: sI4rWnWMrX0zDaN8jofBwSuExKg1e0cmZV3OPaulbXDV97yz95aSo0Gnrfd1En2vyyV1qoEXdTAY9NDgvA8xBA==
+      public_key_fingerprint_sha256: 874c8a008a607021528b2493fa1caf059f9d5c123d29193dfabc09a6d1e7a56a
+    ml_dsa:
+      scheme: ML-DSA-65
+      standard: FIPS 204
+      status: not_configured
+      reason: A backend appears available, but no ML-DSA signing key was configured
+        for this log.

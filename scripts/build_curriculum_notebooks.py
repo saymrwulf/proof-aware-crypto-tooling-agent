@@ -871,6 +871,37 @@ COURSE = {
             ),
             md(
                 """
+                ## Real evidence, checked in this cell
+
+                Everything above used schema fixtures. The repository now ships REAL provider evidence under `evidence/`: signed attestations from a guarded Lean replay of all four verified repositories (~30 minutes of kernel re-checking per fork), each recording the repo commit, the machine-protection block, and all sixteen certificates with their observed axiom cones. Read one and re-derive its verdicts locally - never trust the provider's own labels:
+                """
+            ),
+            code(
+                """
+                from pacta.attestation import load_attestation, _normalize_certificate
+                from pacta.config import load_config
+                from pacta.profiles import get_profile
+                from pacta.signing import verify_attestation_signature_detailed
+
+                config = load_config(repo_root / "examples" / "repos.yaml")
+                repo = config.repo_named("dalek-ed25519-verified")
+                profile = get_profile("ed25519", repo)
+                att = load_attestation(repo_root / "evidence" / "dalek-ed25519.attestation.yaml")
+
+                ok, error, backend = verify_attestation_signature_detailed(att, repo_root / "evidence" / "provider.ed25519.pub")
+                print("signature valid:", ok, "| verified on backend:", backend)
+                print("subject commit:", att["subject"]["repo_commit"][:12])
+                print("machine protection:", att["machine_protection"]["lean_guard"].rsplit("/", 2)[-1])
+
+                rederived = [_normalize_certificate(cert, profile) for cert in att["certificates"]]
+                clean = sum(1 for cert in rederived if cert["status"] == "proven" and cert["axiom_status"] == "clean")
+                print(f"re-derived locally: {clean}/{len(rederived)} proven with boundary-exact cones")
+                apex = [cert for cert in rederived if cert["name"].endswith("_decompress")][0]
+                print("full-lift tier observed cone:", apex["observed_axioms"])
+                """
+            ),
+            md(
+                """
                 ## Exercises
 
                 - Draw the trusted base for local replay and provider attestation. Mark what changes.
@@ -1052,6 +1083,33 @@ COURSE = {
             md(
                 """
                 At real scale the same check runs on every `pacta receipt-verify --sth-store ...` and `pacta agent --sth-store ...` invocation; receipts embed a consistency anchor from the previous tree size, the provider serves proofs from arbitrary pinned sizes (`pacta_provider log-consistency --from-size N`), and `pacta_provider log-audit` is the monitor's self-check. A freshness policy (`--max-sth-age-seconds`) closes the stale-root hole: an old-but-valid tree head could hide later entries.
+
+                ### The real thing
+
+                The `evidence/` directory holds four REAL receipts from the shipped transparency log (tree size 8 - the first four leaves honestly record a failed audit run; read `evidence/README.md`). Verify all four cryptographically and watch a fresh pin store handle them:
+                """
+            ),
+            code(
+                """
+                import tempfile
+                from pathlib import Path as _P
+                from pacta.sthstore import check_sth_against_store
+                from pacta.transparency import verify_receipt
+                from pacta.yamlio import load_data as _load
+
+                log_key = repo_root / "evidence" / "provider.ed25519.pub"
+                with tempfile.TemporaryDirectory() as tmp:
+                    store = _P(tmp) / "pins.json"
+                    for fork in ["dalek", "anza", "risc0", "betrusted"]:
+                        att = _load(repo_root / "evidence" / f"{fork}-ed25519.attestation.yaml")
+                        receipt = _load(repo_root / "evidence" / f"{fork}-ed25519.receipt.yaml")
+                        result = verify_receipt(att, receipt, log_key)
+                        pin = check_sth_against_store(receipt["sth"], store, consistency_from=receipt.get("consistency"))
+                        print(f"{fork}: receipt accepted={result.accepted} backend={result.signatures.get('ed25519_backend')} pin={pin.action}")
+                """
+            ),
+            md(
+                """
 
                 ## Exercises
 

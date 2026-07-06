@@ -118,7 +118,10 @@ def check_sth_against_store(
             False,
             [
                 f"LOG ROLLBACK: presented tree_size {tree_size} is smaller than the pinned size "
-                f"{pinned_size}. Append-only logs never shrink."
+                f"{pinned_size}. Append-only logs never shrink. If this receipt is simply STALE "
+                "(issued before the log grew), request a freshly issued receipt for the same "
+                "leaf - the provider's log-append is idempotent and re-issues an inclusion "
+                "proof against the current tree."
             ],
             "rejected",
         )

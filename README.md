@@ -216,6 +216,18 @@ pacta agent \
 
 This is the intended trust transformation: local agents can avoid constructing the full verifier environment, but they must explicitly trust the provider identity and verification key.
 
+## Real Evidence (shipped)
+
+`evidence/` contains signed, transparency-logged attestations from a REAL
+guarded replay of all four verified repositories: 16/16 certificates proven
+per fork with boundary-exact axiom cones, pinned to exact repo commits,
+machine-protected by `lean-guard` throughout (~30 min of Lean kernel
+re-checking per fork, done ONCE - verifying the signature + inclusion
+receipt afterwards takes milliseconds, which is the entire point of the
+provider model). The log's first four leaves honestly record a failed audit
+run (two pacta bugs, fixed and documented); the ledger keeps its history.
+See `evidence/README.md` to re-verify everything yourself.
+
 ## Split-View Defense (STH Pinning)
 
 Standalone receipt verification cannot detect a provider maintaining two log views. `pacta` keeps a local STH pin store:
