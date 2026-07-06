@@ -1,4 +1,4 @@
-# Deploying the online log at zkdefi.org/lean-transparency-log
+# Deploying the online log at ltl.zkdefi.org
 
 STATUS: DEPLOYED (2026-07-06) and serving. This file is now the as-built
 record plus the update runbook. Deliberately generic about the host: it
@@ -101,7 +101,7 @@ After=network.target
 User=pacta
 WorkingDirectory=/srv/pacta/app
 Environment=PYTHONPATH=/srv/pacta/app/src:/srv/pacta/app/provider/src
-ExecStart=/usr/bin/python3 -m pacta_provider serve --log-dir /srv/pacta/log --base-path lean-transparency-log --host 127.0.0.1 --port 8461
+ExecStart=/usr/bin/python3 -m pacta_provider serve --log-dir /srv/pacta/log --host 127.0.0.1 --port 8461
 Restart=on-failure
 # hardening: read-only service, no key material anywhere near it
 ProtectSystem=strict
@@ -115,16 +115,21 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload && sudo systemctl enable --now pacta-log
-curl -s http://127.0.0.1:8461/lean-transparency-log/healthz
+curl -s http://127.0.0.1:8461/healthz
 ```
 
-## 3. Reverse proxy on zkdefi.org
+The service serves from the root path by default (it lives on its own
+subdomain); pass `--base-path <prefix>` only if you must mount it under
+a path instead.
 
-Caddy (inside the existing `zkdefi.org` site block):
+## 3. Reverse proxy: ltl.zkdefi.org
+
+DNS: an `A` record for `ltl` pointing at the same host (or a `CNAME` to
+the apex). Caddy then gets its own site block and handles the
+certificate automatically:
 
 ```caddy
-redir /lean-transparency-log /lean-transparency-log/docs
-route /lean-transparency-log/* {
+ltl.zkdefi.org {
     reverse_proxy 127.0.0.1:8461 {
         transport http {
             response_header_timeout 15s
@@ -133,21 +138,34 @@ route /lean-transparency-log/* {
 }
 ```
 
+If the log was ever served under a path (the original deployment used
+`zkdefi.org/lean-transparency-log`), keep a permanent redirect in the
+old site block so published links stay alive:
+
+```caddy
+redir /lean-transparency-log https://ltl.zkdefi.org/ permanent
+handle_path /lean-transparency-log/* {
+    redir https://ltl.zkdefi.org{uri} permanent
+}
+```
+
 nginx equivalent, with basic rate limiting (the backend is a stdlib
 threading server - let the proxy absorb abuse):
 
 ```nginx
 limit_req_zone $binary_remote_addr zone=pactalog:1m rate=20r/s;
-location /lean-transparency-log/ {
-    limit_req zone=pactalog burst=40 nodelay;
-    proxy_read_timeout 15s;
-    proxy_pass http://127.0.0.1:8461/lean-transparency-log/;
-    proxy_set_header Host $host;
+server {
+    server_name ltl.zkdefi.org;
+    location / {
+        limit_req zone=pactalog burst=40 nodelay;
+        proxy_read_timeout 15s;
+        proxy_pass http://127.0.0.1:8461/;
+        proxy_set_header Host $host;
+    }
 }
-location = /lean-transparency-log { return 301 /lean-transparency-log/docs; }
 ```
 
-Check: `https://zkdefi.org/lean-transparency-log/docs` renders the customer
+Check: `https://ltl.zkdefi.org/docs` renders the customer
 documentation; `/v1/sth` returns the dogfood-signed head.
 
 ## 4. Second mirror (any Forgejo/Gitea/GitLab you operate)
@@ -182,12 +200,12 @@ sudo systemctl restart pacta-log
 ## 6. Smoke tests from anywhere
 
 ```bash
-pacta log-fetch  --url https://zkdefi.org/lean-transparency-log --component dalek-ed25519-verified --out-dir /tmp/e
+pacta log-fetch  --url https://ltl.zkdefi.org --component dalek-ed25519-verified --out-dir /tmp/e
 pacta receipt-verify --attestation /tmp/e/dalek-ed25519-verified.attestation.json \
     --receipt /tmp/e/dalek-ed25519-verified.receipt.json \
     --log-public-key <provider.ed25519.pub from the published repo> \
     --sth-store ~/.pacta-pins.json
-pacta sth-refresh --url https://zkdefi.org/lean-transparency-log \
+pacta sth-refresh --url https://ltl.zkdefi.org \
     --sth-store ~/.pacta-pins.json --log-public-key <pubkey>
 git clone https://github.com/saymrwulf/lean-transparency-log && cd lean-transparency-log && python3 verify.py --all
 ```

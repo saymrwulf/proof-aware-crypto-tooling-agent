@@ -1549,7 +1549,7 @@ COURSE = {
                 (`pacta witness-audit` recomputes every prefix root from the
                 published leaves; run `python3 verify.py --all` in a clone for the
                 no-install version). The ONLINE SERVICE
-                (`zkdefi.org/lean-transparency-log`) adds live endpoints: fetch
+                (`ltl.zkdefi.org`) adds live endpoints: fetch
                 fresh evidence (`pacta log-fetch`), advance your pin with an
                 online consistency proof (`pacta sth-refresh`). The verification
                 you do afterwards is IDENTICAL in all three transports - this

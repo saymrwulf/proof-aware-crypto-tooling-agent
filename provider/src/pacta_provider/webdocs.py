@@ -102,7 +102,7 @@ def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str) -> s
 
 
 def render_docs(log: TransparencyLog, base_path: str) -> str:
-    base = "/" + base_path.strip("/")
+    base = "/" + base_path.strip("/") if base_path.strip("/") else ""
     metadata = log.metadata()
     history = log.sth_history()
     latest: dict[str, Any] = history[-1] if history else {}

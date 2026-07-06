@@ -72,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve = sub.add_parser("serve", help="Serve the log read-only over HTTP (CT-style endpoints + customer docs). Never touches private keys.")
     serve.add_argument("--log-dir", required=True)
-    serve.add_argument("--base-path", default="lean-transparency-log")
+    serve.add_argument("--base-path", default="")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8461)
     serve.set_defaults(func=cmd_serve)
@@ -166,7 +166,9 @@ def cmd_serve(args) -> int:
     from .web import serve as make_server
 
     server = make_server(args.log_dir, base_path=args.base_path, host=args.host, port=args.port)
-    print(f"serving read-only log on http://{args.host}:{args.port}/{args.base_path.strip('/')}/docs")
+    base = args.base_path.strip("/")
+    prefix = f"/{base}" if base else ""
+    print(f"serving read-only log on http://{args.host}:{args.port}{prefix}/docs")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

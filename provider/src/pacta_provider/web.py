@@ -1,6 +1,6 @@
 """The online face of the transparency log: a READ-ONLY, zero-dependency
 HTTP service exposing CT-style endpoints under a base path (deployed at
-zkdefi.org/lean-transparency-log behind a reverse proxy).
+ltl.zkdefi.org behind a reverse proxy).
 
 Security posture: this process never loads a private key. Tree heads are
 signed OFFLINE by the provider CLI (log-append / log-sth); the service
@@ -150,7 +150,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str):
 
 def serve(
     log_dir: str,
-    base_path: str = "lean-transparency-log",
+    base_path: str = "",
     host: str = "127.0.0.1",
     port: int = 8461,
     docs_html: str | None = None,

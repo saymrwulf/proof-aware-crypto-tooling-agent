@@ -143,7 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
     receipt_verify.set_defaults(func=cmd_receipt_verify)
 
     log_fetch = sub.add_parser("log-fetch", help="Fetch attestation + inclusion proof for a component from an ONLINE log; verify locally afterwards.")
-    log_fetch.add_argument("--url", required=True, help="Base URL, e.g. https://zkdefi.org/lean-transparency-log")
+    log_fetch.add_argument("--url", required=True, help="Base URL, e.g. https://ltl.zkdefi.org")
     log_fetch.add_argument("--component", required=True)
     log_fetch.add_argument("--out-dir", default="fetched-evidence")
     log_fetch.set_defaults(func=cmd_log_fetch)

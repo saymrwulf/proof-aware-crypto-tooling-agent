@@ -30,11 +30,12 @@ def _make_log(tmp_path, n=3):
 
 
 def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
+    # root mount: the production shape (ltl.zkdefi.org serves from /)
     _make_log(tmp_path)
     server = serve(str(tmp_path / "log"), port=0)
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    base = f"http://127.0.0.1:{port}/lean-transparency-log"
+    base = f"http://127.0.0.1:{port}"
     try:
         def get(path):
             with urllib.request.urlopen(base + path, timeout=10) as r:
@@ -60,8 +61,9 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
 
 
 def test_logclient_fetch_and_refresh_pin(tmp_path):
+    # path mount still supported for anyone proxying under a prefix
     _make_log(tmp_path)
-    server = serve(str(tmp_path / "log"), port=0)
+    server = serve(str(tmp_path / "log"), base_path="lean-transparency-log", port=0)
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{port}/lean-transparency-log"

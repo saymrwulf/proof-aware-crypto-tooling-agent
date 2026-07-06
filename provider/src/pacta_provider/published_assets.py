@@ -184,7 +184,7 @@ python3 verify.py --receipt receipts/dalek-ed25519-verified.receipt.json
 ```
 
 The online service (same data, live endpoints + customer documentation):
-**https://zkdefi.org/lean-transparency-log**
+**https://ltl.zkdefi.org**
 
 The provider tooling, agent tooling, and course materials:
 **https://github.com/saymrwulf/proof-aware-crypto-tooling-agent**

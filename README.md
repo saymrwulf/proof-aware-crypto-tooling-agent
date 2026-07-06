@@ -238,7 +238,7 @@ The log has three synchronized faces, transport being orthogonal to trust:
    every leaf, every signed tree head (the WITNESS CHANNEL - all cloners
    see the same heads), per-component receipts, the provider public key,
    and a standalone stdlib-only `verify.py`. Anyone: `python3 verify.py --all`.
-3. **HTTP service** (deployed at `zkdefi.org/lean-transparency-log`, see
+3. **HTTP service** (deployed at `ltl.zkdefi.org`, see
    `DEPLOY.md`): read-only CT-style endpoints + customer docs. The web
    process never touches private keys - heads are signed offline; a
    compromised server can withhold or replay (pinning + freshness detect
@@ -247,8 +247,8 @@ The log has three synchronized faces, transport being orthogonal to trust:
 ```bash
 PYTHONPATH=src:provider/src python -m pacta_provider serve --log-dir ... --base-path lean-transparency-log
 PYTHONPATH=src:provider/src python -m pacta_provider log-publish --log-dir ... --git-dir <mirror clone> --public-key <pub>
-pacta log-fetch   --url https://zkdefi.org/lean-transparency-log --component dalek-ed25519-verified --out-dir fetched
-pacta sth-refresh --url https://zkdefi.org/lean-transparency-log --sth-store pins.json --log-public-key <pub>
+pacta log-fetch   --url https://ltl.zkdefi.org --component dalek-ed25519-verified --out-dir fetched
+pacta sth-refresh --url https://ltl.zkdefi.org --sth-store pins.json --log-public-key <pub>
 pacta witness-audit --published-dir <clone of lean-transparency-log> --log-public-key <pub>
 ```
 
