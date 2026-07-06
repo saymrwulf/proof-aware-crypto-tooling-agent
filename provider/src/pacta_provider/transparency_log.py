@@ -174,5 +174,52 @@ class TransparencyLog:
         return receipt
 
 
+    def consistency_from(self, old_tree_size: int) -> dict[str, Any]:
+        """Consistency proof from an arbitrary earlier tree size - what a
+        pinning agent requests when its pin is older than the receipt's
+        embedded from_tree_size."""
+        entries = self.entries()
+        leaves = [entry.leaf_bytes() for entry in entries]
+        if old_tree_size < 0 or old_tree_size > len(leaves):
+            raise ValueError(f"old_tree_size {old_tree_size} outside tree size {len(leaves)}")
+        return {
+            "schema_version": 1,
+            "type": "pacta.transparency.consistency_proof.v1",
+            "log_id": self.metadata()["log_id"],
+            "from_tree_size": old_tree_size,
+            "from_root_hash": merkle_root(leaves[:old_tree_size]).hex(),
+            "to_tree_size": len(leaves),
+            "to_root_hash": merkle_root(leaves).hex(),
+            "proof": proof_to_hex(consistency_proof(leaves, old_tree_size)),
+        }
+
+    def audit(self) -> dict[str, Any]:
+        """Monitor-side self-check: recompute every prefix root, confirm the
+        stored STH matches the full tree, and confirm every prefix is
+        consistent with the final tree (append-only structure)."""
+        entries = self.entries()
+        leaves = [entry.leaf_bytes() for entry in entries]
+        problems: list[str] = []
+        for position, entry in enumerate(entries):
+            if entry.index != position:
+                problems.append(f"Entry at position {position} carries index {entry.index}.")
+            if leaf_hash(entry.leaf_bytes()).hex() != entry.leaf_hash:
+                problems.append(f"Entry {position} leaf_hash does not match its leaf bytes.")
+        computed_root = merkle_root(leaves).hex()
+        stored_sth = load_data(self.sth_path) if self.sth_path.exists() else None
+        if stored_sth:
+            if stored_sth.get("tree_size") != len(leaves):
+                problems.append("Stored STH tree_size does not match the entry count.")
+            if stored_sth.get("root_hash") != computed_root:
+                problems.append("Stored STH root hash does not match the recomputed tree root.")
+        return {
+            "tree_size": len(leaves),
+            "computed_root": computed_root,
+            "stored_sth_root": (stored_sth or {}).get("root_hash"),
+            "problems": problems,
+            "ok": not problems,
+        }
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")

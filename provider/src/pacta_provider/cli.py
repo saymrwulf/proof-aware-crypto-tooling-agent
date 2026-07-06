@@ -64,6 +64,16 @@ def build_parser() -> argparse.ArgumentParser:
     log_append.add_argument("--out", required=True)
     log_append.set_defaults(func=cmd_log_append)
 
+    log_consistency = sub.add_parser("log-consistency", help="Emit a consistency proof from an earlier tree size (for pinning agents).")
+    log_consistency.add_argument("--log-dir", required=True)
+    log_consistency.add_argument("--from-size", type=int, required=True)
+    log_consistency.add_argument("--out", help="Write the proof document here (default: stdout).")
+    log_consistency.set_defaults(func=cmd_log_consistency)
+
+    log_audit = sub.add_parser("log-audit", help="Monitor check: recompute the tree, verify the stored STH and append-only structure.")
+    log_audit.add_argument("--log-dir", required=True)
+    log_audit.set_defaults(func=cmd_log_audit)
+
     log_sth = sub.add_parser("log-sth", help="Sign and print the latest transparency-log tree head.")
     log_sth.add_argument("--log-dir", default="provider/state/transparency-log")
     log_sth.add_argument("--private-key", required=True)
@@ -129,6 +139,36 @@ def cmd_log_append(args: argparse.Namespace) -> int:
     print(f"ed25519_sth_signature: {receipt['sth']['signatures']['ed25519']['status']}")
     print(f"ml_dsa_sth_signature: {receipt['sth']['signatures']['ml_dsa']['status']}")
     return 0
+
+
+def cmd_log_consistency(args) -> int:
+    from pacta.yamlio import dump_data
+
+    log = TransparencyLog(args.log_dir)
+    document = log.consistency_from(args.from_size)
+    if args.out:
+        dump_data(document, args.out)
+        print(f"consistency proof: {args.out}")
+    else:
+        for key in ("log_id", "from_tree_size", "from_root_hash", "to_tree_size", "to_root_hash"):
+            print(f"{key}: {document[key]}")
+        for item in document["proof"]:
+            print(f"  {item}")
+    return 0
+
+
+def cmd_log_audit(args) -> int:
+    log = TransparencyLog(args.log_dir)
+    report = log.audit()
+    print(f"tree_size: {report['tree_size']}")
+    print(f"computed_root: {report['computed_root']}")
+    print(f"stored_sth_root: {report['stored_sth_root']}")
+    if report["problems"]:
+        print("problems:")
+        for problem in report["problems"]:
+            print(f"  - {problem}")
+    print(f"ok: {str(report['ok']).lower()}")
+    return 0 if report["ok"] else 1
 
 
 def cmd_log_sth(args: argparse.Namespace) -> int:

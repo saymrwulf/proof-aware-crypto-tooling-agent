@@ -24,6 +24,7 @@ from .profiles import get_profile
 from .repo import clone_or_fetch, status_for
 from .report import render_markdown
 from .risk import score_claim_card
+from .sthstore import check_sth_against_store, check_sth_freshness
 from .transparency import load_receipt, verify_receipt
 from .yamlio import dump_data, load_data
 
@@ -111,6 +112,9 @@ def build_parser() -> argparse.ArgumentParser:
     claims.add_argument("--transparency-log-public-key")
     claims.add_argument("--require-transparency-signatures", choices=["ed25519", "both"], default="ed25519")
     claims.add_argument("--require-transparency-receipt", action="store_true")
+    claims.add_argument("--sth-store")
+    claims.add_argument("--consistency-proof")
+    claims.add_argument("--max-sth-age-seconds", type=int)
     claims.set_defaults(func=cmd_claims)
 
     report = sub.add_parser("report", help="Generate a human-readable Markdown risk report.")
@@ -132,6 +136,9 @@ def build_parser() -> argparse.ArgumentParser:
     receipt_verify.add_argument("--receipt", required=True)
     receipt_verify.add_argument("--log-public-key", required=True)
     receipt_verify.add_argument("--require-signatures", choices=["ed25519", "both"], default="ed25519")
+    receipt_verify.add_argument("--sth-store", help="Path to the local STH pin store (split-view/rollback defense).")
+    receipt_verify.add_argument("--consistency-proof", help="File with a hex consistency proof from the pinned tree size (provider: log-consistency).")
+    receipt_verify.add_argument("--max-sth-age-seconds", type=int, help="Reject signed tree heads older than this (freshness policy).")
     receipt_verify.set_defaults(func=cmd_receipt_verify)
 
     agent = sub.add_parser("agent", help="Apply a policy-gated consequence to verification evidence.")
@@ -159,6 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--transparency-log-public-key")
     agent.add_argument("--require-transparency-signatures", choices=["ed25519", "both"], default="ed25519")
     agent.add_argument("--require-transparency-receipt", action="store_true")
+    agent.add_argument("--sth-store", help="Path to the local STH pin store (split-view/rollback defense).")
+    agent.add_argument("--consistency-proof", help="File with a hex consistency proof from the pinned tree size.")
+    agent.add_argument("--max-sth-age-seconds", type=int, help="Reject signed tree heads older than this.")
     agent.set_defaults(func=cmd_agent)
     return parser
 
@@ -369,6 +379,15 @@ def cmd_receipt_verify(args: argparse.Namespace) -> int:
     attestation = load_attestation(args.attestation)
     receipt = load_receipt(args.receipt)
     result = verify_receipt(attestation, receipt, args.log_public_key, require_signatures=args.require_signatures)
+    accountability_diagnostics = _log_accountability_checks(
+        receipt,
+        sth_store=args.sth_store,
+        consistency_proof_path=args.consistency_proof,
+        max_sth_age_seconds=args.max_sth_age_seconds,
+    )
+    if accountability_diagnostics:
+        result.accepted = False
+        result.diagnostics.extend(accountability_diagnostics)
     print(f"accepted: {str(result.accepted).lower()}")
     print(f"log_id: {result.log_id or 'unknown'}")
     print(f"tree_size: {result.tree_size if result.tree_size is not None else 'unknown'}")
@@ -381,6 +400,40 @@ def cmd_receipt_verify(args: argparse.Namespace) -> int:
         for diagnostic in result.diagnostics:
             print(f"  - {diagnostic}")
     return 0 if result.accepted else 1
+
+
+def _log_accountability_checks(
+    receipt: dict,
+    sth_store: str | None,
+    consistency_proof_path: str | None,
+    max_sth_age_seconds: int | None,
+) -> list[str]:
+    diagnostics: list[str] = []
+    sth = receipt.get("sth") or {}
+    if max_sth_age_seconds is not None:
+        fresh, error = check_sth_freshness(sth, max_sth_age_seconds)
+        if not fresh:
+            diagnostics.append(error or "Signed tree head fails the freshness policy.")
+    if sth_store:
+        proof_hex = None
+        if consistency_proof_path:
+            from .yamlio import load_data
+
+            raw = load_data(consistency_proof_path)
+            proof_hex = [str(item) for item in (raw.get("proof") if isinstance(raw, dict) else raw) or []]
+        check = check_sth_against_store(
+            sth,
+            sth_store,
+            consistency_proof_hex=proof_hex,
+            consistency_from=receipt.get("consistency"),
+        )
+        for note in check.diagnostics:
+            prefix = "" if check.ok else "STH store: "
+            if check.ok:
+                print(f"sth-store: {note}")
+            else:
+                diagnostics.append(prefix + note)
+    return diagnostics
 
 
 def cmd_agent(args: argparse.Namespace) -> int:
@@ -497,4 +550,7 @@ def _attestation_for_args(args: argparse.Namespace, repo: RepoConfig):
         transparency_log_public_key_path=getattr(args, "transparency_log_public_key", None),
         require_transparency_signatures=str(getattr(args, "require_transparency_signatures", "ed25519")),
         require_transparency_receipt=bool(getattr(args, "require_transparency_receipt", False)),
+        sth_store_path=getattr(args, "sth_store", None),
+        consistency_proof_path=getattr(args, "consistency_proof", None),
+        max_sth_age_seconds=getattr(args, "max_sth_age_seconds", None),
     )

@@ -7,6 +7,7 @@ from typing import Any
 from .config import RepoConfig
 from .profiles import get_profile
 from .signing import verify_attestation_signature
+from .sthstore import check_sth_against_store, check_sth_freshness
 from .transparency import load_receipt, verify_receipt
 from .yamlio import load_data
 
@@ -41,6 +42,9 @@ def validate_attestation(
     transparency_log_public_key_path: str | Path | None = None,
     require_transparency_signatures: str = "ed25519",
     require_transparency_receipt: bool = False,
+    sth_store_path: str | Path | None = None,
+    consistency_proof_path: str | Path | None = None,
+    max_sth_age_seconds: int | None = None,
 ) -> AttestationResult:
     provider = raw.get("provider")
     subject = raw.get("subject") or {}
@@ -112,6 +116,25 @@ def validate_attestation(
             transparency_evidence["transparency_receipt_path"] = str(transparency_receipt_path)
             if not receipt_result.accepted:
                 diagnostics.extend(receipt_result.diagnostics)
+            sth = receipt.get("sth") or {}
+            if max_sth_age_seconds is not None:
+                fresh, error = check_sth_freshness(sth, int(max_sth_age_seconds))
+                if not fresh:
+                    diagnostics.append(error or "Signed tree head fails the freshness policy.")
+            if sth_store_path:
+                proof_hex = None
+                if consistency_proof_path:
+                    raw_proof = load_data(consistency_proof_path)
+                    proof_hex = [str(item) for item in (raw_proof.get("proof") if isinstance(raw_proof, dict) else raw_proof) or []]
+                sth_check = check_sth_against_store(
+                    sth,
+                    sth_store_path,
+                    consistency_proof_hex=proof_hex,
+                    consistency_from=receipt.get("consistency"),
+                )
+                transparency_evidence.update(sth_check.evidence())
+                if not sth_check.ok:
+                    diagnostics.extend("STH store: " + note for note in sth_check.diagnostics)
 
     accepted = not diagnostics
     evidence = {
