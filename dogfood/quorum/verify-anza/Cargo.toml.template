@@ -1,0 +1,13 @@
+# Rendered by `pacta wallet build-quorum` - {{SOURCE}} is replaced with the
+# local checkout of the PINNED proven anza cryptography workspace.
+# Committed as a template so the repo never hardcodes a machine path.
+[package]
+name = "pacta-verify-anza"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+solana-ed25519 = { path = "{{SOURCE}}/curve25519/solana-ed25519" }
+
+[workspace]
