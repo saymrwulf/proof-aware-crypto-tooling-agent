@@ -197,6 +197,52 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--max-sth-age-seconds", type=int, help="Reject signed tree heads older than this.")
     agent.add_argument("--require-verified-verifier", action="store_true", help="Fail closed unless Ed25519 verification ran on the dogfood (certificate-covered) verifier.")
     agent.set_defaults(func=cmd_agent)
+
+    wallet = sub.add_parser("wallet", help="warden: the verified-custody wallet (quorum boundary + signing firewall).")
+    wsub = wallet.add_subparsers(dest="wallet_cmd", required=True)
+
+    w_build = wsub.add_parser("build-quorum", help="Build the quorum verifier members from the pinned proven source workspaces.")
+    w_build.add_argument("--sources-root", required=True, help="Directory holding the pinned fork source checkouts.")
+    w_build.add_argument("--backends", nargs="*", help="Subset of dalek anza risc0 betrusted (default: all).")
+    w_build.add_argument("--timeout", type=int, default=900)
+    w_build.set_defaults(func=cmd_wallet_build_quorum)
+
+    w_init = wsub.add_parser("init", help="Create a wallet - the R4 gate in executable form (refuses below end-to-end coverage).")
+    w_init.add_argument("--wallet", required=True)
+    w_init.add_argument("--evidence", required=True, help="Directory of <component>.attestation.json + .receipt.json (e.g. from `pacta log-fetch`).")
+    w_init.add_argument("--log-public-key", required=True)
+    w_init.add_argument("--trusted-provider", required=True, help="Whose observations you trust (verdicts are always re-derived locally).")
+    w_init.add_argument("--repos-config", default="examples/repos.yaml")
+    w_init.add_argument("--backends", nargs="*")
+    w_init.add_argument("--require-tier", default="R4")
+    w_init.add_argument("--min-members", type=int, default=2)
+    w_init.add_argument("--freshness-days", type=int, default=30)
+    w_init.set_defaults(func=cmd_wallet_init)
+
+    w_status = wsub.add_parser("status", help="Show wallet custody posture.")
+    w_status.add_argument("--wallet", required=True)
+    w_status.set_defaults(func=cmd_wallet_status)
+
+    w_card = wsub.add_parser("card", help="Emit the self-proving custody card (optionally to a .well-known dir).")
+    w_card.add_argument("--wallet", required=True)
+    w_card.add_argument("--out-dir", help="Write .well-known/custody-card.json under this directory.")
+    w_card.add_argument("--log-url", default="https://ltl.zkdefi.org")
+    w_card.set_defaults(func=cmd_wallet_card)
+
+    w_mcp = wsub.add_parser("mcp", help="Serve the agent-native MCP surface over stdio JSON-RPC.")
+    w_mcp.add_argument("--wallet", required=True)
+    w_mcp.add_argument("--log-url", default="https://ltl.zkdefi.org")
+    w_mcp.set_defaults(func=cmd_wallet_mcp)
+
+    w_ledger = wsub.add_parser("verify-ledger", help="Re-check the wallet's hash-chained ledger integrity.")
+    w_ledger.add_argument("--wallet", required=True)
+    w_ledger.set_defaults(func=cmd_wallet_verify_ledger)
+
+    w_unlatch = wsub.add_parser("unlatch", help="Release a tamper latch (deliberate operator act; the note is recorded permanently).")
+    w_unlatch.add_argument("--wallet", required=True)
+    w_unlatch.add_argument("--note", required=True)
+    w_unlatch.set_defaults(func=cmd_wallet_unlatch)
+
     return parser
 
 
@@ -542,6 +588,92 @@ def _log_accountability_checks(
             else:
                 diagnostics.append(prefix + note)
     return diagnostics
+
+
+def cmd_wallet_build_quorum(args: argparse.Namespace) -> int:
+    from .quorum import QUORUM_BACKENDS, build_quorum_member
+
+    names = args.backends or list(QUORUM_BACKENDS)
+    failures = 0
+    for name in names:
+        try:
+            prov = build_quorum_member(name, args.sources_root, timeout=args.timeout)
+            print(f"{name}: built  source={(prov['source_commit'] or '?')[:12]}  sha256={prov['binary_sha256'][:12]}")
+        except (RuntimeError, KeyError) as exc:
+            failures += 1
+            print(f"{name}: FAILED  {exc}", file=sys.stderr)
+    return 1 if failures else 0
+
+
+def cmd_wallet_init(args: argparse.Namespace) -> int:
+    from .wallet import Wallet, WalletError
+
+    try:
+        wallet = Wallet.init(
+            args.wallet,
+            args.evidence,
+            args.log_public_key,
+            repos_config=args.repos_config,
+            trusted_provider=args.trusted_provider,
+            backends=args.backends,
+            require_tier=args.require_tier,
+            min_members=args.min_members,
+            freshness_max_age_days=args.freshness_days,
+        )
+    except WalletError as exc:
+        print(f"R4 gate refused: {exc}", file=sys.stderr)
+        return 1
+    capsule = wallet.capsule()
+    print(f"wallet created: {args.wallet}")
+    for member in capsule["members"]:
+        print(f"  {member['backend']:>10}  {member['risk_tier']}  leaf {member['evidence']['leaf_index']}  src {(member['source_commit'] or '?')[:12]}")
+    print(f"  policy: unanimity of >={capsule['policy']['min_members']} at tier {capsule['policy']['require_tier']}")
+    return 0
+
+
+def cmd_wallet_status(args: argparse.Namespace) -> int:
+    from .wallet import Wallet
+
+    print(json.dumps(Wallet(args.wallet).posture(), indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_wallet_card(args: argparse.Namespace) -> int:
+    from .custodycard import build_custody_card, write_well_known
+    from .wallet import Wallet
+
+    wallet = Wallet(args.wallet)
+    if args.out_dir:
+        path = write_well_known(wallet, args.out_dir, args.log_url)
+        print(f"custody card: {path}")
+    else:
+        print(json.dumps(build_custody_card(wallet, args.log_url), indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_wallet_mcp(args: argparse.Namespace) -> int:
+    from .walletmcp import WalletMCP
+
+    WalletMCP(args.wallet, log_url=args.log_url).serve_stdio()
+    return 0
+
+
+def cmd_wallet_verify_ledger(args: argparse.Namespace) -> int:
+    from .wallet import Wallet
+
+    ok, problems = Wallet(args.wallet).verify_ledger()
+    print("ledger chain: " + ("intact" if ok else "BROKEN"))
+    for problem in problems:
+        print(f"  - {problem}", file=sys.stderr)
+    return 0 if ok else 1
+
+
+def cmd_wallet_unlatch(args: argparse.Namespace) -> int:
+    from .wallet import Wallet
+
+    Wallet(args.wallet).unlatch(args.note)
+    print("latch released; note recorded in the ledger")
+    return 0
 
 
 def cmd_agent(args: argparse.Namespace) -> int:
