@@ -2026,6 +2026,245 @@ COURSE = {
             ),
         ]
     ),
+    "10_verified_custody_wallet.ipynb": notebook(
+        [
+            md(
+                """
+                # Lecture 10: The Verified-Custody Wallet (warden)
+
+                Everything so far *decided* which cryptographic code to trust.
+                This lecture *acts* on the decision: we build a custody boundary
+                out of the four proven curve25519-dalek forks and use it to
+                guard signatures - inbound and outbound.
+
+                The one idea: **inbound acceptance requires a unanimous quorum of
+                provably-equivalent verifiers, and every outbound signature must
+                pass the same quorum before it is released.**
+
+                We keep the course's ratchet rule: every load-bearing idea runs
+                twice - napkin scale by hand, then real scale against the live
+                system - and both are executable here.
+                """
+            ),
+            md(
+                """
+                ## Learning Objectives
+
+                - Explain why a *unanimous* quorum of provably-equivalent
+                  verifiers turns disagreement into evidence of a fault, and why
+                  majority voting would hide exactly that fault.
+                - Classify a quorum divergence as a documented semantic edge
+                  (note) versus unexplained (tamper -> latch).
+                - Describe the outbound signing firewall as verify-after-sign
+                  with a proven verifier, and state warden's honest asymmetry
+                  (verify custody-grade, sign trusted base).
+                - Recompute a custody card's inclusion proof as a counterparty -
+                  trust by recomputation, not by assertion.
+                """
+            ),
+            md(
+                """
+                ## Why a quorum, when one proof would do?
+
+                Each member is *proven* to decide the same predicate,
+                `accept(A,m,R,s) ⇔ decompress(R) = [k](−A) + [s]B`. So on the
+                proven domain they cannot disagree about *meaning*. Classic
+                N-version programming hopes independent code won't share a bug;
+                we do not hope - we know the semantics coincide, so a runtime
+                disagreement is not opinion, it is **evidence of a fault**: a
+                corrupted build, a memory error, or tampering. The quorum turns
+                "the verifiers differed" into an alarm with a theorem behind it.
+                """
+            ),
+            md(
+                """
+                ## Napkin scale: a 3-of-3 quorum with toy verifiers
+
+                Forget real curves for a moment. Model three verifiers as
+                functions and watch the boundary logic: unanimity accepts,
+                any disagreement fails closed and is classified.
+                """
+            ),
+            code(
+                """
+                def toy_quorum(verdicts):
+                    kinds = set(verdicts.values())
+                    if kinds == {"accept"}:
+                        return "unanimous-accept", True
+                    if kinds == {"reject"}:
+                        return "unanimous-reject", False
+                    return "divergence -> FAIL CLOSED + incident", False
+
+                print(toy_quorum({"dalek": "accept", "anza": "accept", "risc0": "accept"}))
+                print(toy_quorum({"dalek": "reject", "anza": "reject", "risc0": "reject"}))
+                print(toy_quorum({"dalek": "accept", "anza": "reject", "risc0": "accept"}))
+                """
+            ),
+            md(
+                """
+                The third line is the whole point: a lone dissenter does not get
+                out-voted. Acceptance needs *everyone*; anything else is a
+                refusal plus a recorded incident. Majority voting would hide
+                exactly the fault we most want to see.
+                """
+            ),
+            md(
+                """
+                ## The divergence taxonomy
+
+                The forks are *allowed* to differ on documented degenerate
+                inputs (anza rejects `A = 0` and a legacy excluded-small-order-R
+                list). We still fail closed; the taxonomy only grades the alarm:
+
+                - **semantic-edge** - they differ AND a documented edge flag
+                  applies (small-order R, non-canonical s, zero key): severity
+                  *note*.
+                - **unexplained** - they differ with no documented reason, or a
+                  member errored: severity *tamper* -> custody **latches**.
+                """
+            ),
+            code(
+                """
+                import sys, pathlib
+                for parent in [pathlib.Path.cwd(), *pathlib.Path.cwd().parents]:
+                    if (parent / "src" / "pacta").exists():
+                        sys.path.insert(0, str(parent / "src")); ROOT = parent; break
+
+                from pacta.quorum import semantic_edge_flags, SMALL_ORDER_ENCODINGS
+
+                small_order_R = sorted(SMALL_ORDER_ENCODINGS)[0]
+                print("edge flags for a small-order R:",
+                      semantic_edge_flags(b"\\x02" * 32, small_order_R + b"\\x00" * 32))
+                print("edge flags for an ordinary sig:",
+                      semantic_edge_flags(b"\\x02" * 32, b"\\x01" * 64))
+                """
+            ),
+            md(
+                """
+                A divergence on the first input is a documented edge (note); a
+                divergence on the second has no excuse (tamper). Same fail-closed
+                verdict, very different alarm.
+                """
+            ),
+            md(
+                """
+                ## Real scale: the four proven forks, if built
+
+                If you have run `pacta wallet build-quorum`, the next cell drives
+                the **real** four-fork quorum: sign a payload with the dogfood
+                (attested) signer, then watch all four proven verifiers agree on
+                accept, and on reject for a flipped byte. If the binaries are not
+                built, we say so and skip - honestly, the way the wallet itself
+                fails closed.
+                """
+            ),
+            code(
+                """
+                from pacta.quorum import load_quorum, binary_path
+
+                built = [b for b in ("dalek", "anza", "risc0", "betrusted") if binary_path(b).exists()]
+                if len(built) < 2:
+                    print("quorum not built (need >=2). Run: pacta wallet build-quorum --sources-root <...>")
+                else:
+                    import tempfile, os
+                    from pacta.dogfood import locate_verifier, pem_public_key_to_raw, sign_payload_dogfood
+                    from pacta.signing import generate_ed25519_keypair
+                    v = locate_verifier()
+                    if v is None:
+                        print("dogfood signer not built; run pacta dogfood-build")
+                    else:
+                        d = tempfile.mkdtemp()
+                        key, pub = os.path.join(d, "k.pem"), os.path.join(d, "k.pub")
+                        generate_ed25519_keypair(key, pub)
+                        payload = b"curriculum lecture 10 payload"
+                        sig = sign_payload_dogfood(payload, key, v)
+                        pk = pem_public_key_to_raw(pub)
+                        q = load_quorum(min_members=2)
+                        print("members:", sorted(q.members))
+                        good = q.verify(payload, sig, pk)
+                        print("valid signature   ->", good.classification, "accepted =", good.accepted)
+                        bad = q.verify(payload, bytes([sig[0] ^ 0xFF]) + sig[1:], pk)
+                        print("one flipped byte  ->", bad.classification, "accepted =", bad.accepted)
+                """
+            ),
+            md(
+                """
+                ## The signing firewall: verify-after-sign, but proven
+
+                Outbound is `intent -> sign -> firewall -> release`. The fresh
+                signature faces the same quorum; only unanimity releases it. A
+                rejected self-signature is *quarantined, never returned*, and
+                custody latches. This is the textbook fault-injection
+                countermeasure - verify a signer's output before trusting it -
+                with the verifier upgraded to machine-checked code.
+
+                Note the honest asymmetry: the *verify* paths are certificate-
+                covered (custody-grade), but the *signing* step is trusted base -
+                the attested artifact, not a third implementation. The firewall
+                is exactly how we fence that weaker edge.
+                """
+            ),
+            md(
+                """
+                ## Two voices, one boundary (the domain split, again)
+
+                Lecture 06 split provider and agent. warden inherits the split:
+
+                - **The operator voice** seals the capsule: it runs the R4 gate,
+                  pins the attested source commits, and stores the transparency-
+                  log receipts that authorized each member.
+                - **The counterparty (agent) voice** never trusts the operator's
+                  adjectives. It reads the *custody card* and recomputes the
+                  inclusion proofs itself - trust by recomputation.
+
+                The next cell is the counterparty side: given a card, verify a
+                member's inclusion proof with nothing but stdlib hashing.
+                """
+            ),
+            code(
+                """
+                # Counterparty-side check of ONE member's inclusion proof.
+                # (Works whenever you have a wallet + its fetched evidence; here
+                #  we show the primitive the card relies on.)
+                from pacta.transparency import verify_inclusion, leaf_bytes_for_attestation
+                import json, glob
+
+                ev = sorted(glob.glob(str(ROOT / "examples" / "wallet-evidence" / "*.attestation.json")))
+                if not ev:
+                    print("no bundled evidence; fetch with `pacta log-fetch` to try live")
+                else:
+                    att = json.load(open(ev[0]))
+                    rec = json.load(open(ev[0].replace(".attestation.", ".receipt.")))
+                    ok = verify_inclusion(
+                        leaf_bytes_for_attestation(att),
+                        rec["leaf_index"], rec["tree_size"],
+                        [bytes.fromhex(h) for h in rec["inclusion_proof"]],
+                        bytes.fromhex(rec["sth"]["root_hash"]),
+                    )
+                    print(f"{att['subject']['component']}: inclusion recomputes ->", ok)
+                    print("The counterparty believed no adjective; it recomputed a Merkle root.")
+                """
+            ),
+            md(
+                """
+                ## Exercises
+
+                - Change `toy_quorum` to majority voting and write two sentences
+                  on exactly which attack that lets through.
+                - Take the real quorum cell and corrupt one member binary on
+                  disk (append a byte). Predict, then observe, what the wallet's
+                  capsule hash-pin does the next time it assembles the quorum.
+                - The signing path is trusted base. Write the strongest *true*
+                  sentence you can about warden's outbound safety, and the
+                  strongest *false* one a marketer would write - and name the
+                  word that makes the second one false.
+                - Design `warden-treasury`: which member re-verifies Solana
+                  transactions, and what exactly the RPC provider is still
+                  trusted for after you do.
+                """
+            ),
+        ]
+    ),
 }
 
 
@@ -2047,6 +2286,7 @@ The course teaches:
 - receipt-gated agent consequences (including the R4 wallet gate, now reachable),
 - split-view defense: STH pinning, consistency enforcement, freshness, monitoring,
 - dogfood verified cryptography and the honest hybrid post-quantum posture,
+- the verified-custody wallet (warden): a quorum boundary of four proven forks, the signing firewall, and the agent-native MCP surface,
 - research roadmaps from R4 evidence toward R5 assurance.
 
 This curriculum is not financial advice, not a trading bot, and not a wallet-building guide. It is a training path for engineers and researchers who need to evaluate formal-verification-enhanced cryptographic tooling without overclaiming.

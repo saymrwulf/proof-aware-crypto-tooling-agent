@@ -1,0 +1,37 @@
+# pacta — proof-aware crypto tooling agent
+
+> Tooling for autonomous agents that must choose, and then run on, a
+> cryptographic library they can trust with money. Evidence of formal
+> verification is turned into machine-readable claim cards, scored R0–R5,
+> with every verdict re-derived locally from observed Lean axiom cones —
+> never taken on a provider's word. The `warden` product builds a custody
+> wallet whose Ed25519 boundary is a quorum of four independently proven
+> curve25519-dalek forks.
+
+## Start here
+
+- [README.md](README.md): what pacta is, the R0–R5 risk model, the dogfood loop.
+- [WALLET.md](WALLET.md): warden, the verified-custody wallet — the quorum boundary, the signing firewall, the R4 gate, the MCP surface.
+- [docs/agent-native.md](docs/agent-native.md): why the wallet is agent-native first (AX, MCP, A2A, AP2, x402, ERC-8004) and what each idea became.
+- [docs/products.md](docs/products.md): the four warden deployment profiles.
+
+## Live evidence
+
+- Transparency log (RFC 9162): https://ltl.zkdefi.org — signed replay attestations of the Lean proofs, one leaf per fork.
+- The paper: https://ltl.zkdefi.org/paper — "LTL: the Lean Transparency Log".
+
+## For agents
+
+warden speaks MCP over stdio: `pacta wallet mcp --wallet <dir>`. Tools:
+`wallet_status`, `verify_inbound`, `request_signature`, `custody_card`,
+`posture_challenge`, `list_incidents`, `explain_refusal`. Errors are
+structured objects (code / missing / remediation). The custody card at
+`.well-known/custody-card.json` is self-proving: it embeds transparency-log
+inclusion proofs a counterparty recomputes rather than trusts.
+
+## Honesty boundary
+
+Verification paths are certificate-covered; signing is trusted base (the
+attested artifact, fenced by the firewall). SHA-512 is an opaque oracle;
+wire parsers are hypotheses; reproducible builds and side channels are R5,
+not claimed; ML-DSA (PQC) fails closed — no proven implementation exists.

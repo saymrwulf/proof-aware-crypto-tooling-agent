@@ -12,6 +12,15 @@ An autonomous economic agent needs to answer a narrow question before trusting i
 
 `pacta` helps answer that by replaying pure Lean checks where possible, auditing axioms and proof hygiene, generating machine-readable claim cards, and assigning residual-risk classifications with explicit exclusions.
 
+Once that question is answered, **[warden](WALLET.md)** acts on it: a
+verified-custody wallet whose Ed25519 boundary is a unanimous quorum of the
+four independently proven curve25519-dalek forks, with every outbound
+signature passing that same quorum as a firewall before release. warden is
+agent-native first (an MCP server; a self-proving custody card); see
+[WALLET.md](WALLET.md), the deployment profiles in
+[docs/products.md](docs/products.md), and the design research in
+[docs/agent-native.md](docs/agent-native.md).
+
 ## macOS / Apple Silicon
 
 The prototype is written for Python 3.11+ and macOS on Apple Silicon. It does not assume GNU coreutils, Linux `free`, Linux `taskset`, GNU `timeout`, Docker, Nix, or x86_64.
@@ -68,6 +77,7 @@ The `notebooks/` directory contains a zero-to-hero teaching sequence for undergr
 - `07_agent_consequences.ipynb`: receipt-gated artifact builds and wallet-denial policy.
 - `08_capstone_research_program.ipynb`: audit the shipped R4 evidence; design the R5 discharge plan.
 - `09_dogfood_verified_crypto.ipynb`: the proven-path verifier in the agent's own loop; hybrid-PQC posture.
+- `10_verified_custody_wallet.ipynb`: warden - the quorum custody boundary and signing firewall, ratchet-rule (toy 3-of-3, then the real four proven forks), plus the counterparty recomputing a custody card's inclusion proof.
 
 The course states and keeps a "ratchet rule": every load-bearing idea runs twice - napkin scale, then real scale - and every pair is executable in the notebook.
 

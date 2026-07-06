@@ -16,6 +16,7 @@ The course teaches:
 - receipt-gated agent consequences (including the R4 wallet gate, now reachable),
 - split-view defense: STH pinning, consistency enforcement, freshness, monitoring,
 - dogfood verified cryptography and the honest hybrid post-quantum posture,
+- the verified-custody wallet (warden): a quorum boundary of four proven forks, the signing firewall, and the agent-native MCP surface,
 - research roadmaps from R4 evidence toward R5 assurance.
 
 This curriculum is not financial advice, not a trading bot, and not a wallet-building guide. It is a training path for engineers and researchers who need to evaluate formal-verification-enhanced cryptographic tooling without overclaiming.

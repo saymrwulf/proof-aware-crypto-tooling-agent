@@ -15,6 +15,7 @@ EXPECTED_NOTEBOOKS = [
     "07_agent_consequences.ipynb",
     "08_capstone_research_program.ipynb",
     "09_dogfood_verified_crypto.ipynb",
+    "10_verified_custody_wallet.ipynb",
 ]
 
 
