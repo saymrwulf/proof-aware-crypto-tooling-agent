@@ -18,6 +18,13 @@ The prototype is written for Python 3.11+ and macOS on Apple Silicon. It does no
 
 Lean tooling is detected with `shutil.which("lean")` and `shutil.which("lake")`. If neither is available, `pacta` reports clear diagnostics and still supports offline claim-card generation and static hygiene scans.
 
+## Tests
+
+```bash
+python -m pytest            # with pytest installed
+python3 scripts/mini_pytest.py   # dependency-free fallback runner (same suite)
+```
+
 ## Install
 
 ```bash
@@ -58,7 +65,10 @@ The `notebooks/` directory contains a zero-to-hero teaching sequence for undergr
 - `05_third_party_attestation_provider.ipynb`: provider trust transformation and signed attestations.
 - `06_merkle_transparency_logs.ipynb`: RFC 9162-style Merkle proofs, STHs, Ed25519/ML-DSA policy.
 - `07_agent_consequences.ipynb`: receipt-gated artifact builds and wallet-denial policy.
-- `08_capstone_research_program.ipynb`: research roadmap from R3 toward R4/R5.
+- `08_capstone_research_program.ipynb`: audit the shipped R4 evidence; design the R5 discharge plan.
+- `09_dogfood_verified_crypto.ipynb`: the proven-path verifier in the agent's own loop; hybrid-PQC posture.
+
+The course states and keeps a "ratchet rule": every load-bearing idea runs twice - napkin scale, then real scale - and every pair is executable in the notebook.
 
 The notebooks are committed without execution output. They can be opened in Jupyter, VS Code, or any notebook reader. They import `pacta` directly from this repository and avoid external notebook-only dependencies.
 
@@ -206,22 +216,46 @@ pacta agent \
 
 This is the intended trust transformation: local agents can avoid constructing the full verifier environment, but they must explicitly trust the provider identity and verification key.
 
+## Split-View Defense (STH Pinning)
+
+Standalone receipt verification cannot detect a provider maintaining two log views. `pacta` keeps a local STH pin store:
+
+```bash
+pacta receipt-verify ... --sth-store state/sth-store.json [--consistency-proof proof.yaml] [--max-sth-age-seconds 86400]
+pacta agent ... --sth-store state/sth-store.json ...
+PYTHONPATH=src:provider/src python -m pacta_provider log-consistency --log-dir ... --from-size N   # proofs for older pins
+PYTHONPATH=src:provider/src python -m pacta_provider log-audit --log-dir ...                        # monitor self-check
+```
+
+Unknown log: pin on first use (recorded as trust-on-first-use). Same tree size: the root must match the pin - a mismatch is named EQUIVOCATION and rejected forever. Larger tree: a consistency proof from the pinned size is required (receipts embed a from-previous anchor whose root is itself checked against the pin). Smaller tree: rollback, rejected. `--max-sth-age-seconds` additionally rejects stale or future-dated tree heads.
+
+## Dogfood Verified Cryptography
+
+`pacta` can verify its own evidence signatures through the PROVEN code path - a small Rust binary built from the pinned proven source workspace (the exact commit the dalek certificates pin, serial backend pinned as the verified extraction pins it):
+
+```bash
+pacta dogfood-build --source ~/GitClone/FormalVerification/sources/curve25519-dalek-source
+pacta dogfood-status
+pacta receipt-verify ... --require-verified-verifier   # fail closed unless the proven path ran
+```
+
+The backend that actually verified each signature (`verified-dalek-serial` or the `openssl` fallback) is recorded in receipts' signature statuses and attestation evidence; the fallback is never silent. A provenance sidecar records the source commit, backend cfg, and the honest coverage note (the certificates cover the extraction image of this verify path; SHA-512 and the wire glue remain the documented trusted base). ML-DSA is deliberately NOT dogfooded: no proven implementation exists, so the slot stays fail-closed - the hybrid-PQC posture is one proven-classical signature plus one required-but-honest post-quantum slot.
+
 ## Truth Boundary
 
-The Ed25519 repositories should not be marketed as fully verified wallets or fully verified Ed25519 end-to-end. The strongest current claim is lower-layer and theorem-bound:
+The Ed25519 repositories should not be marketed as fully verified wallets. Since 2026-07-06 the strongest claim is substantial and theorem-bound:
 
-For selected curve25519-dalek / Solana-Ed25519-family Rust code paths already transpiled into Lean, the repositories contain Lean-checked certificates for field arithmetic over `F_p`, `p = 2^255 - 19`, and complete twisted Edwards point-operation laws, under explicit invariants and backend constraints.
+Every ed25519 repository in the corpus carries Lean-checked certificates for field arithmetic over `F_p` (`p = 2^255 - 19`), the complete twisted Edwards laws, full scalar arithmetic mod l, encoding/decoding canonicality with constructive decompression, and a FOUR-TIER signature apex culminating in the full lift: the extracted verifier accepts iff the signature's R decompresses to a valid on-curve point equal to `[k](-A) + [s]B`. Each apex tier's axiom cone is pinned to EXACTLY the fork's documented SHA-512/wire-format boundary by that repository's own check script (`pacta` mirrors those boundary sets per fork and re-checks observed cones against them - the authority is always the repo's button).
 
-`pacta` treats these as out of scope unless separately proven:
+`pacta` treats these as out of scope (they are the theorems' documented trusted base or genuinely unproven):
 
-- Full EdDSA signature verification.
-- Complete Scalar52 arithmetic.
-- SHA-512.
-- Encoding, decoding, and canonicality.
+- SHA-512 itself (an opaque oracle in the apex theorems - no properties assumed).
+- Wire parser/filter byte-level specs (their outcomes are hypotheses in the apex tiers).
+- Signing-side correctness (key generation, nonces, the signer).
 - Rust compiler correctness.
 - Charon/Aeneas translation faithfulness.
 - Side-channel resistance.
-- SIMD, AVX, hardware, zkVM, accelerator, or syscall paths.
+- SIMD, AVX, hardware, zkVM, accelerator, or syscall paths (extraction pins the serial path).
 - Wallet policy, transaction construction, RPC, chain, oracle, market, and LLM decision safety.
 
 ## Risk Levels
@@ -233,4 +267,4 @@ For selected curve25519-dalek / Solana-Ed25519-family Rust code paths already tr
 - `R4`: End-to-end primitive proof covers public API, parsing/encoding, scalar arithmetic, hashing interface, signature equation, rejection rules, and implementation boundary.
 - `R5`: `R4` plus reproducible production builds, compiler/build assurance, side-channel analysis, hardware/KMS/MPC integration, and operational controls.
 
-Expected first-pass classification: Ed25519 field plus Edwards point arithmetic can reach `R3` if configured certificates compile and the axiom audit is clean. Full Ed25519 signature verification remains `R2` or lower unless complete scalar, encoding, hashing, and signature certificates exist.
+Expected classifications: the arithmetic pair alone reaches `R3`. The full configured set - arithmetic, scalars, encoding/decoding, and the four apex tiers with boundary-exact cones - reaches `R4`, always with explicit residual blockers (the SHA-512 oracle, hypothesis-parametric parses, translation faithfulness, missing side-channel/build assurance). `R5` remains future work. The `build-wallet-demo` gate therefore genuinely opens on real evidence now - and still emits only a policy scaffold, never a production wallet.
