@@ -1,9 +1,56 @@
 # Deploying the online log at zkdefi.org/lean-transparency-log
 
-Checklist for the server session. Deliberately generic about the host:
-this file is public, so it names only what customers must know anyway
-(the service URL) and standard software layouts - no provider inventory,
-no credentials, nothing an attacker couldn't already get from public DNS.
+STATUS: DEPLOYED (2026-07-06) and serving. This file is now the as-built
+record plus the update runbook. Deliberately generic about the host: it
+names only what customers must know anyway (the service URL) and standard
+software layouts - no provider inventory, no credentials.
+
+## As built (docker compose variant)
+
+The target host runs a compose stack; the LTL joined it as a read-only
+container instead of the host-systemd variant below:
+
+- app + published-log clones + reconstructed log dir under the compose
+  project directory (`ltl/app`, `ltl/published`, `ltl/log`);
+- compose service: `python:3.12-alpine`, `read_only: true`, both volumes
+  mounted `:ro`, NO published ports (reachable only on the compose
+  network), `restart: unless-stopped`;
+- Caddy site block for the domain gained a path `handle` that takes
+  precedence over the existing catch-all:
+
+```caddy
+redir /lean-transparency-log /lean-transparency-log/docs
+handle /lean-transparency-log/* {
+    reverse_proxy ltl:8461
+}
+handle {
+    reverse_proxy <existing upstream>
+}
+```
+
+- config validated in a throwaway caddy container before `caddy reload`;
+  Caddyfile and compose file backed up with timestamps first.
+
+Update runbook (after each new proof-check run on the provider machine):
+
+```bash
+# on the provider machine
+pacta_provider log-append ...        # sign new head (offline, dogfood)
+pacta_provider log-publish --log-dir ... --git-dir <mirror clone> --public-key <pub>
+cd <mirror clone> && git add -A && git commit -m "log update" && git push
+tar czf /tmp/pacta-app.tgz --exclude=.git --exclude='provider/state' --exclude='provider/out'     --exclude='dogfood/state' --exclude='dogfood/*/target' --exclude='.venv'     --exclude='__pycache__' --exclude='artifacts*' --exclude='repos' .   # only when app code changed
+scp /tmp/pacta-app.tgz zkdefi-ltl:<compose-dir>/ltl/
+ssh zkdefi-ltl 'cd <compose-dir>/ltl && (cd published && git pull) && \
+  python3 reconstruct.py && cd .. && sudo docker compose restart ltl'
+```
+
+(`reconstruct.py` = the entries.jsonl/sth-history rebuild from step 1
+below; it lives in the server's ltl dir.)
+
+---
+
+The remainder of this file is the original host-systemd variant, kept for
+deployments without docker.
 
 ## What gets deployed
 
