@@ -130,7 +130,10 @@ def render_docs(log: TransparencyLog, base_path: str) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LTL — Lean Transparency Log</title><style>{_STYLE}</style></head><body>
 
-<p class="muted" style="margin-bottom:0">zkdefi.org</p>
+<p class="muted" style="margin-bottom:0">zkdefi
+· <a href="https://blog.zkdefi.org/">notes</a>
+· <a href="https://zkdefi.org/saymrwulf">code</a>
+· <a href="https://zkdefi.com/">cv</a></p>
 <h1>LTL — the Lean Transparency Log</h1>
 <p class="tagline"><strong>One sentence:</strong> a public, append-only Merkle
 accumulator of <em>signed statements that the Lean&nbsp;4 formal proofs of specific
