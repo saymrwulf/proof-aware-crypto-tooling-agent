@@ -1538,6 +1538,23 @@ COURSE = {
             ),
             md(
                 """
+                ## Transports: files, git, and the online service
+
+                Everything you verified above arrived as FILES - and that is a
+                feature: receipts are self-contained, so transport never carries
+                trust. The same log has two more faces. The GIT MIRROR
+                (`lean-transparency-log` on GitHub and on the provider's Forgejo)
+                publishes every leaf and every signed head - all cloners see the
+                same heads, which makes every cloner a WITNESS
+                (`pacta witness-audit` recomputes every prefix root from the
+                published leaves; run `python3 verify.py --all` in a clone for the
+                no-install version). The ONLINE SERVICE
+                (`zkdefi.org/lean-transparency-log`) adds live endpoints: fetch
+                fresh evidence (`pacta log-fetch`), advance your pin with an
+                online consistency proof (`pacta sth-refresh`). The verification
+                you do afterwards is IDENTICAL in all three transports - this
+                notebook's ~25 lines never change.
+
                 ## Convinced - of what, exactly?
 
                 After these cells pass, the agent knows: *the provider whose key I

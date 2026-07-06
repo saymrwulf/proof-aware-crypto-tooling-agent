@@ -64,6 +64,19 @@ def build_parser() -> argparse.ArgumentParser:
     log_append.add_argument("--out", required=True)
     log_append.set_defaults(func=cmd_log_append)
 
+    log_publish = sub.add_parser("log-publish", help="Export the log's public face into a git-publishable directory (entries, STH history, receipts).")
+    log_publish.add_argument("--log-dir", required=True)
+    log_publish.add_argument("--git-dir", required=True)
+    log_publish.add_argument("--public-key", help="Provider public key to include in the published repo.")
+    log_publish.set_defaults(func=cmd_log_publish)
+
+    serve = sub.add_parser("serve", help="Serve the log read-only over HTTP (CT-style endpoints + customer docs). Never touches private keys.")
+    serve.add_argument("--log-dir", required=True)
+    serve.add_argument("--base-path", default="lean-transparency-log")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8461)
+    serve.set_defaults(func=cmd_serve)
+
     log_consistency = sub.add_parser("log-consistency", help="Emit a consistency proof from an earlier tree size (for pinning agents).")
     log_consistency.add_argument("--log-dir", required=True)
     log_consistency.add_argument("--from-size", type=int, required=True)
@@ -138,6 +151,26 @@ def cmd_log_append(args: argparse.Namespace) -> int:
     print(f"leaf_hash: {receipt['leaf_hash']}")
     print(f"ed25519_sth_signature: {receipt['sth']['signatures']['ed25519']['status']}")
     print(f"ml_dsa_sth_signature: {receipt['sth']['signatures']['ml_dsa']['status']}")
+    return 0
+
+
+def cmd_log_publish(args) -> int:
+    log = TransparencyLog(args.log_dir)
+    report = log.publish(args.git_dir, public_key_path=args.public_key)
+    print(f"published {report['entries']} entries, components: {', '.join(report['components'])}")
+    print(f"out: {report['out']}")
+    return 0
+
+
+def cmd_serve(args) -> int:
+    from .web import serve as make_server
+
+    server = make_server(args.log_dir, base_path=args.base_path, host=args.host, port=args.port)
+    print(f"serving read-only log on http://{args.host}:{args.port}/{args.base_path.strip('/')}/docs")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
     return 0
 
 

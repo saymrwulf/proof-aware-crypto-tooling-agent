@@ -142,6 +142,23 @@ def build_parser() -> argparse.ArgumentParser:
     receipt_verify.add_argument("--require-verified-verifier", action="store_true", help="Fail closed unless Ed25519 verification ran on the dogfood (certificate-covered) verifier.")
     receipt_verify.set_defaults(func=cmd_receipt_verify)
 
+    log_fetch = sub.add_parser("log-fetch", help="Fetch attestation + inclusion proof for a component from an ONLINE log; verify locally afterwards.")
+    log_fetch.add_argument("--url", required=True, help="Base URL, e.g. https://zkdefi.org/lean-transparency-log")
+    log_fetch.add_argument("--component", required=True)
+    log_fetch.add_argument("--out-dir", default="fetched-evidence")
+    log_fetch.set_defaults(func=cmd_log_fetch)
+
+    sth_refresh = sub.add_parser("sth-refresh", help="Fetch the latest STH online, verify signature + consistency from the pinned size, advance the pin.")
+    sth_refresh.add_argument("--url", required=True)
+    sth_refresh.add_argument("--sth-store", required=True)
+    sth_refresh.add_argument("--log-public-key", required=True)
+    sth_refresh.set_defaults(func=cmd_sth_refresh)
+
+    witness = sub.add_parser("witness-audit", help="Audit a CLONE of the published log repo: recompute every prefix root, check every historical STH + signature.")
+    witness.add_argument("--published-dir", required=True)
+    witness.add_argument("--log-public-key")
+    witness.set_defaults(func=cmd_witness_audit)
+
     dogfood_build = sub.add_parser("dogfood-build", help="Build the dogfood Ed25519 verifier from the pinned proven source workspace.")
     dogfood_build.add_argument("--source", required=True, help="Local checkout of saymrwulf/curve25519-dalek-source (the pinned proven workspace).")
     dogfood_build.add_argument("--timeout", type=int, default=900)
@@ -419,6 +436,46 @@ def cmd_receipt_verify(args: argparse.Namespace) -> int:
         for diagnostic in result.diagnostics:
             print(f"  - {diagnostic}")
     return 0 if result.accepted else 1
+
+
+def cmd_log_fetch(args: argparse.Namespace) -> int:
+    from .logclient import LogClientError, fetch_evidence
+
+    try:
+        paths = fetch_evidence(args.url, args.component, args.out_dir)
+    except LogClientError as exc:
+        print(f"error: {exc}")
+        return 1
+    for kind, path in paths.items():
+        print(f"{kind}: {path}")
+    print("fetched material is UNVERIFIED until you run receipt-verify on it (transport is not trust).")
+    return 0
+
+
+def cmd_sth_refresh(args: argparse.Namespace) -> int:
+    from .logclient import LogClientError, refresh_pin
+
+    try:
+        ok, diagnostics = refresh_pin(args.url, args.sth_store, args.log_public_key)
+    except LogClientError as exc:
+        print(f"error: {exc}")
+        return 1
+    for diagnostic in diagnostics:
+        print(("" if ok else "REFUSED: ") + diagnostic)
+    return 0 if ok else 1
+
+
+def cmd_witness_audit(args: argparse.Namespace) -> int:
+    from .witness import audit_published_log
+
+    report = audit_published_log(args.published_dir, args.log_public_key)
+    print(f"entries: {report.tree_size} | heads checked: {report.heads_checked}")
+    for note in report.notes:
+        print(f"note: {note}")
+    for problem in report.problems:
+        print(f"PROBLEM: {problem}")
+    print(f"ok: {str(report.ok).lower()}")
+    return 0 if report.ok else 1
 
 
 def cmd_dogfood_build(args: argparse.Namespace) -> int:

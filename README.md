@@ -229,6 +229,29 @@ provider model). The log's first four leaves honestly record a failed audit
 run (two pacta bugs, fixed and documented); the ledger keeps its history.
 See `evidence/README.md` to re-verify everything yourself.
 
+## The Online Log and the Published Mirror
+
+The log has three synchronized faces, transport being orthogonal to trust:
+
+1. **Files** (`evidence/`): self-contained receipts, verifiable offline.
+2. **Git mirror** ([saymrwulf/lean-transparency-log](https://github.com/saymrwulf/lean-transparency-log), mirrored on Forgejo):
+   every leaf, every signed tree head (the WITNESS CHANNEL - all cloners
+   see the same heads), per-component receipts, the provider public key,
+   and a standalone stdlib-only `verify.py`. Anyone: `python3 verify.py --all`.
+3. **HTTP service** (deployed at `zkdefi.org/lean-transparency-log`, see
+   `DEPLOY.md`): read-only CT-style endpoints + customer docs. The web
+   process never touches private keys - heads are signed offline; a
+   compromised server can withhold or replay (pinning + freshness detect
+   both) but never forge.
+
+```bash
+PYTHONPATH=src:provider/src python -m pacta_provider serve --log-dir ... --base-path lean-transparency-log
+PYTHONPATH=src:provider/src python -m pacta_provider log-publish --log-dir ... --git-dir <mirror clone> --public-key <pub>
+pacta log-fetch   --url https://zkdefi.org/lean-transparency-log --component dalek-ed25519-verified --out-dir fetched
+pacta sth-refresh --url https://zkdefi.org/lean-transparency-log --sth-store pins.json --log-public-key <pub>
+pacta witness-audit --published-dir <clone of lean-transparency-log> --log-public-key <pub>
+```
+
 ## Split-View Defense (STH Pinning)
 
 Standalone receipt verification cannot detect a provider maintaining two log views. `pacta` keeps a local STH pin store:

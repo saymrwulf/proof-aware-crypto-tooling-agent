@@ -41,6 +41,7 @@ class TransparencyLog:
         self.metadata_path = self.log_dir / "metadata.json"
         self.entries_path = self.log_dir / "entries.jsonl"
         self.sth_path = self.log_dir / "sth.yaml"
+        self.sth_history_path = self.log_dir / "sth-history.jsonl"
 
     def init(self, provider: str, public_key_path: str | Path) -> dict[str, Any]:
         if self.metadata_path.exists() or self.entries_path.exists():
@@ -109,6 +110,7 @@ class TransparencyLog:
             signing_provenance=self.signing_provenance(entries),
         )
         dump_data(sth, self.sth_path)
+        self._record_sth(sth)
         return sth
 
     def append_attestation(
@@ -151,6 +153,7 @@ class TransparencyLog:
             signing_provenance=self.signing_provenance(entries),
         )
         dump_data(sth, self.sth_path)
+        self._record_sth(sth)
         consistency = []
         if appended and previous_size > 0:
             consistency = proof_to_hex(consistency_proof(leaves, previous_size))
@@ -217,6 +220,88 @@ class TransparencyLog:
         clean = sum(1 for c in attested if c.get("status") == "proven" and c.get("axiom_status") == "clean")
         provenance["signing_library_certificates_proven"] = f"{clean}/{len(attested)}"
         return provenance
+
+    def _record_sth(self, sth: dict[str, Any]) -> None:
+        with self.sth_history_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(sth, sort_keys=True, separators=(",", ":")) + "\n")
+
+    def sth_history(self) -> list[dict[str, Any]]:
+        if not self.sth_history_path.exists():
+            return []
+        return [
+            json.loads(line)
+            for line in self.sth_history_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+    def proof_for_leaf_hash(self, leaf_hash_hex: str) -> dict[str, Any] | None:
+        """Read-only inclusion proof against the CURRENT tree for an existing
+        leaf - what the online service returns. Never signs anything."""
+        entries = self.entries()
+        match = next((entry for entry in entries if entry.leaf_hash == leaf_hash_hex), None)
+        if match is None:
+            return None
+        leaves = [entry.leaf_bytes() for entry in entries]
+        stored_sth = load_data(self.sth_path) if self.sth_path.exists() else None
+        return {
+            "schema_version": 1,
+            "type": RECEIPT_TYPE,
+            "log_id": self.metadata()["log_id"],
+            "hash_algorithm": HASH_ALGORITHM,
+            "leaf_index": match.index,
+            "leaf_hash": match.leaf_hash,
+            "tree_size": len(leaves),
+            "inclusion_proof": proof_to_hex(inclusion_proof(leaves, match.index)),
+            "sth": stored_sth,
+        }
+
+    def newest_entry_for_component(self, component: str) -> LogEntry | None:
+        matches = [
+            entry
+            for entry in self.entries()
+            if ((entry.leaf.get("attestation") or {}).get("subject") or {}).get("component") == component
+        ]
+        return matches[-1] if matches else None
+
+    def publish(self, git_dir: str | Path, public_key_path: str | Path | None = None) -> dict[str, Any]:
+        """Export the PUBLIC face of the log into a git-publishable directory:
+        metadata, one file per leaf (append-only in git history too), the
+        full STH history (the witness channel: everyone who clones sees the
+        same heads), the latest head, and per-component convenience
+        receipts. Private keys never appear here."""
+        out = Path(git_dir)
+        (out / "entries").mkdir(parents=True, exist_ok=True)
+        (out / "receipts").mkdir(parents=True, exist_ok=True)
+        metadata = self.metadata()
+        (out / "log-metadata.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        entries = self.entries()
+        for entry in entries:
+            path = out / "entries" / f"{entry.index:06d}.json"
+            if not path.exists():
+                path.write_text(json.dumps({"index": entry.index, "leaf_hash": entry.leaf_hash, "leaf": entry.leaf}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        if self.sth_history_path.exists():
+            (out / "sth-history.jsonl").write_text(self.sth_history_path.read_text(encoding="utf-8"), encoding="utf-8")
+        if self.sth_path.exists():
+            latest = load_data(self.sth_path)
+            (out / "latest-sth.json").write_text(json.dumps(latest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        components = {}
+        for entry in entries:
+            component = ((entry.leaf.get("attestation") or {}).get("subject") or {}).get("component")
+            if component:
+                components[component] = entry
+        for component, entry in components.items():
+            receipt = self.proof_for_leaf_hash(entry.leaf_hash)
+            (out / "receipts" / f"{component}.receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            (out / "entries" / f"{component}.attestation.json").write_text(
+                json.dumps(entry.leaf.get("attestation"), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+        from .published_assets import README_MD, VERIFY_PY
+
+        (out / "verify.py").write_text(VERIFY_PY, encoding="utf-8")
+        (out / "README.md").write_text(README_MD, encoding="utf-8")
+        if public_key_path is not None:
+            (out / "provider.ed25519.pub").write_bytes(Path(public_key_path).read_bytes())
+        return {"entries": len(entries), "components": sorted(components), "out": str(out)}
 
     def consistency_from(self, old_tree_size: int) -> dict[str, Any]:
         """Consistency proof from an arbitrary earlier tree size - what a
