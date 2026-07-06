@@ -56,6 +56,9 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
         assert consistency["from_tree_size"] == 2 and consistency["proof"]
         history = get("/v1/sth-history")["sth_history"]
         assert len(history) == 3  # one head per append
+        with urllib.request.urlopen(base + "/paper", timeout=10) as r:
+            assert r.headers["Content-Type"] == "application/pdf"
+            assert r.read(5) == b"%PDF-"
     finally:
         server.shutdown()
 

@@ -168,13 +168,15 @@ server {
 Check: `https://ltl.zkdefi.org/docs` renders the customer
 documentation; `/v1/sth` returns the dogfood-signed head.
 
-## 4. Second mirror (any Forgejo/Gitea/GitLab you operate)
+## 4. Second mirror (an independently-operated host — not yours)
 
 Create a periodic pull-mirror of
-`https://github.com/saymrwulf/lean-transparency-log` on a second,
-independently-operated git host. The published repo is the witness
-channel; two independent mirrors mean split-view lies must fool two
-infrastructures at once — exactly the point.
+`https://github.com/saymrwulf/lean-transparency-log` on a second git
+host **operated by someone else** (e.g. Codeberg). The published repo is
+the witness channel; two independent mirrors mean split-view lies must
+fool two infrastructures at once — exactly the point. A mirror on
+infrastructure the log operator also controls adds convenience, not
+witness value: the operator could equivocate consistently on both.
 
 ## 4b. Key hygiene (non-negotiable)
 

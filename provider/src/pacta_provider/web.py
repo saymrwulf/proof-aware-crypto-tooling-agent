@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -20,7 +21,7 @@ from .transparency_log import TransparencyLog
 API_VERSION = "v1"
 
 
-def make_handler(log: TransparencyLog, base_path: str, docs_html: str):
+def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf: bytes | None = None):
     base = "/" + base_path.strip("/") if base_path.strip("/") else ""
 
     class Handler(BaseHTTPRequestHandler):
@@ -43,6 +44,16 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str):
 
             if route in ("/", "/docs"):
                 self._send_html(docs_html)
+            elif route in ("/paper", "/paper/ltl.pdf"):
+                if paper_pdf is None:
+                    self._send(404, {"error": "paper not available on this deployment"})
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Disposition", 'inline; filename="ltl.pdf"')
+                self.send_header("Content-Length", str(len(paper_pdf)))
+                self.end_headers()
+                self.wfile.write(paper_pdf)
             elif route == "/healthz":
                 self._send(200, {"ok": True, "tree_size": len(log.entries())})
             elif route == f"/{API_VERSION}/metadata":
@@ -112,6 +123,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str):
                     "error": "unknown endpoint",
                     "endpoints": [
                         f"{base}/docs",
+                        f"{base}/paper",
                         f"{base}/healthz",
                         f"{base}/{API_VERSION}/metadata",
                         f"{base}/{API_VERSION}/sth",
@@ -161,5 +173,7 @@ def serve(
         from .webdocs import render_docs
 
         docs_html = render_docs(log, base_path)
-    handler = make_handler(log, base_path, docs_html)
+    paper_path = Path(__file__).resolve().parents[3] / "paper" / "ltl.pdf"
+    paper_pdf = paper_path.read_bytes() if paper_path.is_file() else None
+    handler = make_handler(log, base_path, docs_html, paper_pdf)
     return ThreadingHTTPServer((host, port), handler)

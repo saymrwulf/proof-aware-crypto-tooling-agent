@@ -218,6 +218,12 @@ the content hash) and build it yourself — compiler and build are declared trus
 until the reproducible-builds program (R5) lands. Every attestation carries its full
 residual-risk list. Honesty about the boundary is the product.</div>
 
+<h2>The paper</h2>
+<div class="card"><a href="{base}/paper"><strong>LTL: the Lean Transparency Log</strong></a>
+(PDF, 4 pages) — the design in full: the trust model (observations, never verdicts),
+the self-certifying signature, the deployment with its retained failure leaves, and an
+exact account of what a verified receipt does and does not establish.</div>
+
 <p class="muted">Log heads are signed offline; this service is read-only and holds no
 key material. Provider tooling, agent tooling, and the full course (12 Jupyter
 lectures) live in the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a>.</p>
