@@ -101,6 +101,31 @@ def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str) -> s
     return "".join(out)
 
 
+def _trust_anchor_html(log: TransparencyLog, metadata: dict[str, Any], base: str, mirror: str) -> str:
+    """The provider public key, displayed in full on the front page. The key
+    is the one thing a consumer takes on trust, once - hiding it behind a
+    path would invert the page's priorities."""
+    key_path = log.log_dir / "provider.ed25519.pub"
+    fingerprint = str(metadata.get("ed25519_public_key_fingerprint_sha256", ""))
+    if not key_path.is_file():
+        return (
+            '<div class="card"><span class="pill warn">missing</span> This deployment '
+            "does not expose its public key in the log directory - fetch it from the "
+            f'<a href="{mirror}/blob/main/provider.ed25519.pub">mirror</a> instead.</div>'
+        )
+    pem = escape(key_path.read_text(encoding="utf-8").strip())
+    return f"""<div class="card">
+<p style="margin-top:0">This key is <strong>the only thing you take on trust, once</strong>.
+Everything else on this page - every attestation, every tree head - is verified against it.
+Pin it, and compare this copy byte-for-byte with the independently hosted
+<a href="{mirror}/blob/main/provider.ed25519.pub">mirror copy</a>; they must be identical.</p>
+<pre style="margin-bottom:.4rem">{pem}</pre>
+<p class="muted" style="margin:.2rem 0 0">SHA-256 fingerprint <code>{escape(fingerprint)}</code>
+&nbsp;·&nbsp; raw: <a href="{base}/log-public-key"><code>{base or ''}/log-public-key</code></a>
+&nbsp;·&nbsp; <code>curl -s ltl.zkdefi.org/log-public-key</code></p>
+</div>"""
+
+
 def render_docs(log: TransparencyLog, base_path: str) -> str:
     base = "/" + base_path.strip("/") if base_path.strip("/") else ""
     metadata = log.metadata()
@@ -141,6 +166,9 @@ cryptographic Rust libraries, at specific git commits, machine-re-check with exa
 their documented assumptions</em> — so that you can trust a proof result by checking
 <strong>one signature and ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes in
 milliseconds</strong>, instead of running a theorem prover for hours.</p>
+
+<h2>The trust anchor — pin this key</h2>
+{_trust_anchor_html(log, metadata, base, mirror)}
 
 <h2>The accumulator, live</h2>
 {tree_svg}

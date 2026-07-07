@@ -31,7 +31,11 @@ def _make_log(tmp_path, n=3):
 
 def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
     # root mount: the production shape (ltl.zkdefi.org serves from /)
+    import shutil
+
     _make_log(tmp_path)
+    # trust anchor present at render time: front page must display it in full
+    shutil.copy2(tmp_path / "k.pub", tmp_path / "log" / "provider.ed25519.pub")
     server = serve(str(tmp_path / "log"), port=0)
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -60,11 +64,13 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
             assert r.headers["Content-Type"] == "application/pdf"
             assert r.read(5) == b"%PDF-"
         # the site's copy of the trust anchor (TOFU: two independent locations)
-        import shutil
-
-        shutil.copy2(tmp_path / "k.pub", tmp_path / "log" / "provider.ed25519.pub")
         with urllib.request.urlopen(base + "/log-public-key", timeout=10) as r:
             assert r.read() == (tmp_path / "k.pub").read_bytes()
+        # and the front page displays the key IN FULL, above the fold
+        with urllib.request.urlopen(base + "/docs", timeout=10) as r:
+            page = r.read().decode()
+        assert "BEGIN PUBLIC KEY" in page
+        assert "pin this key" in page.lower()
     finally:
         server.shutdown()
 
