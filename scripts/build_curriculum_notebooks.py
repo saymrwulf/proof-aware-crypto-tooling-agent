@@ -2312,6 +2312,194 @@ COURSE = {
             ),
         ]
     ),
+    "11_the_customers_eye_view.ipynb": notebook(
+        [
+            md(
+                """
+                # Lecture 11: The Customer's-Eye View — You Hold the Ruler
+
+                Every earlier lecture looked at the log from the *operator's*
+                side: replaying proofs, signing attestations, building the
+                tree. This one flips the telescope. You are now a customer — an
+                agent, a wallet, a developer — who wants to trust one of the
+                four verified Ed25519 forks and has no theorem prover, no Lean,
+                no desire to spend hours re-checking anything. What actually
+                happens on your side? The answer reframes the whole system, and
+                it is the most intuitive on-ramp to it.
+                """
+            ),
+            md(
+                """
+                ## Learning Objectives
+
+                - Separate the three roles that a verification touches:
+                  *measurement* (operator), *publication* (the log), and
+                  *judgment* (you) — and see that only the last is yours.
+                - Understand the "allowed axioms" list as a **requirements
+                  card** you own, can read, and could write yourself.
+                - Explain why a self-written card meeting the supply *exactly*
+                  is engineered, not coincidental.
+                - State the three honest outcomes when your card is stricter
+                  than the supply: relax (itemized), walk away, or grow the
+                  supply.
+                """
+            ),
+            md(
+                """
+                ## The card is a requirements card — and ideally you write it
+
+                The list of axioms a certificate is *allowed* to rest on is not
+                handed to you by the operator at verification time. It ships
+                inside your own tooling (the ed25519 profile), on your disk,
+                versioned by you. A maximally paranoid customer ignores the
+                shipped copy and writes the card from first principles:
+
+                > *"I accept Lean's three foundational axioms, because that is
+                > what the proof kernel's logic IS. For the signature-tier
+                > theorems I accept named placeholders for SHA-512 and the wire
+                > format, because RFC 8032 tells me those parts exist and I can
+                > see they are declared, not smuggled. Nothing else."*
+
+                That is a wish-list: the assumptions you are willing to live
+                under. Call it your ruler.
+                """
+            ),
+            code(
+                """
+                import sys, pathlib
+                for parent in [pathlib.Path.cwd(), *pathlib.Path.cwd().parents]:
+                    if (parent / "src" / "pacta").exists():
+                        sys.path.insert(0, str(parent / "src")); break
+
+                # A customer writes their OWN card, from first principles - no
+                # peeking at the operator. Lean's three, plus named oracle slots.
+                my_card = {
+                    "foundational": {"propext", "Classical.choice", "Quot.sound"},
+                    "apex_oracle_allowed": {
+                        "sha2.Sha512", "verifying.sha512_new",
+                        "verifying.sha512_update", "verifying.sha512_finalize_bytes",
+                        "ed25519.Signature", "ed25519.Signature.to_bytes",
+                        "signature.error.Error", "signature.error.Error.new",
+                    },
+                }
+                print("my requirements card:", sum(len(v) for v in my_card.values()), "named assumptions")
+                """
+            ),
+            md(
+                """
+                ## Wish meets supply — and it is no accident
+
+                Now compare your self-written card against what the four forks
+                actually declare. They match. That convergence is *engineered*:
+                the supply was deliberately shrunk — every axiom made to justify
+                its existence — so that any reasonable person's independently
+                written card lands on the same minimal list. When the wish meets
+                the supply exactly, it is because the supplier spent months
+                making the supply as small as honesty allows.
+                """
+            ),
+            code(
+                """
+                from pacta.profiles.ed25519 import APEX_BOUNDARIES
+
+                # The supply: the apex-tier certificate's documented, allowed
+                # axiom cone for the upstream fork - the exact set the strongest
+                # theorem is permitted to rest on, nothing more, nothing less.
+                supply = set(APEX_BOUNDARIES["dalek-wrappers"])
+                wish = my_card["foundational"] | my_card["apex_oracle_allowed"]
+                print("supply == my wish:", supply == wish)
+                print("axioms in supply my card did not anticipate:", (supply - wish) or "none")
+                print("axioms my card wanted that are absent:", (wish - supply) or "none")
+                """
+            ),
+            md(
+                """
+                ## The three roles, kept apart
+
+                It is tempting to say "the inclusion proof proves the Lean proof
+                is about my card." It does not, and the precision matters:
+
+                | role | who | what it establishes |
+                |---|---|---|
+                | measurement | operator's kernel run | "this theorem rests on exactly these named axioms" (recorded verbatim in the attestation) |
+                | publication | the transparency log | "this measurement is in the permanent record, shown identically to everyone" (the inclusion proof + signed head) |
+                | judgment | **you** | "these observed axioms are inside my allowed card" (re-derived locally, every time) |
+
+                Only judgment is yours, and it is the only step that involves an
+                opinion. The operator is trusted to *copy down what the kernel
+                printed* — never to interpret it.
+                """
+            ),
+            md(
+                """
+                ## If you are happy — you are already finished
+
+                If your card covers the observed cone, verification is: check
+                one signature, walk ~4 hashes to the signed root, compare cones
+                to your card. Milliseconds, standard library, no Lean. Done.
+
+                ## If you are NOT happy — there is nothing to negotiate
+
+                Suppose your card is stricter: *"I require SHA-512 itself
+                proven, not an oracle."* The system has no sales pitch for you.
+                Its entire answer is an **itemized** statement of the gap:
+                *not in supply; SHA-512-proven is the R5 frontier; here is the
+                exact list of what you would be accepting if you proceed
+                anyway.* Your decision is never "lower my standards" in the
+                abstract — it is a named line item: *SHA-512 as oracle: yes/no.*
+                Informed compromise, not diffuse trust.
+                """
+            ),
+            code(
+                """
+                # The honest gap, itemized. A stricter customer wants no hash oracle.
+                strict_card = my_card["foundational"]  # foundational ONLY, no oracle slots
+                gap = supply - strict_card
+                print("this customer must explicitly accept, or walk away:")
+                for ax in sorted(gap):
+                    print("  -", ax)
+                print()
+                print("verdict for the strict card:", "PASSES" if supply <= strict_card else "REFUSED (gap above)")
+                """
+            ),
+            md(
+                """
+                ## The third option: grow the supply
+
+                The gap between anyone's dream card and today's supply is a
+                to-do list, not a wall. Prove SHA-512, certify the wire
+                parsers, and the new certificates enter the same log — and
+                stricter cards start passing. The log is additive in exactly
+                the way requirements are.
+
+                **So: you hold the ruler. If your ruler is stricter than our
+                supply, your ruler is our roadmap.** That is the quiet
+                invitation built into the whole design.
+                """
+            ),
+            md(
+                """
+                ## Exercises
+
+                - Write your own requirements card for the *foundational*
+                  (non-signature) certificates from scratch. Those certificates
+                  are expected to carry exactly Lean's three standard axioms
+                  (`propext`, `Classical.choice`, `Quot.sound`) and nothing
+                  else - did your card guess exactly those three?
+                - A vendor's attestation says `status: proven`. Explain in two
+                  sentences why your tooling ignores that field entirely, and
+                  what it looks at instead.
+                - You require reproducible builds. Is that a card you can write
+                  today and have pass? Name the tier that gap belongs to, and
+                  what would have to enter the log to close it.
+                - Argue both sides: is "wish meets supply exactly" a strength
+                  (minimal, auditable) or a weakness (the same author wrote the
+                  card and the supply)? What single action by a customer
+                  settles the argument in their favor?
+                """
+            ),
+        ]
+    ),
 }
 
 
@@ -2334,6 +2522,7 @@ The course teaches:
 - split-view defense: STH pinning, consistency enforcement, freshness, monitoring,
 - dogfood verified cryptography and the honest hybrid post-quantum posture,
 - the verified-custody wallet (warden): a quorum boundary of four proven forks, the signing firewall, and the agent-native MCP surface,
+- the customer's-eye view: the allowed-axioms list as a requirements card you own and could write yourself, and what happens when your card is stricter than the supply,
 - research roadmaps from R4 evidence toward R5 assurance.
 
 This curriculum is not financial advice, not a trading bot, and not a wallet-building guide. It is a training path for engineers and researchers who need to evaluate formal-verification-enhanced cryptographic tooling without overclaiming.
