@@ -77,6 +77,7 @@ REFUSAL_CODES = (
     "SIGNER_UNAVAILABLE",    # signer backend cannot serve the request
     "FIREWALL_QUARANTINE",   # produced signature failed the quorum firewall
     "PENDING_AIRGAP",        # request parked in the airgap outbox
+    "RATE_LIMITED",          # surface-level throttle (issued by the MCP layer)
 )
 
 
@@ -215,8 +216,9 @@ class PendingAirgap(Exception):
 
 
 class Wallet:
-    def __init__(self, wallet_dir: str | Path) -> None:
+    def __init__(self, wallet_dir: str | Path, state_dir: str | Path | None = None) -> None:
         self.dir = Path(wallet_dir)
+        self.state_dir = state_dir  # default quorum binary location override
         self.capsule_path = self.dir / "capsule.json"
         self.ledger_path = self.dir / "ledger.jsonl"
         self.latch_path = self.dir / "latch.json"
@@ -451,40 +453,105 @@ class Wallet:
             if line.strip()
         ]
 
+    @staticmethod
+    def _last_ledger_line(handle: Any) -> dict[str, Any] | None:
+        """Read only the final line - O(1) in ledger size, not O(n).
+
+        Seeks back from EOF in one chunk (ledger lines are well under 64 KiB;
+        a single quarantine-size body is ~2 KiB) and parses the last
+        newline-terminated record."""
+        handle.seek(0, os.SEEK_END)
+        size = handle.tell()
+        if size == 0:
+            return None
+        back = min(size, 65536)
+        handle.seek(size - back)
+        tail = handle.read(back)
+        lines = [line for line in tail.splitlines() if line.strip()]
+        return json.loads(lines[-1]) if lines else None
+
     def _append_ledger(self, entry_type: str, body: dict[str, Any]) -> dict[str, Any]:
         # Single-flight: the chain is read-modify-append, so two concurrent
         # writers (threads, or two processes sharing a wallet dir) could both
         # read the same tail, compute the same prev_hash, and fork the chain.
-        # An advisory exclusive lock over the whole critical section - taken
-        # AFTER reopening under the lock so the prev-read reflects any writer
-        # that just finished - makes appends serialize. fsync so a crash can't
-        # leave a torn line that verify_ledger would read as tampering.
-        self.ledger_path.touch(exist_ok=True)
-        with self.ledger_path.open("r+", encoding="utf-8") as handle:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                existing = [json.loads(line) for line in handle.read().splitlines() if line.strip()]
-                prev_hash = existing[-1]["entry_hash"] if existing else "0" * 64
-                entry = {
-                    "index": len(existing),
+        # The exclusive lock lives on a dedicated lock FILE (not the ledger
+        # fd) so it survives the rotation rename; fsync so a crash can't
+        # leave a torn line that verify_ledger would read as tampering. Only
+        # the LAST line is read per append (O(1)); when a segment reaches
+        # the rotation threshold it is archived and a `rotation` entry
+        # carries the chain across files, keeping history verifiable end to
+        # end.
+        lock_path = self.dir / "ledger.lock"
+        with lock_path.open("w") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            self.ledger_path.touch(exist_ok=True)
+            with self.ledger_path.open("rb") as handle:
+                last = self._last_ledger_line(handle)
+            prev_hash = last["entry_hash"] if last else "0" * 64
+            next_index = (last["index"] + 1) if last else 0
+            rotate_at = int((self.policy().get("ledger") or {}).get("rotate_at", 100_000))
+            if last is not None and next_index % rotate_at == 0 and last.get("entry_type") != "rotation":
+                archive = self.dir / f"ledger-{next_index:08d}-{prev_hash[:12]}.jsonl"
+                self.ledger_path.rename(archive)
+                rotation = {
+                    "index": next_index,
                     "timestamp": _now(),
-                    "entry_type": entry_type,
-                    "body": body,
+                    "entry_type": "rotation",
+                    "body": {
+                        "archived_file": archive.name,
+                        "archived_head": prev_hash,
+                        "archived_through_index": next_index - 1,
+                    },
                     "prev_hash": prev_hash,
                 }
-                entry["entry_hash"] = _sha256(_canonical(entry))
-                handle.seek(0, os.SEEK_END)
-                handle.write(json.dumps(entry, sort_keys=True) + "\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-                return entry
-            finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                rotation["entry_hash"] = _sha256(_canonical(rotation))
+                with self.ledger_path.open("w", encoding="utf-8") as fresh:
+                    fresh.write(json.dumps(rotation, sort_keys=True) + "\n")
+                    fresh.flush()
+                    os.fsync(fresh.fileno())
+                prev_hash = rotation["entry_hash"]
+                next_index += 1
+            with self.ledger_path.open("ab") as handle:
+                return self._write_entry(handle, entry_type, body, prev_hash, next_index)
+
+    @staticmethod
+    def _write_entry(handle: Any, entry_type: str, body: dict[str, Any], prev_hash: str, index: int) -> dict[str, Any]:
+        entry = {
+            "index": index,
+            "timestamp": _now(),
+            "entry_type": entry_type,
+            "body": body,
+            "prev_hash": prev_hash,
+        }
+        entry["entry_hash"] = _sha256(_canonical(entry))
+        handle.seek(0, os.SEEK_END)
+        handle.write((json.dumps(entry, sort_keys=True) + "\n").encode("utf-8"))
+        handle.flush()
+        os.fsync(handle.fileno())
+        return entry
 
     def verify_ledger(self) -> tuple[bool, list[str]]:
+        """Re-check the full chain, walking archived segments through their
+        `rotation` links, oldest first back to genesis."""
         problems: list[str] = []
+        segments: list[list[dict[str, Any]]] = []
+        entries = self._ledger_entries()
+        while True:
+            segments.insert(0, entries)
+            first = entries[0] if entries else None
+            if not first or first.get("entry_type") != "rotation":
+                break
+            archive = self.dir / str((first.get("body") or {}).get("archived_file", ""))
+            if not archive.is_file():
+                problems.append(f"rotation at index {first.get('index')}: archive {archive.name} missing")
+                break
+            entries = [
+                json.loads(line)
+                for line in archive.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
         prev = "0" * 64
-        for entry in self._ledger_entries():
+        for entry in (e for segment in segments for e in segment):
             claimed = entry.get("entry_hash")
             body = {k: v for k, v in entry.items() if k != "entry_hash"}
             if entry.get("prev_hash") != prev:
@@ -495,8 +562,11 @@ class Wallet:
         return (not problems), problems
 
     def ledger_head(self) -> str:
-        entries = self._ledger_entries()
-        return entries[-1]["entry_hash"] if entries else "0" * 64
+        if not self.ledger_path.exists():
+            return "0" * 64
+        with self.ledger_path.open("rb") as handle:
+            last = self._last_ledger_line(handle)
+        return last["entry_hash"] if last else "0" * 64
 
     # -- quorum assembly -------------------------------------------------------
 
@@ -509,6 +579,7 @@ class Wallet:
         # is the right granularity: an attacker who can rewrite the on-disk
         # binary already outranks this check, and re-hashing per call buys
         # nothing against them while taxing every honest verification.
+        state_dir = state_dir if state_dir is not None else self.state_dir
         cache_key = str(state_dir) if state_dir is not None else "__default__"
         cached = self._quorum_cache.get(cache_key)
         if cached is not None:
@@ -639,35 +710,166 @@ class Wallet:
     ) -> dict[str, Any] | Refusal:
         """The outbound path. Returns a release dict on success, or a Refusal.
 
-        Order matters and is deliberate: latch, policy freshness, intent
-        binding, signer, then the firewall - the quorum verifies the fresh
-        signature and only unanimity releases it. A signature that fails the
-        firewall is quarantined and never returned to the caller; that is
-        the verify-after-sign fault-injection countermeasure, custody-grade.
+        Gate order is deliberate and each gate is its own method: latch,
+        evidence freshness, intent binding, spending policy, signer
+        resolution, signing, then the firewall - the quorum verifies the
+        fresh signature and only unanimity releases it. A signature that
+        fails the firewall is quarantined and never returned to the caller;
+        that is the verify-after-sign fault-injection countermeasure,
+        custody-grade.
         """
         request = {"intent": intent, "payload_sha256": _sha256(payload), "key_name": key_name}
+        refusal = self._gate_latch(request)
+        if refusal is not None:
+            return refusal
+        refusal = self._check_freshness(self.capsule())
+        if refusal is not None:
+            return refusal
+        refusal = self._gate_intent(intent, payload, request)
+        if refusal is not None:
+            return refusal
+        refusal = self._gate_policy(intent, key_name, request)
+        if refusal is not None:
+            return refusal
+        resolved = self._resolve_signer(signer, key_name, request)
+        if isinstance(resolved, Refusal):
+            return resolved
+        signer, key, pub = resolved
+        signature = self._obtain_signature(signer, payload, key, intent, request_id, request)
+        if isinstance(signature, Refusal):
+            return signature
+        return self._run_firewall(
+            payload, signature, pub, intent, request, state_dir,
+            key_name=key_name, signer_name=getattr(signer, "name", "unknown"),
+        )
+
+    # -- outbound gates, one method each ---------------------------------------
+
+    def _gate_latch(self, request: dict[str, Any]) -> Refusal | None:
         latch = self.latch_state()
-        if latch.get("latched"):
-            return self._refuse(
-                "CUSTODY_LATCHED",
-                f"custody latch engaged: {latch.get('reason')}",
-                [f"operator unlatch with written note (incident {latch.get('incident')})"],
-                "resolve the incident, then `pacta wallet unlatch --note <why>`",
-                request,
-            )
-        capsule = self.capsule()
-        stale = self._check_freshness(capsule)
-        if stale is not None:
-            return stale
+        if not latch.get("latched"):
+            return None
+        return self._refuse(
+            "CUSTODY_LATCHED",
+            f"custody latch engaged: {latch.get('reason')}",
+            [f"operator unlatch with written note (incident {latch.get('incident')})"],
+            "resolve the incident, then `pacta wallet unlatch --note <why>`",
+            request,
+        )
+
+    def _gate_intent(self, intent: dict[str, Any], payload: bytes, request: dict[str, Any]) -> Refusal | None:
         problem = self._validate_intent(intent, payload)
-        if problem:
-            return self._refuse(
-                "MALFORMED_INTENT",
-                problem,
-                ["intent.purpose (non-empty string)", "intent.payload_sha256 matching the payload"],
-                "resend with a well-formed intent envelope; see WALLET.md#intent",
-                request,
+        if problem is None:
+            return None
+        return self._refuse(
+            "MALFORMED_INTENT",
+            problem,
+            ["intent.purpose (non-empty string)", "intent.payload_sha256 matching the payload"],
+            "resend with a well-formed intent envelope; see WALLET.md#intent",
+            request,
+        )
+
+    def _gate_policy(self, intent: dict[str, Any], key_name: str, request: dict[str, Any]) -> Refusal | None:
+        """The lightweight spending-policy engine (POLICY_DENIED consequences).
+
+        Rules live in ``policy.json`` in the wallet directory - the rules you
+        would give a teenager with a debit card: per-request and per-day
+        amount ceilings and counterparty allow/deny lists, with per-identity
+        overrides. No policy file means no restrictions (and the posture
+        reports as much). Amount rules bind on ``intent.amount``; list rules
+        bind on ``intent.counterparty`` - policy makes those intent fields
+        mandatory, so a request that omits them is refused, not waved past.
+        """
+        rules = self._policy_rules(key_name)
+        if not rules:
+            return None
+
+        def deny(reason: str, missing: list[str], remediation: str) -> Refusal:
+            return self._refuse("POLICY_DENIED", reason, missing, remediation, request)
+
+        allow = rules.get("counterparty_allowlist")
+        denylist = rules.get("counterparty_denylist") or []
+        counterparty = intent.get("counterparty")
+        if (allow is not None or denylist) and not isinstance(counterparty, str):
+            return deny(
+                "policy has counterparty rules but the intent names no counterparty",
+                ["intent.counterparty"],
+                "resend with intent.counterparty set",
             )
+        if denylist and counterparty in denylist:
+            return deny(
+                f"counterparty {counterparty!r} is on the denylist",
+                [],
+                "this counterparty is blocked by wallet policy; change the policy deliberately if wrong",
+            )
+        if allow is not None and counterparty not in allow:
+            return deny(
+                f"counterparty {counterparty!r} is not on the allowlist",
+                [],
+                "add the counterparty to policy.json outbound.counterparty_allowlist if intended",
+            )
+        max_request = rules.get("max_amount_per_request")
+        max_day = rules.get("max_amount_per_day")
+        if max_request is not None or max_day is not None:
+            amount = intent.get("amount")
+            if not isinstance(amount, (int, float)) or amount <= 0:
+                return deny(
+                    "policy has amount ceilings but the intent carries no positive intent.amount",
+                    ["intent.amount (positive number)"],
+                    "resend with intent.amount set; amounts are policy units, recorded in the ledger",
+                )
+            if max_request is not None and amount > float(max_request):
+                return deny(
+                    f"amount {amount} exceeds the per-request ceiling {max_request}",
+                    [],
+                    "split the request or raise the ceiling deliberately in policy.json",
+                )
+            if max_day is not None:
+                spent = self._spent_last_24h(key_name)
+                if spent + amount > float(max_day):
+                    return deny(
+                        f"amount {amount} would exceed the daily ceiling {max_day} "
+                        f"(already released in the last 24h: {spent})",
+                        [],
+                        "wait for the window to roll, or raise the ceiling deliberately in policy.json",
+                    )
+        return None
+
+    def policy(self) -> dict[str, Any]:
+        path = self.dir / "policy.json"
+        if not path.exists():
+            return {}
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def _policy_rules(self, key_name: str) -> dict[str, Any]:
+        policy = self.policy()
+        rules = dict(policy.get("outbound") or {})
+        rules.update((policy.get("identities") or {}).get(key_name) or {})
+        return rules
+
+    def _spent_last_24h(self, key_name: str) -> float:
+        cutoff = datetime.now(timezone.utc).timestamp() - 86400
+        spent = 0.0
+        for entry in self._ledger_entries():
+            if entry.get("entry_type") != "outbound-sign":
+                continue
+            body = entry.get("body") or {}
+            if body.get("identity") != key_name:
+                continue
+            try:
+                stamp = datetime.fromisoformat(str(entry.get("timestamp", "")).replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                continue
+            if stamp < cutoff:
+                continue
+            amount = (body.get("intent") or {}).get("amount")
+            if isinstance(amount, (int, float)):
+                spent += float(amount)
+        return spent
+
+    def _resolve_signer(
+        self, signer: Any, key_name: str, request: dict[str, Any]
+    ) -> tuple[Any, Path, Path] | Refusal:
         key = self.keys_dir / f"{key_name}.key.pem"
         pub = self.keys_dir / f"{key_name}.pub.pem"
         if signer is None:
@@ -688,11 +890,21 @@ class Wallet:
                 "use the airgap signer for this identity",
                 request,
             )
+        return signer, key, pub
+
+    def _obtain_signature(
+        self,
+        signer: Any,
+        payload: bytes,
+        key: Path,
+        intent: dict[str, Any],
+        request_id: str | None,
+        request: dict[str, Any],
+    ) -> bytes | Refusal:
         try:
             if isinstance(signer, AirgapSigner):
-                signature = signer.sign(payload, key, request_id=request_id, intent=intent)
-            else:
-                signature = signer.sign(payload, key)
+                return signer.sign(payload, key, request_id=request_id, intent=intent)
+            return signer.sign(payload, key)
         except PendingAirgap as pending:
             return self._refuse(
                 "PENDING_AIRGAP",
@@ -706,15 +918,24 @@ class Wallet:
             return self._refuse(
                 "SIGNER_UNAVAILABLE", f"signer failed: {exc}", [], "check the signer backend", request
             )
-        # THE FIREWALL: the fresh signature faces the full quorum.
+
+    def _run_firewall(
+        self,
+        payload: bytes,
+        signature: bytes,
+        pub: Path,
+        intent: dict[str, Any],
+        request: dict[str, Any],
+        state_dir: str | Path | None,
+        key_name: str,
+        signer_name: str,
+    ) -> dict[str, Any] | Refusal:
+        """The fresh signature faces the full quorum; only unanimity releases."""
         public_key = pem_public_key_to_raw(pub)
         result = self.quorum(state_dir).verify(payload, signature, public_key)
         if not result.accepted:
             quarantine_ref = self._quarantine(payload, signature, public_key, intent, result)
-            if result.incident:
-                incident_ref = self._write_incident(result.incident)
-            else:
-                incident_ref = None
+            incident_ref = self._write_incident(result.incident) if result.incident else None
             self._latch(
                 "outbound firewall rejected a signature this wallet just produced "
                 f"(quarantine {quarantine_ref})",
@@ -735,7 +956,7 @@ class Wallet:
             "signature_hex": signature.hex(),
             "public_key_hex": public_key.hex(),
             "identity": key_name,
-            "signer": getattr(signer, "name", "unknown"),
+            "signer": signer_name,
             "intent": intent,
             "payload_sha256": _sha256(payload),
             "firewall": result.to_dict(),
@@ -830,6 +1051,7 @@ class Wallet:
                 for m in capsule["members"]
             ],
             "policy": capsule["policy"],
+            "spending_policy": self.policy() or {"note": "no policy.json - outbound is unrestricted"},
             "latch": self.latch_state(),
             "ledger": {
                 "entries": len(self._ledger_entries()),

@@ -129,9 +129,11 @@ pacta wallet mcp --wallet ./my-warden             # stdio JSON-RPC MCP server
 
 ## Agent-native surface (MCP)
 
-`pacta wallet mcp` speaks MCP over stdio JSON-RPC. Seven outcome-first
-tools; strict input schemas; results carry evidence; errors are structured
-objects, never prose.
+`pacta wallet mcp` speaks MCP over stdio JSON-RPC. Eight outcome-first
+tools with read-only/destructive annotations; strict input schemas;
+results carry evidence; errors are structured objects that include the
+signed refusal receipt, never prose. Tool classes are rate-limited
+(custody 30/min, verify 120/min, liveness 240/min).
 
 | tool | does |
 |---|---|
@@ -142,10 +144,12 @@ objects, never prose.
 | `posture_challenge` | nonce → firewalled, signed posture attestation with the quorum trail |
 | `list_incidents` | divergences and quarantines, newest-first |
 | `explain_refusal` | fetch a refusal receipt by index (or latest) |
+| `airgap_pending` | parked gap-signing requests and whether the device answered |
 
 Refusal codes (every refusal names one): `EVIDENCE_REQUIRED`,
 `POLICY_DENIED`, `CUSTODY_LATCHED`, `EVIDENCE_STALE`, `MALFORMED_INTENT`,
-`SIGNER_UNAVAILABLE`, `FIREWALL_QUARANTINE`, `PENDING_AIRGAP`.
+`SIGNER_UNAVAILABLE`, `FIREWALL_QUARANTINE`, `PENDING_AIRGAP`,
+`RATE_LIMITED`.
 
 ### The custody card is self-proving
 
@@ -157,6 +161,54 @@ recomputation, not by assertion. See `verify_posture_attestation` and the
 log's own `verify.py` for the ~40-line client side.
 
 ---
+
+## The spending policy (POLICY_DENIED)
+
+Optional `policy.json` in the wallet directory - the rules you would give
+a teenager with a debit card, checked before the signer ever runs:
+
+```json
+{
+  "outbound": {
+    "max_amount_per_request": 100.0,
+    "max_amount_per_day": 500.0,
+    "counterparty_allowlist": ["alice"],
+    "counterparty_denylist": ["mallory"]
+  },
+  "identities": { "warden": { "max_amount_per_request": 10.0 } },
+  "ledger": { "rotate_at": 100000 }
+}
+```
+
+Amount rules bind on `intent.amount`; list rules bind on
+`intent.counterparty` - policy makes those fields **mandatory**, so a
+request that omits them is refused, never waved past. Daily ceilings sum
+the released amounts in the ledger's last 24 hours per identity.
+Per-identity overrides win over `outbound` defaults. No `policy.json`
+means unrestricted (and `wallet_status` says so). `pacta wallet policy
+--wallet <dir> --init-template` writes a starter file.
+
+## Surface controls and the ledger's diet
+
+The MCP layer rate-limits by tool class (custody 30/min, verify 120/min,
+liveness 240/min) so a hostile counterparty cannot grind the signer or
+bloat the audit trail; rate refusals are surface events, not custody
+events, and are not ledgered. The ledger itself appends in O(1) (only
+the tail is read, under a dedicated lock file, fsynced) and rotates into
+hash-chained archive segments at `ledger.rotate_at` entries -
+`verify-ledger` walks the whole chain across segments back to genesis.
+
+## warden-treasury (Solana)
+
+`pacta wallet treasury-verify` takes a wire-format Solana transaction
+(from a file, or fetched by signature via `--rpc-url`), parses it locally
+(stdlib; legacy and v0), and quorum-verifies **every required signature**
+over the exact message bytes - including through the `anza` member, the
+certificate-covered verify path of the code Solana validators run. The
+RPC is demoted from oracle to bandwidth: it can withhold transactions
+(the verdict names this completeness gap explicitly), but it cannot
+manufacture one the quorum will accept. Every check lands in the ledger
+with a treasury context.
 
 ## The signing firewall (verify-after-sign)
 
@@ -201,7 +253,9 @@ alarm:
 ## Product lineup
 
 warden ships as one core with four production-ready deployment profiles —
-see [docs/products.md](docs/products.md). In one line each:
+see [docs/products.md](docs/products.md). Operational docs: the attacker
+matrix in [docs/threat-model.md](docs/threat-model.md) and the
+[latch-recovery runbook](docs/runbook-latch.md). In one line each:
 
 - **warden-solo** — a single agent's custody sidecar (local signer).
 - **warden-airgap** — signing behind a Precursor/Betrusted hardware gap.

@@ -73,9 +73,11 @@ the bytes, re-derive the verdict, with a verifier you hold a proof about.
 compromised or lying RPC can withhold data but cannot manufacture a
 signature the quorum will accept.
 
-**Ready because:** the anza member is built and tested; wiring it to a
-transaction feed is deployment configuration, not new trust surface. (The
-chain-adapter layer is the documented integration point.)
+**Ready because:** it is built: `pacta wallet treasury-verify` parses
+wire-format transactions (legacy + v0, stdlib only) and quorum-verifies
+every required signature, with the completeness gap (an RPC can withhold)
+named in every verdict. The wire parser is ~120 lines of declared trusted
+base, exactly like the forks' own parsers are hypotheses of the theorems.
 
 ---
 
@@ -104,9 +106,9 @@ scoped as the next build.)
 
 ## Honesty about "production-ready"
 
-Profiles 1 and 2 run end-to-end today on the tested core. Profiles 3 and 4
-are complete *product definitions* on the same core with one documented
-integration point each (a chain-transaction adapter; a gossip transport) —
+Profiles 1, 2, and 3 run end-to-end today on the tested core. Profile 4
+is a complete *product definition* on the same core with one documented
+integration point (a gossip transport) —
 named here so the boundary between "built and tested" and "wired to your
 environment" is exact, which is the whole ethos of this project. None of
 them changes the trust posture; all of them fail closed.

@@ -38,9 +38,76 @@ def _b64_to_bytes(field: str, value: Any) -> bytes:
 
 
 class _ToolError(Exception):
-    def __init__(self, code: str, reason: str, missing: list[str], remediation: str) -> None:
+    def __init__(
+        self,
+        code: str,
+        reason: str,
+        missing: list[str],
+        remediation: str,
+        receipt: dict[str, Any] | None = None,
+        receipt_path: str | None = None,
+    ) -> None:
         super().__init__(reason)
         self.payload = {"code": code, "reason": reason, "missing": missing, "remediation": remediation}
+        if receipt is not None:
+            # The signed refusal receipt travels WITH the error: the refused
+            # agent can hand its principal a provable, stamped "the wallet
+            # said no, and this is why" instead of an unsigned anecdote.
+            self.payload["receipt"] = receipt
+            self.payload["receipt_path"] = receipt_path
+
+
+def _refusal_error(refusal: Any) -> _ToolError:
+    return _ToolError(
+        refusal.code,
+        refusal.reason,
+        refusal.missing,
+        refusal.remediation,
+        receipt=refusal.receipt,
+        receipt_path=str(refusal.receipt_path) if refusal.receipt_path else None,
+    )
+
+
+class _RateLimiter:
+    """Sliding-window throttle per tool class. Liveness reads are cheap and
+    generous; custody mutations are scarce on purpose. Limits exist so a
+    hostile counterparty cannot grind the ledger or the signer; they are a
+    surface control, not a custody event - refusals here are NOT ledgered."""
+
+    WINDOW = 60.0
+    LIMITS = {"custody": 30, "verify": 120, "liveness": 240}
+
+    def __init__(self) -> None:
+        self._hits: dict[str, list[float]] = {}
+
+    def check(self, category: str) -> None:
+        import time
+
+        now = time.monotonic()
+        hits = self._hits.setdefault(category, [])
+        cutoff = now - self.WINDOW
+        while hits and hits[0] < cutoff:
+            hits.pop(0)
+        if len(hits) >= self.LIMITS[category]:
+            raise _ToolError(
+                "RATE_LIMITED",
+                f"{category} budget exhausted ({self.LIMITS[category]} calls / {int(self.WINDOW)}s)",
+                [],
+                "back off and retry after the window rolls; liveness reads have a higher budget than custody calls",
+            )
+        hits.append(now)
+
+
+_TOOL_CATEGORY = {
+    "request_signature": "custody",
+    "verify_inbound": "verify",
+    "posture_challenge": "custody",   # it produces a firewalled signature
+    "wallet_status": "liveness",
+    "custody_card": "liveness",
+    "list_incidents": "liveness",
+    "explain_refusal": "liveness",
+    "airgap_pending": "liveness",
+}
 
 
 TOOLS: list[dict[str, Any]] = [
@@ -48,6 +115,7 @@ TOOLS: list[dict[str, Any]] = [
         "name": "wallet_status",
         "description": "Custody posture: quorum members and tiers, latch state, ledger head and chain integrity, incident and refusal counts. Read this first.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "annotations": {"readOnlyHint": True},
     },
     {
         "name": "verify_inbound",
@@ -63,25 +131,38 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["payload_b64", "signature_b64", "public_key_b64"],
             "additionalProperties": False,
         },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True},
     },
     {
         "name": "request_signature",
-        "description": "Outbound signing with intent binding and the quorum firewall. Provide an intent.purpose (recorded as WHY) and the payload; the produced signature is verified by the quorum before release and quarantined if it fails.",
+        "description": "Outbound signing with intent binding, spending policy, and the quorum firewall. Provide intent.purpose (recorded as WHY) and the payload; amount/counterparty feed the policy engine when rules exist; signer 'airgap' parks the request for the gap device (resend with the returned request_id after the device answers). The produced signature is quorum-verified before release and quarantined if it fails.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "payload_b64": {"type": "string", "description": "message bytes to sign, base64"},
                 "purpose": {"type": "string", "description": "why this signature is requested (recorded in the ledger)"},
                 "identity": {"type": "string", "description": "wallet identity name (default: warden)"},
+                "amount": {"type": "number", "description": "policy units for spending rules (required when the policy has amount ceilings)"},
+                "counterparty": {"type": "string", "description": "who this benefits (required when the policy has counterparty lists)"},
+                "signer": {"type": "string", "enum": ["local", "airgap"], "description": "signing backend (default local)"},
+                "request_id": {"type": "string", "description": "airgap request id when completing a parked request"},
             },
             "required": ["payload_b64", "purpose"],
             "additionalProperties": False,
         },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False},
+    },
+    {
+        "name": "airgap_pending",
+        "description": "List parked airgap signing requests (outbox) and whether the device has answered (inbox). Use the request_id with request_signature to complete one.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "annotations": {"readOnlyHint": True},
     },
     {
         "name": "custody_card",
         "description": "The self-proving business card: quorum membership with embedded transparency-log inclusion proofs a counterparty can recompute, signing provenance, honesty ledger. No trust required.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "annotations": {"readOnlyHint": True},
     },
     {
         "name": "posture_challenge",
@@ -92,11 +173,13 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["nonce"],
             "additionalProperties": False,
         },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False},
     },
     {
         "name": "list_incidents",
         "description": "Quorum divergences and firewall quarantines recorded by this wallet, newest-first, with severities and trails.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "annotations": {"readOnlyHint": True},
     },
     {
         "name": "explain_refusal",
@@ -106,18 +189,26 @@ TOOLS: list[dict[str, Any]] = [
             "properties": {"index": {"type": "integer", "description": "receipt number; omit for latest"}},
             "additionalProperties": False,
         },
+        "annotations": {"readOnlyHint": True},
     },
 ]
 
 
 class WalletMCP:
-    def __init__(self, wallet_dir: str | Path, log_url: str = "https://ltl.zkdefi.org") -> None:
-        self.wallet = Wallet(wallet_dir)
+    def __init__(
+        self,
+        wallet_dir: str | Path,
+        log_url: str = "https://ltl.zkdefi.org",
+        state_dir: str | Path | None = None,
+    ) -> None:
+        self.wallet = Wallet(wallet_dir, state_dir=state_dir)
         self.log_url = log_url
+        self.limiter = _RateLimiter()
         self.handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "wallet_status": self._wallet_status,
             "verify_inbound": self._verify_inbound,
             "request_signature": self._request_signature,
+            "airgap_pending": self._airgap_pending,
             "custody_card": self._custody_card,
             "posture_challenge": self._posture_challenge,
             "list_incidents": self._list_incidents,
@@ -147,15 +238,42 @@ class WalletMCP:
         purpose = args.get("purpose")
         if not isinstance(purpose, str) or not purpose.strip():
             raise _ToolError("MALFORMED_INTENT", "purpose is required", ["purpose"], "state why the signature is requested")
-        intent = {"purpose": purpose, "payload_sha256": hashlib.sha256(payload).hexdigest()}
+        intent: dict[str, Any] = {"purpose": purpose, "payload_sha256": hashlib.sha256(payload).hexdigest()}
+        if args.get("amount") is not None:
+            intent["amount"] = args["amount"]
+        if args.get("counterparty") is not None:
+            intent["counterparty"] = args["counterparty"]
+        signer = None
+        if args.get("signer") == "airgap":
+            from .wallet import AirgapSigner
+
+            signer = AirgapSigner(self.wallet.airgap_dir)
         result = self.wallet.request_signature(
-            intent, payload, key_name=str(args.get("identity", "warden"))
+            intent,
+            payload,
+            signer=signer,
+            key_name=str(args.get("identity", "warden")),
+            request_id=args.get("request_id"),
         )
         if isinstance(result, Refusal):
-            raise _ToolError(
-                result.code, result.reason, result.missing, result.remediation
-            )
+            raise _refusal_error(result)
         return result
+
+    def _airgap_pending(self, _: dict[str, Any]) -> dict[str, Any]:
+        pending = []
+        outbox = self.wallet.airgap_dir / "outbox"
+        inbox = self.wallet.airgap_dir / "inbox"
+        for req in sorted(outbox.glob("*.request.json")):
+            request_id = req.name.removesuffix(".request.json")
+            body = json.loads(req.read_text(encoding="utf-8"))
+            pending.append({
+                "request_id": request_id,
+                "created_at": body.get("created_at"),
+                "payload_sha256": body.get("payload_sha256"),
+                "intent": body.get("intent"),
+                "device_answered": (inbox / f"{request_id}.response.json").exists(),
+            })
+        return {"pending": pending, "count": len(pending)}
 
     def _custody_card(self, _: dict[str, Any]) -> dict[str, Any]:
         return build_custody_card(self.wallet, self.log_url)
@@ -166,7 +284,7 @@ class WalletMCP:
         except ValueError as exc:
             raise _ToolError("MALFORMED_INTENT", str(exc), ["nonce"], "send an 8..128 character nonce")
         if isinstance(result, Refusal):
-            raise _ToolError(result.code, result.reason, result.missing, result.remediation)
+            raise _refusal_error(result)
         return result
 
     def _list_incidents(self, _: dict[str, Any]) -> dict[str, Any]:
@@ -212,6 +330,7 @@ class WalletMCP:
             if handler is None:
                 return self._err(msg_id, -32602, f"unknown tool {name}")
             try:
+                self.limiter.check(_TOOL_CATEGORY.get(name, "custody"))
                 payload = handler(args)
                 return self._ok(msg_id, {
                     "content": [{"type": "text", "text": json.dumps(payload, indent=2, sort_keys=True)}],

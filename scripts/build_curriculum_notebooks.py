@@ -2247,13 +2247,60 @@ COURSE = {
             ),
             md(
                 """
+                ## Corrupt a member, watch the pin catch it (executable)
+
+                The wallet seals each member's SHA-256 into its capsule. The
+                next cell stages a COPY of a real member binary in a temp
+                directory, "seals" its hash the way the capsule does, appends
+                one byte (a supply-chain attack in miniature), and re-checks.
+                Nothing on your machine is modified.
+                """
+            ),
+            code(
+                """
+                import hashlib, shutil, tempfile, pathlib
+                from pacta.quorum import binary_path
+
+                member = binary_path("dalek")
+                if not member.exists():
+                    print("quorum not built; run pacta wallet build-quorum first")
+                else:
+                    stage = pathlib.Path(tempfile.mkdtemp()) / member.name
+                    shutil.copy2(member, stage)
+                    sealed = hashlib.sha256(stage.read_bytes()).hexdigest()   # capsule pin
+                    print("sealed :", sealed[:24], "...")
+                    with stage.open("ab") as f:
+                        f.write(b"\\x00")                                      # the attack
+                    current = hashlib.sha256(stage.read_bytes()).hexdigest()
+                    print("current:", current[:24], "...")
+                    if current != sealed:
+                        print("PIN CAUGHT IT: wallet.quorum() would refuse to assemble ->")
+                        print("  'quorum member dalek binary hash changed since the capsule was sealed'")
+                    else:
+                        print("impossible: SHA-256 collision")
+                """
+            ),
+            md(
+                """
+                One appended byte and the wallet refuses to even *assemble* the
+                quorum - before any verification runs. Note what this control
+                is and is not: it stops binary substitution *between* wallet
+                sessions; an attacker with live root outranks it (see
+                docs/threat-model.md, attacker #7 - that is what the choir and
+                the airgap profiles are for).
+                """
+            ),
+            md(
+                """
                 ## Exercises
 
                 - Change `toy_quorum` to majority voting and write two sentences
                   on exactly which attack that lets through.
-                - Take the real quorum cell and corrupt one member binary on
-                  disk (append a byte). Predict, then observe, what the wallet's
-                  capsule hash-pin does the next time it assembles the quorum.
+                - Extend the corrupt-a-member cell: corrupt the capsule JSON
+                  itself instead of the binary. What catches that, and when?
+                  (Hint: nothing does until the ledger genesis is compared -
+                  write down the exact trust statement the capsule hash in the
+                  genesis entry provides.)
                 - The signing path is trusted base. Write the strongest *true*
                   sentence you can about warden's outbound safety, and the
                   strongest *false* one a marketer would write - and name the

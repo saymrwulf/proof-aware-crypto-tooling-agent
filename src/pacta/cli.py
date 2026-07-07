@@ -244,6 +244,19 @@ def build_parser() -> argparse.ArgumentParser:
     w_unlatch.add_argument("--note", required=True)
     w_unlatch.set_defaults(func=cmd_wallet_unlatch)
 
+    w_policy = wsub.add_parser("policy", help="Show the wallet's spending policy (policy.json), or write a starter template.")
+    w_policy.add_argument("--wallet", required=True)
+    w_policy.add_argument("--init-template", action="store_true", help="Write a commented starter policy.json (refuses to overwrite).")
+    w_policy.set_defaults(func=cmd_wallet_policy)
+
+    w_treasury = wsub.add_parser("treasury-verify", help="Quorum-verify every signature of a Solana transaction (RPC demoted to bandwidth).")
+    w_treasury.add_argument("--wallet", required=True)
+    group = w_treasury.add_mutually_exclusive_group(required=True)
+    group.add_argument("--tx-file", help="File with wire-format transaction bytes (raw or base64).")
+    group.add_argument("--tx-sig", help="Transaction signature (base58) to fetch via --rpc-url.")
+    w_treasury.add_argument("--rpc-url", help="Solana JSON-RPC endpoint (required with --tx-sig).")
+    w_treasury.set_defaults(func=cmd_wallet_treasury_verify)
+
     return parser
 
 
@@ -675,6 +688,60 @@ def cmd_wallet_unlatch(args: argparse.Namespace) -> int:
     Wallet(args.wallet).unlatch(args.note)
     print("latch released; note recorded in the ledger")
     return 0
+
+
+POLICY_TEMPLATE = {
+    "outbound": {
+        "max_amount_per_request": 100.0,
+        "max_amount_per_day": 500.0,
+        "counterparty_allowlist": ["example-counterparty-id"],
+        "counterparty_denylist": [],
+    },
+    "identities": {},
+    "ledger": {"rotate_at": 100000},
+}
+
+
+def cmd_wallet_policy(args: argparse.Namespace) -> int:
+    from .wallet import Wallet
+
+    wallet = Wallet(args.wallet)
+    path = wallet.dir / "policy.json"
+    if args.init_template:
+        if path.exists():
+            print(f"refusing to overwrite existing {path}", file=sys.stderr)
+            return 1
+        path.write_text(json.dumps(POLICY_TEMPLATE, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"starter policy written: {path} - edit it, the rules you would give a teenager with a debit card")
+        return 0
+    policy = wallet.policy()
+    if not policy:
+        print("no policy.json - outbound is unrestricted (run with --init-template for a starter)")
+        return 0
+    print(json.dumps(policy, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_wallet_treasury_verify(args: argparse.Namespace) -> int:
+    import base64 as _b64
+
+    from .treasury import fetch_transaction, verify_transaction
+    from .wallet import Wallet
+
+    if args.tx_sig and not args.rpc_url:
+        print("--tx-sig requires --rpc-url", file=sys.stderr)
+        return 2
+    if args.tx_file:
+        raw = Path(args.tx_file).read_bytes()
+        try:
+            tx = _b64.b64decode(raw, validate=True)
+        except Exception:  # noqa: BLE001 - not base64, treat as wire bytes
+            tx = raw
+    else:
+        tx = fetch_transaction(args.rpc_url, args.tx_sig)
+    verdict = verify_transaction(Wallet(args.wallet), tx)
+    print(json.dumps(verdict.to_dict(), indent=2, sort_keys=True))
+    return 0 if verdict.authentic else 1
 
 
 def cmd_agent(args: argparse.Namespace) -> int:
