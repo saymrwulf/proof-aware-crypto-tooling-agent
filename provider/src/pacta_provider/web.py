@@ -54,6 +54,20 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                 self.send_header("Content-Length", str(len(paper_pdf)))
                 self.end_headers()
                 self.wfile.write(paper_pdf)
+            elif route == "/log-public-key":
+                # TOFU mitigation depends on the key being published in two
+                # independent locations; this is the site's copy (the mirror
+                # carries the other). Serving only a fingerprint would not do.
+                key_path = Path(log.log_dir) / "provider.ed25519.pub"
+                if not key_path.is_file():
+                    self._send(404, {"error": "log public key not present in this log directory"})
+                    return
+                body = key_path.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
             elif route == "/healthz":
                 self._send(200, {"ok": True, "tree_size": len(log.entries())})
             elif route == f"/{API_VERSION}/metadata":
@@ -124,6 +138,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                     "endpoints": [
                         f"{base}/docs",
                         f"{base}/paper",
+                        f"{base}/log-public-key",
                         f"{base}/healthz",
                         f"{base}/{API_VERSION}/metadata",
                         f"{base}/{API_VERSION}/sth",

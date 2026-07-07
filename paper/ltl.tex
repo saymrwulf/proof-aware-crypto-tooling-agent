@@ -97,8 +97,9 @@ $E : -x^2+y^2 = 1+d\,x^2y^2$ over $\mathbb{F}_p$,
 \Bigl(\tfrac{x_1y_2+x_2y_1}{1+d\,x_1x_2y_1y_2},\;
 \tfrac{y_1y_2+x_1x_2}{1-d\,x_1x_2y_1y_2}\Bigr),
 \end{equation*}
-including the completeness fact that makes it branch-free ($d$ is a
-non-square, so the denominators never vanish~\cite{bernsteinlange}).
+including the completeness fact that makes it branch-free ($a=-1$ is a
+square and $d$ a non-square in $\mathbb{F}_p$, so the denominators never
+vanish~\cite{bernsteinlange}).
 At the apex, writing $\code{accept}(A,m,R,s)$ for ``the extracted
 verifier returns \code{ok}'', with $k$ the scalar produced by the hash
 oracle $H(R,A,m)$ and no properties assumed of $H$, the byte-level tier
@@ -287,7 +288,7 @@ Operator/consumer tooling and a twelve-lecture course:
 underlying proof corpora are in the \code{saymrwulf/*-ed25519-verified}
 repositories; every claim in this paper is re-checkable from these
 artifacts.} with eight leaves: one attestation per fork from each of two
-full replay runs ($\approx$64 Lean files and $\approx$1{,}800\,s per
+full replay runs (58--64 Lean files and $\approx$1{,}800\,s per
 fork, under hard memory caps and core pinning). In the second run all
 four forks reported 16/16 certificates proven with boundary-exact cones,
 pinned to exact commits. The first run is deliberately still in the log: its audit step
@@ -328,9 +329,11 @@ lemma file) are byte-identical across all four; extraction-facing proof
 scripts diverge sharply where the forks' code or the extractor's naming
 differs (e.g., 215 changed lines for the byte-parser proofs on the two
 forks whose extraction produces a closure-based loader; 121 lines for
-the signature-glue proofs on the same-crate fork; zero lines between
-structurally identical forks). Per-target verification, in other words,
-is doing measurable work exactly where the targets actually differ.
+the signature-glue proofs on the same-crate fork; 27 lines---all
+annotation---between the two structurally closest forks, documenting the
+one fork's \code{black\_box} optimization barrier). Per-target
+verification, in other words, is doing measurable work exactly where the
+targets actually differ.
 
 \section{Related work}
 \label{sec:related}

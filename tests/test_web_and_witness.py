@@ -59,6 +59,12 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
         with urllib.request.urlopen(base + "/paper", timeout=10) as r:
             assert r.headers["Content-Type"] == "application/pdf"
             assert r.read(5) == b"%PDF-"
+        # the site's copy of the trust anchor (TOFU: two independent locations)
+        import shutil
+
+        shutil.copy2(tmp_path / "k.pub", tmp_path / "log" / "provider.ed25519.pub")
+        with urllib.request.urlopen(base + "/log-public-key", timeout=10) as r:
+            assert r.read() == (tmp_path / "k.pub").read_bytes()
     finally:
         server.shutdown()
 

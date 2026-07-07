@@ -164,9 +164,9 @@ library, plus optionally the whole mirror. Nothing else.</p>
 <tr><th>#</th><th>Artifact</th><th>What it is</th><th>Where</th></tr>
 <tr><td><b>1</b></td><td><code>provider.ed25519.pub</code></td>
 <td><strong>The trust anchor.</strong> The provider's public key — the only thing you
-take on trust, once. Compare the copy here with the copy in the GitHub mirror; they
+take on trust, once. Fetch it from BOTH independent locations and compare; the copies
 must be identical.</td>
-<td><a href="{mirror}/blob/main/provider.ed25519.pub">mirror</a></td></tr>
+<td><a href="{base}/log-public-key">this site</a> · <a href="{mirror}/blob/main/provider.ed25519.pub">mirror</a></td></tr>
 <tr><td><b>2</b></td><td><code>&lt;library&gt;.attestation.json</code></td>
 <td><strong>The claim.</strong> Which repo, which exact git commit, which theorems,
 which observed axiom cones, what machine protection — signed by the provider.</td>
