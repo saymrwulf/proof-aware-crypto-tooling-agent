@@ -94,6 +94,33 @@ def test_ledger_is_hash_chained(tmp_path):
     assert not ok2 and problems2
 
 
+def test_ledger_survives_concurrent_appends(tmp_path):
+    # The single-flight lock must keep the chain intact under parallel writers
+    # (two threads racing on the same wallet's ledger).
+    import threading
+
+    wallet = _seal_wallet(tmp_path, {"a": "accept", "b": "accept"}, tmp_path / "state")
+    start = threading.Barrier(8)
+
+    def worker(n):
+        start.wait()
+        for i in range(6):
+            wallet._append_ledger("stress", {"worker": n, "i": i})
+
+    threads = [threading.Thread(target=worker, args=(n,)) for n in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    ok, problems = wallet.verify_ledger()
+    assert ok, problems
+    # genesis + 48 appends, all with unique strictly-increasing indices
+    entries = wallet._ledger_entries()
+    indices = [e["index"] for e in entries]
+    assert indices == list(range(len(entries)))
+    assert len(entries) == 1 + 8 * 6
+
+
 def test_outbound_firewall_releases_when_quorum_agrees(tmp_path):
     from pacta.dogfood import locate_verifier
 

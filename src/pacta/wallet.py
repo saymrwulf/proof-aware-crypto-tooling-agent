@@ -32,6 +32,7 @@ boundary does not pretend to certify its apologies.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -224,6 +225,7 @@ class Wallet:
         self.receipts_dir = self.dir / "receipts"
         self.quarantine_dir = self.dir / "quarantine"
         self.airgap_dir = self.dir / "airgap"
+        self._quorum_cache: dict[str, QuorumVerifier] = {}
 
     # -- init / R4 gate ------------------------------------------------------
 
@@ -450,19 +452,34 @@ class Wallet:
         ]
 
     def _append_ledger(self, entry_type: str, body: dict[str, Any]) -> dict[str, Any]:
-        entries = self._ledger_entries()
-        prev_hash = entries[-1]["entry_hash"] if entries else "0" * 64
-        entry = {
-            "index": len(entries),
-            "timestamp": _now(),
-            "entry_type": entry_type,
-            "body": body,
-            "prev_hash": prev_hash,
-        }
-        entry["entry_hash"] = _sha256(_canonical(entry))
-        with self.ledger_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(entry, sort_keys=True) + "\n")
-        return entry
+        # Single-flight: the chain is read-modify-append, so two concurrent
+        # writers (threads, or two processes sharing a wallet dir) could both
+        # read the same tail, compute the same prev_hash, and fork the chain.
+        # An advisory exclusive lock over the whole critical section - taken
+        # AFTER reopening under the lock so the prev-read reflects any writer
+        # that just finished - makes appends serialize. fsync so a crash can't
+        # leave a torn line that verify_ledger would read as tampering.
+        self.ledger_path.touch(exist_ok=True)
+        with self.ledger_path.open("r+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                existing = [json.loads(line) for line in handle.read().splitlines() if line.strip()]
+                prev_hash = existing[-1]["entry_hash"] if existing else "0" * 64
+                entry = {
+                    "index": len(existing),
+                    "timestamp": _now(),
+                    "entry_type": entry_type,
+                    "body": body,
+                    "prev_hash": prev_hash,
+                }
+                entry["entry_hash"] = _sha256(_canonical(entry))
+                handle.seek(0, os.SEEK_END)
+                handle.write(json.dumps(entry, sort_keys=True) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+                return entry
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def verify_ledger(self) -> tuple[bool, list[str]]:
         problems: list[str] = []
@@ -484,6 +501,18 @@ class Wallet:
     # -- quorum assembly -------------------------------------------------------
 
     def quorum(self, state_dir: str | Path | None = None) -> QuorumVerifier:
+        # Memoized per state_dir: assembling the quorum re-reads and SHA-256s
+        # every member binary (a swap-detection control). Doing that on every
+        # verify would hash ~4 binaries per operation; instead we pin once at
+        # first assembly and hold the verifier. A binary swapped mid-process
+        # is therefore caught at the next assembly (restart / re-init), which
+        # is the right granularity: an attacker who can rewrite the on-disk
+        # binary already outranks this check, and re-hashing per call buys
+        # nothing against them while taxing every honest verification.
+        cache_key = str(state_dir) if state_dir is not None else "__default__"
+        cached = self._quorum_cache.get(cache_key)
+        if cached is not None:
+            return cached
         capsule = self.capsule()
         members: dict[str, Path] = {}
         for member in capsule["members"]:
@@ -498,7 +527,9 @@ class Wallet:
                     f"({actual[:12]} != {member['binary_sha256'][:12]}); rebuild or re-init"
                 )
             members[name] = binary
-        return QuorumVerifier(members, min_members=int(capsule["policy"]["min_members"]))
+        verifier = QuorumVerifier(members, min_members=int(capsule["policy"]["min_members"]))
+        self._quorum_cache[cache_key] = verifier
+        return verifier
 
     # -- inbound ---------------------------------------------------------------
 
@@ -625,9 +656,9 @@ class Wallet:
                 request,
             )
         capsule = self.capsule()
-        freshness = self._check_freshness(capsule)
-        if freshness is not None:
-            return freshness if isinstance(freshness, Refusal) else freshness
+        stale = self._check_freshness(capsule)
+        if stale is not None:
+            return stale
         problem = self._validate_intent(intent, payload)
         if problem:
             return self._refuse(

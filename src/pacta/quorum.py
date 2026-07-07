@@ -30,6 +30,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -80,23 +81,36 @@ QUORUM_BACKENDS: dict[str, dict[str, Any]] = {
     },
 }
 
-# The eight small-order points' canonical encodings plus their sign-flipped
-# variants - the classic excluded-R list (as used by Solana's legacy
-# exclusion and libsodium's checks). Presence of R (or A) on this list is
-# what makes an inter-fork divergence a *documented semantic edge*.
+# Encodings of low-order points, used ONLY to decide whether an inter-fork
+# divergence is a documented semantic edge (severity "note") rather than an
+# unexplained one (severity "tamper" -> latch).
+#
+# FAIL-SAFE ASYMMETRY (why this list is deliberately conservative):
+#   - A MISSING low-order encoding is safe: a genuine edge on it is instead
+#     classified "unexplained" -> tamper -> custody latches. That is a false
+#     alarm / availability cost, never a security loss.
+#   - A BOGUS entry is dangerous: it would down-grade a real tamper to a mere
+#     "note" and skip the latch. So an entry may appear here ONLY if it is
+#     provably a low-order encoding.
+# Therefore this set contains exactly the encodings that are certainly
+# low-order from first principles: y in {0, 1, -1} (orders 4, 1, 2), in both
+# their reduced and non-reduced representatives, each with the sign bit clear
+# and set. These match RFC 8032 / libsodium's canonical low-order rows for
+# those y-values. The order-8 points (whose encodings must be *derived* via
+# field arithmetic, not transcribed) are intentionally OMITTED for now: an
+# edge on an order-8 R will escalate to tamper until a derived, tested list
+# lands. See test_quorum.py::test_small_order_list_is_conservative.
 SMALL_ORDER_ENCODINGS: frozenset[bytes] = frozenset(
     bytes.fromhex(h)
     for h in (
-        "0100000000000000000000000000000000000000000000000000000000000000",  # identity
-        "0000000000000000000000000000000000000000000000000000000000000000",  # (0, 0)-ish y=0 encoding
-        "0000000000000000000000000000000000000000000000000000000000000080",  # y=0, sign flipped
-        "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # -1 = p-1 (order 2)
-        "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",  # order-8 point
-        "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",  # order-8, sign flipped
-        "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",  # order-8 point
-        "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",  # order-8, sign flipped
-        "0100000000000000000000000000000000000000000000000000000000000080",  # identity, sign flipped
-        "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # p-1 with high bit
+        "0000000000000000000000000000000000000000000000000000000000000000",  # y=0            (order 4)
+        "0000000000000000000000000000000000000000000000000000000000000080",  # y=0,  sign set
+        "0100000000000000000000000000000000000000000000000000000000000000",  # y=1  identity  (order 1)
+        "0100000000000000000000000000000000000000000000000000000000000080",  # y=1,  sign set
+        "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # y=p-1 = -1     (order 2)
+        "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",  # y=p-1, sign set
+        "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # y=p  ≡ 0        (non-canonical, order 4)
+        "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",  # y=p+1 ≡ 1       (non-canonical, order 1)
     )
 )
 
@@ -263,12 +277,23 @@ class QuorumVerifier:
     def verify(self, payload: bytes, signature: bytes, public_key: bytes) -> QuorumResult:
         if len(signature) != 64 or len(public_key) != 32:
             raise ValueError("signature must be 64 bytes and public key 32 bytes")
-        verdicts: list[MemberVerdict] = []
         with tempfile.TemporaryDirectory(prefix="pacta-quorum-") as tmp:
             payload_path = Path(tmp) / "payload.bin"
             payload_path.write_bytes(payload)
-            for name, binary in sorted(self.members.items()):
-                verdicts.append(self._run_member(name, binary, public_key, signature, payload_path))
+            # Members are independent subprocesses; run them concurrently so a
+            # verification costs one member's latency, not the sum. subprocess
+            # releases the GIL while the child runs, so threads suffice. Sort
+            # the collected verdicts for a deterministic, position-stable trail.
+            names = sorted(self.members)
+            with ThreadPoolExecutor(max_workers=len(names)) as pool:
+                verdicts = list(
+                    pool.map(
+                        lambda name: self._run_member(
+                            name, self.members[name], public_key, signature, payload_path
+                        ),
+                        names,
+                    )
+                )
         return self._judge(verdicts, payload, signature, public_key)
 
     def _run_member(

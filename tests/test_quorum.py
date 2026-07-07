@@ -92,6 +92,18 @@ def test_edge_flags_detect_classes():
     assert any("non-canonical-s" in f for f in flags)
 
 
+def test_small_order_list_is_conservative():
+    # The fail-safe contract: every listed encoding must be a certain
+    # low-order y-value (0, 1, or -1), reduced or non-reduced, sign bit
+    # either way. No order-8 or unverifiable entries may sneak in, because a
+    # bogus entry would down-grade a real tamper to a note.
+    p = 2**255 - 19
+    allowed_y = {0, 1, p - 1, p, p + 1}
+    for enc in SMALL_ORDER_ENCODINGS:
+        y = int.from_bytes(enc, "little") & ((1 << 255) - 1)  # strip sign bit
+        assert y in allowed_y, f"non-low-order encoding in list: {enc.hex()}"
+
+
 def test_quorum_requires_min_members(tmp_path):
     with pytest.raises(ValueError):
         _quorum(tmp_path, {"only": "accept"})
