@@ -132,6 +132,8 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                         for entry in entries
                     ]
                 })
+            elif self._serve_site_document(route, log):
+                pass  # operator-dropped document; checked LAST so it can never shadow an API route
             else:
                 self._send(404, {
                     "error": "unknown endpoint",
@@ -149,6 +151,32 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                         f"{base}/{API_VERSION}/entries?start=N&end=M",
                     ],
                 })
+
+        def _serve_site_document(self, route: str, log_obj: TransparencyLog) -> bool:
+            """Serve operator-dropped PDFs from ``<log>/site/`` by bare name.
+
+            Deliberately UNLISTED: these documents do not appear in the
+            endpoint index or anywhere on the docs page - the operator
+            decides who receives a link. The name must be a single plain
+            path segment (no traversal); only ``.pdf`` payloads are served.
+            Returns True when it handled the request.
+            """
+            name = route.lstrip("/")
+            if not name or not name.replace("-", "").replace("_", "").isalnum():
+                return False
+            candidate = (log_obj.log_dir / "site" / f"{name}.pdf").resolve()
+            site_dir = (log_obj.log_dir / "site").resolve()
+            if site_dir not in candidate.parents or not candidate.is_file():
+                return False
+            body = candidate.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Disposition", f'inline; filename="{name}.pdf"')
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("X-Robots-Tag", "noindex, nofollow")
+            self.end_headers()
+            self.wfile.write(body)
+            return True
 
         def _send(self, code: int, payload: dict[str, Any], code_if_error: int | None = None) -> None:
             if code_if_error and "error" in payload:

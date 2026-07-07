@@ -71,6 +71,26 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
             page = r.read().decode()
         assert "BEGIN PUBLIC KEY" in page
         assert "pin this key" in page.lower()
+        # operator-dropped documents: served by bare name, absent from the
+        # endpoint index, traversal-safe
+        site = tmp_path / "log" / "site"
+        site.mkdir()
+        (site / "extra.pdf").write_bytes(b"%PDF-1.4 dummy")
+        with urllib.request.urlopen(base + "/extra", timeout=10) as r:
+            assert r.read().startswith(b"%PDF-")
+            assert r.headers["X-Robots-Tag"].startswith("noindex")
+        try:
+            urllib.request.urlopen(base + "/nope-not-there", timeout=10)
+            raise AssertionError("expected 404")
+        except urllib.error.HTTPError as exc:
+            listing = json.loads(exc.read())
+            assert exc.code == 404
+            assert not any("extra" in e for e in listing["endpoints"])  # unlisted
+        try:
+            urllib.request.urlopen(base + "/..%2fsth", timeout=10)
+            raise AssertionError("expected 404")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 404
     finally:
         server.shutdown()
 
