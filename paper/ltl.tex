@@ -1,5 +1,5 @@
 \documentclass[10pt,twocolumn]{article}
-\usepackage[margin=1.7cm,bottom=2.1cm]{geometry}
+\usepackage[margin=1.7cm,bottom=1.95cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{microtype}
@@ -134,7 +134,13 @@ databases---applied to a payload with different trust semantics:
 exact assumption set}. We claim no novelty for any component (the hash
 structure and proof algorithms are RFC~9162 verbatim); the contribution
 is the composition, its trust model, and a deployed, reproducible
-instance.
+instance. The LTL does not mechanize cryptographic security
+proofs---that inter-disciplinary bridge is already being built by
+EasyCrypt and its relatives~\cite{easycrypt}. It bridges the adjacent,
+mostly empty gap: type-theory-certified artifacts have no distribution
+infrastructure, and cryptographic transparency infrastructure has never
+carried kernel-checked mathematics---each discipline solving the
+other's problem.
 
 \S\ref{sec:log} describes the log and its trust model,
 \S\ref{sec:dogfood} the self-referential signing loop,
@@ -400,7 +406,7 @@ and this paper were produced with substantial assistance from Claude
 (Anthropic). All claims are enforced by the referenced check scripts and
 are independently re-checkable from the public artifacts.
 
-\begin{thebibliography}{19}\footnotesize
+\begin{thebibliography}{19}\scriptsize
 \setlength{\itemsep}{1pt}
 
 \bibitem{rfc6962} B.~Laurie, A.~Langley, E.~K\"asper.
@@ -427,6 +433,10 @@ Users. \emph{USENIX Security}, 2015.
 \bibitem{cheval} V.~Cheval, J.~Moreira, M.~Ryan.
 Automatic verification of transparency protocols.
 \emph{IEEE EuroS\&P}, 2023. arXiv:2303.04500.
+
+\bibitem{easycrypt} G.~Barthe, B.~Gr\'egoire, S.~Heraud,
+S.~Zanella~B\'eguelin. Computer-Aided Security Proofs for the Working
+Cryptographer. \emph{CRYPTO}, LNCS 6841, pp.~71--90, 2011.
 
 \bibitem{aeneas} S.~Ho, J.~Protzenko.
 Aeneas: Rust verification by functional translation.
