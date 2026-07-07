@@ -98,6 +98,22 @@ custody wallet that cannot show its evidence has no business existing.
 `--trusted-provider` is **required**: you must name whose *observations*
 you are consuming. You are never asked to trust their verdicts.
 
+### You hold the ruler
+
+The allowed-axioms lists the gate checks against are a **requirements
+card** that ships in *your* tooling ([the ed25519
+profile](src/pacta/profiles/ed25519.py)) — small enough to read over
+coffee, re-derivable from the attested repos' own docs and check
+scripts, and replaceable with a card you write yourself from first
+principles. Verdicts are re-derived against *your* copy, name by name;
+the provider's labels are ignored. If your card is stricter than
+today's supply (e.g. "SHA-512 itself proven"), the gap is itemized and
+your options are honest: accept a named line item, walk away, or prove
+the missing piece and enter it into the log — *if your ruler is
+stricter than our supply, your ruler is our roadmap.* The full
+walk-through is
+[lecture 11](notebooks/11_the_customers_eye_view.ipynb).
+
 ---
 
 ## Quickstart

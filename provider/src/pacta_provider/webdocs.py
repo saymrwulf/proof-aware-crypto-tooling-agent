@@ -249,6 +249,27 @@ the content hash) and build it yourself — compiler and build are declared trus
 until the reproducible-builds program (R5) lands. Every attestation carries its full
 residual-risk list. Honesty about the boundary is the product.</div>
 
+<h2>You hold the ruler</h2>
+<div class="card">The list of assumptions a certificate is <em>allowed</em> to rest on
+is not something this site hands you at verification time — it is a
+<strong>requirements card</strong> that lives in <em>your</em> tooling, on
+<em>your</em> disk, and that you can read in five minutes or rewrite from first
+principles: Lean's three foundational axioms, plus — for the signature tiers only —
+named placeholders for SHA-512 and the wire format. Your tooling ignores this
+operator's pass/fail labels entirely and re-derives every verdict by comparing the
+attestation's <em>observed</em> axiom list against <em>your</em> card, name by name.
+The operator is trusted to copy down what the proof kernel printed — never to
+interpret it.</div>
+<div class="card">A card you write yourself will match this log's supply
+<strong>exactly</strong> — and that is engineered, not coincidence: the corpus was
+shrunk until every remaining axiom justifies its existence. If your card is
+<em>stricter</em> (say: "SHA-512 itself must be proven"), there is nothing here to
+negotiate — the gap is itemized, never blurred, and you have three honest options:
+accept a <em>named</em> line item, walk away, or prove the missing piece and enter it
+into this same log. <strong>If your ruler is stricter than our supply, your ruler is
+our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
+<a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">course</a>.)</div>
+
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>LTL: Lean Transparency Log</strong></a>
 (PDF, 4 pages) — the design in full: the trust model (observations, never verdicts),
