@@ -222,7 +222,7 @@ until the reproducible-builds program (R5) lands. Every attestation carries its 
 residual-risk list. Honesty about the boundary is the product.</div>
 
 <h2>The paper</h2>
-<div class="card"><a href="{base}/paper"><strong>LTL: the Lean Transparency Log</strong></a>
+<div class="card"><a href="{base}/paper"><strong>LTL: Lean Transparency Log</strong></a>
 (PDF, 4 pages) — the design in full: the trust model (observations, never verdicts),
 the self-certifying signature, the deployment with its retained failure leaves, and an
 exact account of what a verified receipt does and does not establish.</div>
