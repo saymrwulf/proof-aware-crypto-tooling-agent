@@ -1,32 +1,45 @@
 {
+  "attestation_digest_sha256": "5f7937a172aff808548b663d0708eb05c79dfaea201f7131816befa83cd6b96e",
+  "attestation_path": "provider/out/reattest/betrusted-ed25519.attestation.yaml",
+  "consistency": {
+    "from_root_hash": "96f2a27d1a668a2dfe832d26e8870d997cec5447fa636b13d51ec25f441360b4",
+    "from_tree_size": 11,
+    "proof": [
+      "ed368f5f9b3714b5c633bc55971b61c31af55a8022ac9fb567515810007b527f",
+      "ad7ccbb6def18dccba7176f4be36ad1ce731c1456672c19310e73e87c4f312df",
+      "3253f2e4dcb5515e0caf021b1e4a257a15bd04df969aaf08174da745d72cd00f",
+      "9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283"
+    ],
+    "status": "included"
+  },
   "hash_algorithm": "RFC9162_SHA256",
   "inclusion_proof": [
-    "bdde4e4b87cd263b5914dbbae0c85ceed468c3054596f6ca79121e54cc6a134e",
-    "f3724e66715b582c384cf49928d4705458475ea4293749989c483ab7fe9496ce",
-    "04541cffd46cf5a97d7453ed8ae681b1a1fedb879eb8c7a262e05b3176159eed"
+    "ed368f5f9b3714b5c633bc55971b61c31af55a8022ac9fb567515810007b527f",
+    "3253f2e4dcb5515e0caf021b1e4a257a15bd04df969aaf08174da745d72cd00f",
+    "9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283"
   ],
-  "leaf_hash": "2791c352956ebc620a4fe12b20bfd6faa0813238c5bc0563fa4eb0130d829247",
-  "leaf_index": 7,
+  "leaf_hash": "ad7ccbb6def18dccba7176f4be36ad1ce731c1456672c19310e73e87c4f312df",
+  "leaf_index": 11,
   "log_id": "205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7",
   "schema_version": 1,
   "sth": {
     "hash_algorithm": "RFC9162_SHA256",
     "log_id": "205e4c389cb143e08f0d2d58bdc8e425e47e3cbe7f2108cc58bbe835d2cc41d7",
-    "root_hash": "9a15b9a1379edc07ae43d3fc61b52dc4446b56770bff6538e88ed98746ac2283",
+    "root_hash": "bcd15f9d7ea1c9e5bd0a9e64fa8d846208b1e29ee167d4f1eac19b30e6913ee9",
     "schema_version": 1,
     "signatures": {
       "ed25519": {
-        "payload_digest_sha256": "c9a3c000d448ebd35e313fac0c9ce0e1dc88ff03540b0828e5246407c75e2a1a",
+        "payload_digest_sha256": "fab790262c7e1b1eadc0fbf1d10481da0984cd7b99d6e19d98820d2c33d5f34d",
         "public_key_fingerprint_sha256": "874c8a008a607021528b2493fa1caf059f9d5c123d29193dfabc09a6d1e7a56a",
         "scheme": "openssl-ed25519",
-        "signature_base64": "P8M4gjB7BCZblUvRtvJnbjfaTYKU4oO0/2LZwzpHIgp9fmOXGZqkqi7UaP5Fn1Kx4+RJSgyI2nnnK1pLpkV8CQ==",
+        "signature_base64": "GYsT/T61aokWWbv+dqrMt1CtJTeGAC/aX0K1MazlXDo7tpEiex3O1uvox9mU/FWFIxwuBg/l2X8gB0DjYjc1Cw==",
         "signing_backend": "verified-dalek-serial",
         "signing_provenance": {
           "self_inclusion": "verified",
           "signing_backend": "verified-dalek-serial",
           "signing_library_certificates_proven": "16/16",
           "signing_library_component": "dalek-ed25519-verified",
-          "signing_library_leaf_index": 4,
+          "signing_library_leaf_index": 8,
           "signing_library_source_commit": "aa0f6abc327ba2a54a534b21608ca8996cf73682"
         },
         "status": "signed"
@@ -38,10 +51,10 @@
         "status": "not_configured"
       }
     },
-    "timestamp": "2026-07-06T13:59:16Z",
-    "tree_size": 8,
+    "timestamp": "2026-07-07T19:12:17Z",
+    "tree_size": 12,
     "type": "pacta.transparency.signed_tree_head.v1"
   },
-  "tree_size": 8,
+  "tree_size": 12,
   "type": "pacta.transparency.receipt.v1"
 }
