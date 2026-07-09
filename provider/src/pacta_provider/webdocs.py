@@ -271,10 +271,15 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
 <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">course</a>.)</div>
 
 <h2>The paper</h2>
-<div class="card"><a href="{base}/paper"><strong>LTL: Lean Transparency Log</strong></a>
-(PDF, 4 pages) — the design in full: the trust model (observations, never verdicts),
-the self-certifying signature, the deployment with its retained failure leaves, and an
-exact account of what a verified receipt does and does not establish.</div>
+<div class="card"><a href="{base}/paper"><strong>The Lean Transparency Log: Distributing
+Kernel-Checked Correctness Evidence for Deployed Ed25519 Implementations</strong></a>
+(PDF, 14 pages, revised) — the trust model with an explicit malicious-operator adversary,
+security proofs for every consumer-facing claim (inclusion soundness as an explicit
+SHA-256-collision extractor, pin-store safety with transferable equivocation evidence,
+verdict integrity), the self-referential signing loop, the twelve-leaf deployment with
+its retained failure leaves, and appendices with the leaf schema, the full ~25-line
+consumer verifier, and the verbatim per-fork axiom boundaries.
+<span class="muted">Previous version: <a href="{base}/paper/v0.1">v0.1</a> (4 pages).</span></div>
 
 <p class="muted">Log heads are signed offline; this service is read-only and holds no
 key material. Provider tooling, agent tooling, and the full course (12 Jupyter

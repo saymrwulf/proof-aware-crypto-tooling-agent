@@ -791,9 +791,12 @@ C. Peters. Twisted Edwards curves. AFRICACRYPT, LNCS 5023, pp. 389--405,
 
 Each leaf is the canonical JSON serialization (sorted keys, no
 insignificant whitespace, UTF-8) of an attestation. Below is leaf~8 of
-the deployed log---the re-attestation of the upstream fork---with the
-16-certificate array elided to its first (foundational) and last (apex)
-entries; all other fields are verbatim.
+the deployed log---the re-attestation of the upstream fork. The
+16-certificate array is elided to its first (foundational) and last
+(apex) entries, and long values (hashes, timestamps, version strings,
+paths) are shortened with ellipses; field names, structure, and the
+axiom lists are verbatim, and the unelided leaf is one \texttt{jq}
+invocation away in the public mirror.
 \begin{quote}\ttfamily\scriptsize
 \{ "type": "pacta.attestation", "schema\_version": 1,\\
 \hspace*{0.6em}"attestation": \{\\

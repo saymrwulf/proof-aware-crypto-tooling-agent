@@ -46,17 +46,12 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
             if route in ("/", "/docs"):
                 self._send_html(docs_html)
             elif route in ("/paper", "/paper/ltl.pdf",
-                           "/paper/v0.1", "/paper/v0.1/ltl.pdf",
-                           "/paper/v0.0", "/paper/v0.0/ltl.pdf"):
-                # /paper is the current (v2) paper; /paper/v0.1 the prior named
-                # version, /paper/v0.0 the pseudonymous version. Older versions
-                # are served but deliberately unlisted (the docs page links only
-                # the current one) - versions are preserved, not advertised.
+                           "/paper/v0.1", "/paper/v0.1/ltl.pdf"):
+                # /paper is the current (revised) paper; /paper/v0.1 the prior
+                # version - preserved for citability, linked from the docs page.
                 variant = "current"
                 if route.startswith("/paper/v0.1"):
                     variant = "v0.1"
-                elif route.startswith("/paper/v0.0"):
-                    variant = "v0.0"
                 body = paper_pdfs.get(variant)
                 if body is None:
                     self._send(404, {"error": f"paper ({variant}) not available on this deployment"})
@@ -231,9 +226,8 @@ def serve(
         docs_html = render_docs(log, base_path)
     paper_dir = Path(__file__).resolve().parents[3] / "paper"
     variants = {
-        "current": paper_dir / "ltl.pdf",       # v2 (revised), the live paper
-        "v0.1": paper_dir / "ltl-v0.1.pdf",     # prior named 4-page version
-        "v0.0": paper_dir / "ltl-v0.0.pdf",     # pseudonymous version
+        "current": paper_dir / "ltl.pdf",       # revised paper, the live one
+        "v0.1": paper_dir / "ltl-v0.1.pdf",     # prior 4-page version
     }
     paper_pdfs = {name: p.read_bytes() for name, p in variants.items() if p.is_file()}
     handler = make_handler(log, base_path, docs_html, paper_pdfs)
