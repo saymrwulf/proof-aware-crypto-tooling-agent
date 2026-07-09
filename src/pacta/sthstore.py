@@ -85,6 +85,11 @@ def check_sth_against_store(
             "tree_size": tree_size,
             "root_hash": root_hash,
             "sth_timestamp": sth.get("timestamp"),
+            # The FULL signed head is retained, not just (size, root): if the
+            # log ever equivocates, the pinned head is one half of the
+            # transferable evidence pair (both are verifiable by anyone who
+            # holds the log's public key).
+            "sth": sth,
             "first_seen": stamp,
             "last_updated": stamp,
             "trust_origin": "trust_on_first_use",
@@ -97,18 +102,52 @@ def check_sth_against_store(
             "pinned_first_use",
         )
 
+    # A poisoned pin is terminal: once this log has been caught presenting a
+    # split view, no later head - however consistent-looking - is accepted.
+    # The retained evidence pair survives restarts and is transferable.
+    if pinned.get("poisoned"):
+        poisoned = pinned["poisoned"]
+        return SthCheckResult(
+            False,
+            [
+                f"POISONED: this log was caught equivocating at {poisoned.get('at')} "
+                f"({poisoned.get('reason')}). The conflicting signed heads are retained in the "
+                "pin store as transferable evidence. This log must never be trusted again; "
+                "manual removal of the store entry is the only (deliberate) way back."
+            ],
+            "rejected",
+        )
+
     pinned_size = int(pinned["tree_size"])
     pinned_root = str(pinned["root_hash"])
+
+    def _poison(reason: str) -> None:
+        pinned["poisoned"] = {
+            "at": stamp,
+            "reason": reason,
+            # both halves of the evidence: the head we pinned, and the head
+            # that contradicts it - each independently signature-verifiable.
+            "evidence": {
+                "pinned_sth": pinned.get("sth"),
+                "conflicting_sth": sth,
+            },
+        }
+        save_store(store, store_path)  # evidence retention must not depend on `update`
 
     if tree_size == pinned_size:
         if root_hash == pinned_root:
             return SthCheckResult(True, [], "matched")
+        _poison(
+            f"different root hash at the pinned tree size {pinned_size} "
+            f"(pinned {pinned_root[:16]}…, presented {root_hash[:16]}…)"
+        )
         return SthCheckResult(
             False,
             [
                 "EQUIVOCATION: the log presented a different root hash at the pinned tree size "
                 f"{pinned_size} (pinned {pinned_root[:16]}…, presented {root_hash[:16]}…). "
-                "This log is maintaining a split view and must not be trusted again."
+                "This log is maintaining a split view and must not be trusted again. Both signed "
+                "heads are retained in the pin store as transferable evidence; the pin is poisoned."
             ],
             "rejected",
         )
@@ -133,11 +172,15 @@ def check_sth_against_store(
         from_root = str(consistency_from.get("from_root_hash") or "")
         if from_size == pinned_size:
             if from_root != pinned_root:
+                _poison(
+                    f"consistency anchor disagrees with the pinned root at tree_size {pinned_size} "
+                    f"(pinned {pinned_root[:16]}…, anchor {from_root[:16]}…)"
+                )
                 return SthCheckResult(
                     False,
                     [
                         "EQUIVOCATION: the receipt's consistency anchor disagrees with the pinned root at "
-                        f"tree_size {pinned_size}."
+                        f"tree_size {pinned_size}. The pin is poisoned and the evidence retained."
                     ],
                     "rejected",
                 )
@@ -174,6 +217,7 @@ def check_sth_against_store(
             "tree_size": tree_size,
             "root_hash": root_hash,
             "sth_timestamp": sth.get("timestamp"),
+            "sth": sth,
             "last_updated": stamp,
         }
     )

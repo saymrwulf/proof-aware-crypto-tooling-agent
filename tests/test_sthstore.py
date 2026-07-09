@@ -55,8 +55,48 @@ def test_receipt_embedded_consistency_anchor_is_checked(tmp_path):
     }
     out = check_sth_against_store(_sth(4, new_root), store, consistency_from=lying_anchor)
     assert not out.ok and any("EQUIVOCATION" in d for d in out.diagnostics)
+    # A lying anchor IS equivocation evidence: the pin is now POISONED, so even
+    # a subsequently honest anchor must be refused (pin-store safety).
     honest_anchor = dict(lying_anchor, from_root_hash=old_root)
-    assert check_sth_against_store(_sth(4, new_root), store, consistency_from=honest_anchor).ok
+    after = check_sth_against_store(_sth(4, new_root), store, consistency_from=honest_anchor)
+    assert not after.ok and any("POISONED" in d for d in after.diagnostics)
+
+
+def test_equivocation_poisons_and_retains_transferable_evidence(tmp_path):
+    import json
+
+    store = tmp_path / "sth.json"
+    root3 = merkle_root(_tree(3)).hex()
+    evil_root = merkle_root(_tree(9)).hex()
+    assert check_sth_against_store(_sth(3, root3), store).ok
+    evil = check_sth_against_store(_sth(3, evil_root), store)
+    assert not evil.ok and any("evidence" in d for d in evil.diagnostics)
+    # the poison and BOTH signed heads survive on disk, restart-proof
+    persisted = json.loads(store.read_text())["logs"]["log-1"]
+    poison = persisted["poisoned"]
+    assert poison["evidence"]["pinned_sth"]["root_hash"] == root3
+    assert poison["evidence"]["conflicting_sth"]["root_hash"] == evil_root
+    # nothing rehabilitates the log: not even the originally pinned head
+    again = check_sth_against_store(_sth(3, root3), store)
+    assert not again.ok and any("POISONED" in d for d in again.diagnostics)
+    # ...and growth with a valid proof is refused too
+    leaves = _tree(5)
+    grown = check_sth_against_store(
+        _sth(5, merkle_root(leaves).hex()), store,
+        consistency_proof_hex=proof_to_hex(consistency_proof(leaves, 3)),
+    )
+    assert not grown.ok and any("POISONED" in d for d in grown.diagnostics)
+
+
+def test_pin_retains_full_signed_head(tmp_path):
+    import json
+
+    store = tmp_path / "sth.json"
+    sth = _sth(3, merkle_root(_tree(3)).hex())
+    sth["signatures"] = {"ed25519": {"status": "signed", "signature_base64": "AAAA"}}
+    assert check_sth_against_store(sth, store).ok
+    pinned = json.loads(store.read_text())["logs"]["log-1"]
+    assert pinned["sth"]["signatures"]["ed25519"]["signature_base64"] == "AAAA"
 
 
 def test_rollback_is_rejected(tmp_path):
