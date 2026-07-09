@@ -21,7 +21,8 @@ from .transparency_log import TransparencyLog
 API_VERSION = "v1"
 
 
-def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf: bytes | None = None):
+def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdfs: dict[str, bytes] | None = None):
+    paper_pdfs = paper_pdfs or {}
     base = "/" + base_path.strip("/") if base_path.strip("/") else ""
 
     class Handler(BaseHTTPRequestHandler):
@@ -44,16 +45,28 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
 
             if route in ("/", "/docs"):
                 self._send_html(docs_html)
-            elif route in ("/paper", "/paper/ltl.pdf"):
-                if paper_pdf is None:
-                    self._send(404, {"error": "paper not available on this deployment"})
+            elif route in ("/paper", "/paper/ltl.pdf",
+                           "/paper/v0.1", "/paper/v0.1/ltl.pdf",
+                           "/paper/v0.0", "/paper/v0.0/ltl.pdf"):
+                # /paper is the current (v2) paper; /paper/v0.1 the prior named
+                # version, /paper/v0.0 the pseudonymous version. Older versions
+                # are served but deliberately unlisted (the docs page links only
+                # the current one) - versions are preserved, not advertised.
+                variant = "current"
+                if route.startswith("/paper/v0.1"):
+                    variant = "v0.1"
+                elif route.startswith("/paper/v0.0"):
+                    variant = "v0.0"
+                body = paper_pdfs.get(variant)
+                if body is None:
+                    self._send(404, {"error": f"paper ({variant}) not available on this deployment"})
                     return
                 self.send_response(200)
                 self.send_header("Content-Type", "application/pdf")
                 self.send_header("Content-Disposition", 'inline; filename="ltl.pdf"')
-                self.send_header("Content-Length", str(len(paper_pdf)))
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(paper_pdf)
+                self.wfile.write(body)
             elif route == "/log-public-key":
                 # TOFU mitigation depends on the key being published in two
                 # independent locations; this is the site's copy (the mirror
@@ -216,7 +229,12 @@ def serve(
         from .webdocs import render_docs
 
         docs_html = render_docs(log, base_path)
-    paper_path = Path(__file__).resolve().parents[3] / "paper" / "ltl.pdf"
-    paper_pdf = paper_path.read_bytes() if paper_path.is_file() else None
-    handler = make_handler(log, base_path, docs_html, paper_pdf)
+    paper_dir = Path(__file__).resolve().parents[3] / "paper"
+    variants = {
+        "current": paper_dir / "ltl.pdf",       # v2 (revised), the live paper
+        "v0.1": paper_dir / "ltl-v0.1.pdf",     # prior named 4-page version
+        "v0.0": paper_dir / "ltl-v0.0.pdf",     # pseudonymous version
+    }
+    paper_pdfs = {name: p.read_bytes() for name, p in variants.items() if p.is_file()}
+    handler = make_handler(log, base_path, docs_html, paper_pdfs)
     return ThreadingHTTPServer((host, port), handler)

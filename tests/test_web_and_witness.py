@@ -63,6 +63,20 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
         with urllib.request.urlopen(base + "/paper", timeout=10) as r:
             assert r.headers["Content-Type"] == "application/pdf"
             assert r.read(5) == b"%PDF-"
+        # versioned paper routes serve when their PDFs exist (current always
+        # does in this repo); older versions are unlisted but reachable
+        for path in ("/paper/ltl.pdf", "/paper/v0.1", "/paper/v0.0"):
+            try:
+                with urllib.request.urlopen(base + path, timeout=10) as r:
+                    assert r.read(5) == b"%PDF-", path
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 404  # variant PDF absent in this checkout
+        # older versions must NOT appear in the endpoint index (unlisted)
+        try:
+            urllib.request.urlopen(base + "/no-such", timeout=10)
+        except urllib.error.HTTPError as exc:
+            idx = json.loads(exc.read()).get("endpoints", [])
+            assert not any("v0." in e for e in idx)
         # the site's copy of the trust anchor (TOFU: two independent locations)
         with urllib.request.urlopen(base + "/log-public-key", timeout=10) as r:
             assert r.read() == (tmp_path / "k.pub").read_bytes()
