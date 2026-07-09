@@ -471,11 +471,13 @@ where $k$ is the largest power of two below $n$, $(x,y) =
 \ConsRec(n_0 - k, n - k, C', \bot, r)$ in the fourth (any shape mismatch
 rejects). The consumer accepts $C$ between signed heads $(n_0, r_0)$ and
 $(n_1, r_1)$ iff $n_0 = 0$, or $\ConsRec(n_0, n_1, C, \top, r_0) =
-(r_0, r_1)$. We verified this recursive form agrees with the deployed
-iterative RFC~9162 verifier by exhaustive differential testing on all
-$(n_0, n_1)$ with $n_1 \le 256$, on honest proofs and on four mutation
-classes (wrong old root, wrong new root, truncated and padded proofs):
-$5{,}508$ cases, full agreement.
+(r_0, r_1)$. We verified that this recursive form agrees with the deployed
+iterative RFC~9162 verifier by \emph{exhaustive} differential testing over
+every pinned/current size pair $1 \le n_0 \le n_1 \le 256$, each with the
+honest proof and four adversarial mutations (wrong old root, wrong new
+root, truncated and padded proofs): $164{,}224$ verifier invocations,
+full agreement. The inclusion verifier of Appendix~\ref{app:verifier} was
+checked the same way ($164{,}479$ invocations over all $m < n \le 256$).
 
 The operator signs tree heads $(n, \MTH(D), t)$ with Ed25519; a
 \emph{receipt} for a leaf is its index, its sibling path, and a signed head.
@@ -560,78 +562,67 @@ so the outer step yields
 $\hnode(\MTH(D[0{:}k]), \MTH(D[k{:}n])) = \MTH(D)$.
 \end{proof}
 
+Both soundness theorems below rest on a single collision-extraction fact,
+which we isolate first. Call a reconstruction a \emph{hash-fold over $T$}
+if it computes its output by emitting $\hnode(\cdot,\cdot)$ at every
+internal node of the honest tree $T$ and the leaf hash at each leaf. The
+inclusion reconstruction $\Root(\hleaf(\cdot), \cdot, n, \cdot)$ is a
+hash-fold over the size-$n$ tree; so is the size-$n_1$ component of the
+consistency verifier $\ConsRec$ (\S\ref{sec:tree}). The values folded in
+may be adversarial; only the \emph{shape} matches $T$.
+
+\begin{lemma}[Root binding]\label{lem:bind}
+Let $F$ be a hash-fold over the honest Merkle tree $T$ of a leaf list $D$,
+run on otherwise adversarial inputs, and suppose $F$'s output equals
+$\MTH(D)$. Then, walking $F$ and $T$ in parallel from the root, either
+(i)~at some internal node $F$'s $\hnode$ argument pair differs from $T$'s
+while the two $\hnode$ values agree---an explicit SHA-256 collision---or
+(ii)~every value $F$ emits equals the corresponding node of $T$, down to
+the leaves, whence $F$ read the true leaf bytes of $D$.
+\end{lemma}
+\begin{proof}
+Induction on the height of $T$. At the root both values equal $\MTH(D)$ by
+hypothesis, and each is $\hnode$ of an argument pair (for $F$ by the
+hash-fold property, for $T$ by definition of $\MTH$ at an internal node).
+Equal $\hnode$ values of \emph{distinct} argument pairs are a collision
+(case i); otherwise the pairs coincide, so $F$'s two child values equal
+$T$'s two children, and the hypothesis applies to each child subtree. At a
+leaf, $F$ emits $\hleaf(d')$ and $T$ has $\hleaf(D[j])$; equality with
+$d' \neq D[j]$ is again a collision, and Lemma~\ref{lem:domsep} rules out
+a leaf value coinciding with an internal-node value by type, so the two
+cases are exhaustive and exclusive.
+\end{proof}
+
 \begin{theorem}[Inclusion soundness: position binding]\label{thm:sound}
 There is an explicit algorithm $\mathcal{E}$ (running in time $O(n)$ hash
 evaluations) such that: whenever an adversary outputs a leaf list $D$ with
 $|D| = n$, an index $m < n$, a leaf $d \neq D[m]$, and a path $P$ with
-\[
-\Root(\hleaf(d), m, n, P) = \MTH(D),
-\]
-$\mathcal{E}(D, m, d, P)$ outputs a SHA-256 collision.
+$\Root(\hleaf(d), m, n, P) = \MTH(D)$, $\mathcal{E}(D, m, d, P)$ outputs a
+SHA-256 collision.
 \end{theorem}
 \begin{proof}
-$\mathcal{E}$ recomputes the honest tree for $D$ and walks the two
-derivations of the common root value in parallel, top-down; we argue by
-induction on $n$ that a collision is found.
-
-$n = 1$: the acceptance condition forces $P = [\,]$ and
-$\hash(\texttt{0x00} \| d) = \hleaf(d) = \MTH(D) = \hash(\texttt{0x00} \|
-D[0])$. Since $d \neq D[0]$, the two preimages are distinct strings with
-equal hash: a collision, output directly.
-
-$n > 1$: let $k$ be the split point and write $P = P' \| [s]$ (acceptance
-forces $P$ non-empty). Suppose $m < k$ (the case $m \ge k$ is symmetric).
-Then acceptance gives
-\[
-\hash\bigl(\texttt{0x01} \| u \| s\bigr) = \MTH(D)
- = \hash\bigl(\texttt{0x01} \| u^\ast \| s^\ast\bigr),
-\quad\text{where } u = \Root(\hleaf(d), m, k, P'),
-\]
-$u^\ast = \MTH(D[0{:}k])$ and $s^\ast = \MTH(D[k{:}n])$. If
-$(u, s) \neq (u^\ast, s^\ast)$, the two preimages are distinct equal-length
-strings with equal hash: a collision, output directly. Otherwise $u =
-u^\ast$, i.e.\ $\Root(\hleaf(d), m, k, P') = \MTH(D[0{:}k])$ with $m < k$
-and $d \neq D[0{:}k][m] = D[m]$: exactly the premise for leaf list
-$D[0{:}k]$ of size $k < n$, so the induction hypothesis applies. The
-recursion terminates at the leaf level, where Lemma~\ref{lem:domsep}
-additionally guarantees that no spurious equality between leaf and node
-preimages can mask the collision.
+$F = \Root(\hleaf(d), m, n, \cdot)$ applied to $P$ is a hash-fold over the
+honest tree $T_D$ (it has the size-$n$ tree's shape; its inputs---the leaf
+$d$ and the siblings in $P$---are adversarial), and by hypothesis its
+output is $\MTH(D)$. Apply Lemma~\ref{lem:bind}. Case (ii) is impossible:
+it would require $F$'s emitted leaf at position $m$, namely $\hleaf(d)$, to
+equal $T_D$'s leaf $\hleaf(D[m])$, which for $d \neq D[m]$ is itself a
+collision. So case (i) fires; $\mathcal{E}$ recomputes $T_D$ ($O(n)$
+hashes), replays the fold to locate the differing $\hnode$ (or leaf) pair,
+and outputs it.
 \end{proof}
 
 \begin{remark}
-Theorem~\ref{thm:sound} is unconditional in the following sense: it does not
-say forgeries are infeasible, it \emph{constructs} a SHA-256 collision from
-any successful forgery. Infeasibility of forgery is then exactly the
-assumption ``SHA-256 is collision resistant''---no more, no less. This is
-the form in which the statement will be mechanized (\S\ref{sec:next}): the
-extractor is a total function, and collision resistance enters only as a
-documented boundary axiom, audited by the log exactly like the SHA-512
-oracle in the Ed25519 tiers.
+Both soundness statements are unconditional in the same sense: they do not
+assert forgery is infeasible, they \emph{construct} a SHA-256 collision
+from any successful forgery, so append-only and position security are
+\emph{precisely} ``SHA-256 is collision resistant''---no more, no less. The
+two theorems share Lemma~\ref{lem:bind}, the only place hashing is reasoned
+about; this factoring is deliberate, as Lemma~\ref{lem:bind} is exactly
+what the Lean mechanization of \S\ref{sec:next} will carry, with collision
+resistance entering only as a documented boundary axiom, audited by the log
+like the SHA-512 oracle in the Ed25519 tiers.
 \end{remark}
-
-Before the consistency statement we isolate the single fact that both root
-soundness arguments share, so the induction that follows is clean.
-
-\begin{lemma}[Root binding]\label{lem:bind}
-Let $\ConsRec$ (\S\ref{sec:tree}) or $\Root$ (\S\ref{sec:security}) be run
-on adversarial inputs, and let $T$ be the honest Merkle tree of a leaf list
-$D$. Suppose the reconstruction returns a value equal to $\MTH(D)$. Then,
-walking the reconstruction and $T$ in parallel from the root, either (i) at
-some node the reconstruction's two hash preimages differ from $T$'s while
-the hash values agree---an explicit SHA-256 collision---or (ii) every
-reconstructed subtree value equals the corresponding node of $T$, down to
-the leaves. Lemma~\ref{lem:domsep} ensures a leaf value and a node value
-never collide by type, so case (ii) reaching a leaf forces equality of the
-underlying leaf bytes.
-\end{lemma}
-\begin{proof}
-Induction on tree height. At the root the two values are equal by
-hypothesis; each is a hash of a preimage (the reconstruction's node
-concatenation, and $T$'s). Equal hashes of \emph{distinct} preimages are a
-collision (case i); otherwise the preimages coincide, so the child values
-coincide, and the hypothesis holds at each child. Domain separation
-(Lemma~\ref{lem:domsep}) makes the leaf/node cases exclusive.
-\end{proof}
 
 \begin{theorem}[Consistency soundness]\label{thm:consistency}
 There is an explicit algorithm $\mathcal{E}'$, running in $O(n_1)$ hash
@@ -642,41 +633,37 @@ i.e.\ $\ConsRec(n_0, n_1, C, \top, \MTH(D_0)) = (\MTH(D_0), \MTH(D_1))$,
 $\mathcal{E}'(D_0, D_1, C)$ outputs a SHA-256 collision.
 \end{theorem}
 \begin{proof}
-$\ConsRec$ returns a pair; acceptance equates its first component with
-$\MTH(D_0)$ and its second with $\MTH(D_1)$. The two components are built
-from one common list of nodes: reading the four cases of $\ConsRec$, the
-recursion descends the size-$n_1$ tree by its splits $k$, and in the fourth
-case ($n_0 > k$) it prefixes the \emph{same} sibling $s$ to both
-components, while in the third case ($n_0 \le k$) it recurses into the left
-part for both and appends the right sibling $s$ only to the second
-component. Thus the second component is a reconstruction of $\MTH(D_1)$
-over the honest size-$n_1$ tree $T_1$, and the first is a reconstruction of
-$\MTH(D_0)$ that reuses exactly the shared-range nodes of that same
-transcript over the honest size-$n_0$ tree $T_0$.
+$\ConsRec$ returns a pair; acceptance equates its second component with
+$\MTH(D_1)$ and its first with $\MTH(D_0)$. Reading the four cases, the
+second component emits $\hnode$ at every split of the size-$n_1$ tree---it
+is a hash-fold over the honest tree $T_1$---while the first component reuses
+a sub-list of the very same proof nodes, namely those covering the index
+range $[0, n_0)$, and folds \emph{only} those. We use the two components
+differently, so the delicate first component never enters the lemma.
 
-$\mathcal{E}'$ runs both reconstructions against $T_1$ and $T_0$
-respectively under Lemma~\ref{lem:bind}. If either invocation hits case
-(i), output that collision. Otherwise both are in case (ii): every node of
-the transcript that lies in the range $[0, n_0)$ equals the corresponding
-node of \emph{both} $T_0$ and $T_1$ (it is one physical value, matched
-against each honest tree). The nodes covering $[0, n_0)$ are exactly the
-canonical (RFC~9162) decomposition of that range into maximal perfect
-subtrees; agreeing with both honest trees on each, and descending by
-Lemma~\ref{lem:bind} to the leaves within each, gives $D_0[i] = D_1[i]$ for
-all $i < n_0$, i.e.\ $D_0 = D_1[0{:}n_0]$---contradicting the premise. Hence
-a collision is found on some branch, and $\mathcal{E}'$ outputs it. The
-$O(n_1)$ bound is the size of the two honest trees $\mathcal{E}'$
-recomputes.
+\emph{Step 1 (the transcript nodes are genuine).} Apply
+Lemma~\ref{lem:bind} to the second component against $T_1$. Either it hits
+case (i)---output that collision---or (case ii) every value it emitted, in
+particular every proof node it consumed, equals the corresponding node of
+$T_1$. Assume the latter; the proof nodes are now known to be genuine nodes
+of the honest tree $T_1$.
+
+\emph{Step 2 (the prefix roots collide).} The nodes covering $[0, n_0)$
+are the canonical RFC~9162 decomposition of that range into maximal perfect
+subtrees of $T_1$; by Step~1 they are genuine, so folding them---which is
+exactly what the first component does---yields the root of $D_1[0{:}n_0]$,
+i.e.\ the first component equals $\MTH(D_1[0{:}n_0])$. But acceptance also
+equates the first component with $\MTH(D_0)$. Hence
+$\MTH(D_0) = \MTH(D_1[0{:}n_0])$ while $D_0 \neq D_1[0{:}n_0]$.
+
+\emph{Step 3 (descend).} Apply Lemma~\ref{lem:bind} once more, this time
+with the honest hash-fold $F = T_{D_1[0{:}n_0]}$ (the honest tree of
+$D_1[0{:}n_0]$, trivially a hash-fold over itself) against the honest tree
+$T = T_{D_0}$: their roots are equal but their leaf lists differ, so case
+(ii) is impossible and case (i) fires---an explicit collision.
+$\mathcal{E}'$ outputs whichever collision was found. It recomputes $T_0$
+and $T_1$, so it runs in $O(n_1)$ hash evaluations.
 \end{proof}
-
-\begin{remark}
-As with Theorem~\ref{thm:sound}, the statement is a total
-\emph{construction}: any accepted inconsistent extension yields a concrete
-collision, so append-only security is precisely ``SHA-256 is collision
-resistant.'' The two theorems share Lemma~\ref{lem:bind}, which is the
-only place hashing is reasoned about; this factoring is deliberate, as it
-is the lemma the Lean mechanization of \S\ref{sec:next} will carry.
-\end{remark}
 
 \begin{proposition}[Pin-store safety]\label{prop:pin}
 Assume Ed25519 EUF-CMA security for the head-signing key and consider the
@@ -855,24 +842,23 @@ from the public leaves.}
 
 \begin{table}[t]
 \centering\small
-\begin{tabular}{@{}lrrrl@{}}
+\begin{tabular}{@{}lrrl@{}}
 \toprule
-fork & Lean files & apex-boundary & files vs.\ & SHA-512 \\
-     &            & axioms        & upstream\rlap{$^\dagger$} & shape \\
+fork & Lean files & apex-boundary axioms & SHA-512 in the boundary \\
 \midrule
-upstream \texttt{dalek} & 64 & 11 & --- & 3-call streaming \\
-Solana (\texttt{anza})  & 58 & \phantom{0}7 & (own crate) & \texttt{ed\_sigs} hash3 \\
-RISC~Zero               & 63 & \phantom{0}8 & +215 (parser) & \texttt{hash3} \\
-Betrusted               & 63 & \phantom{0}8 & \phantom{0}+27 vs.\ RISC0 & \texttt{hash3} \\
+upstream \texttt{dalek} & 64 & 11 & 3-call streaming (\texttt{new/update/finalize}) \\
+Solana (\texttt{anza})  & 58 & \phantom{0}7 & one \texttt{ed\_sigs.sha512\_hash3} \\
+RISC~Zero               & 63 & \phantom{0}8 & one \texttt{verifying.sha512\_hash3} \\
+Betrusted               & 63 & \phantom{0}8 & one \texttt{verifying.sha512\_hash3} \\
 \bottomrule
 \end{tabular}
 \caption{The four subject implementations. Each replay re-checks 16
 certificates in ${\approx}1{,}800$\,s under memory caps and core pinning.
-$^\dagger$Changed proof-script lines against the nearest sibling: the
-byte-parser proof differs by 215 lines on the closure-loader forks; RISC~Zero
-and Betrusted differ by 27 lines, all annotation of one fork's
-\texttt{black\_box} barrier. Pure-mathematics files are byte-identical
-across all four.}
+The apex-boundary count is the size of the fork's enumerated oracle
+boundary (Appendix~\ref{app:axioms}); it differs by fork because the
+SHA-512 surface and the byte-accessor shape differ. Proof-script
+divergence across forks is quantified in the portability paragraph below;
+the pure-mathematics files are byte-identical across all four.}
 \label{tab:forks}
 \end{table}
 
