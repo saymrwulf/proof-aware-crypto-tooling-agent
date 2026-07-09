@@ -573,24 +573,29 @@ may be adversarial; only the \emph{shape} matches $T$.
 
 \begin{lemma}[Root binding]\label{lem:bind}
 Let $F$ be a hash-fold over the honest Merkle tree $T$ of a leaf list $D$,
-run on otherwise adversarial inputs, and suppose $F$'s output equals
-$\MTH(D)$. Then, walking $F$ and $T$ in parallel from the root, either
-(i)~at some internal node $F$'s $\hnode$ argument pair differs from $T$'s
-while the two $\hnode$ values agree---an explicit SHA-256 collision---or
-(ii)~every value $F$ emits equals the corresponding node of $T$, down to
-the leaves, whence $F$ read the true leaf bytes of $D$.
+run on otherwise adversarial inputs (a leaf value and sibling nodes it
+folds in), and suppose $F$'s output equals $\MTH(D)$. Then either (i)~at
+some internal node $F$'s $\hnode$ argument pair differs from $T$'s while the
+two $\hnode$ values agree---an explicit SHA-256 collision---or (ii)~$F$'s
+computation coincides with $T$ node-for-node: every value $F$ emits and
+\emph{every sibling node $F$ consumes} equals the corresponding node of
+$T$, and $F$'s leaf inputs are the true leaves of $D$.
 \end{lemma}
 \begin{proof}
 Induction on the height of $T$. At the root both values equal $\MTH(D)$ by
-hypothesis, and each is $\hnode$ of an argument pair (for $F$ by the
-hash-fold property, for $T$ by definition of $\MTH$ at an internal node).
-Equal $\hnode$ values of \emph{distinct} argument pairs are a collision
-(case i); otherwise the pairs coincide, so $F$'s two child values equal
-$T$'s two children, and the hypothesis applies to each child subtree. At a
-leaf, $F$ emits $\hleaf(d')$ and $T$ has $\hleaf(D[j])$; equality with
-$d' \neq D[j]$ is again a collision, and Lemma~\ref{lem:domsep} rules out
-a leaf value coinciding with an internal-node value by type, so the two
-cases are exhaustive and exclusive.
+hypothesis, and each is $\hnode$ of an argument pair---for $F$ that pair is
+(its recursive child value, the sibling it consumed there); for $T$ it is
+$(\MTH$ of the left block, $\MTH$ of the right block$)$. Equal $\hnode$
+values of \emph{distinct} argument pairs are a collision (case i);
+otherwise the two pairs coincide \emph{as pairs}, so simultaneously $F$'s
+recursive child value equals $T$'s child \emph{and the sibling $F$ consumed
+equals $T$'s other child}, and the hypothesis applies to the child subtree.
+At a leaf, $F$ folds $\hleaf(d')$ where $T$ has $\hleaf(D[j])$; equality
+with $d' \neq D[j]$ is again a collision, and Lemma~\ref{lem:domsep} rules
+out a leaf value coinciding with an internal-node value by type, so the two
+cases are exhaustive and exclusive. In case (ii) the argument-pair
+coincidence at every level is exactly the claim that both emitted values
+and consumed siblings match $T$.
 \end{proof}
 
 \begin{theorem}[Inclusion soundness: position binding]\label{thm:sound}
@@ -656,13 +661,15 @@ i.e.\ the first component equals $\MTH(D_1[0{:}n_0])$. But acceptance also
 equates the first component with $\MTH(D_0)$. Hence
 $\MTH(D_0) = \MTH(D_1[0{:}n_0])$ while $D_0 \neq D_1[0{:}n_0]$.
 
-\emph{Step 3 (descend).} Apply Lemma~\ref{lem:bind} once more, this time
-with the honest hash-fold $F = T_{D_1[0{:}n_0]}$ (the honest tree of
-$D_1[0{:}n_0]$, trivially a hash-fold over itself) against the honest tree
-$T = T_{D_0}$: their roots are equal but their leaf lists differ, so case
-(ii) is impossible and case (i) fires---an explicit collision.
-$\mathcal{E}'$ outputs whichever collision was found. It recomputes $T_0$
-and $T_1$, so it runs in $O(n_1)$ hash evaluations.
+\emph{Step 3 (descend).} Since $|D_0| = |D_1[0{:}n_0]| = n_0$, the two
+honest trees have identical shape, so $T_{D_1[0{:}n_0]}$ is a hash-fold
+over $T_{D_0}$ (same shape; its leaf inputs are the leaves of
+$D_1[0{:}n_0]$). Its output is $\MTH(D_1[0{:}n_0]) = \MTH(D_0)$ by Step~2,
+so Lemma~\ref{lem:bind} applies with $D = D_0$. Case (ii) would force the
+leaf inputs to equal $D_0$, i.e.\ $D_1[0{:}n_0] = D_0$, contradicting the
+premise; so case (i) fires---an explicit collision. $\mathcal{E}'$ outputs
+whichever collision was found; recomputing $T_0$ and $T_1$, it runs in
+$O(n_1)$ hash evaluations.
 \end{proof}
 
 \begin{proposition}[Pin-store safety]\label{prop:pin}
@@ -736,7 +743,14 @@ self\_inclusion: verified
 The signature vouches for the tree; the tree vouches for the code that
 produced the signature; and the two vouchings are different proof modalities
 (cryptographic and deductive), so the loop is self-referential without being
-circular. The self-check always references the \emph{newest} leaf
+circular. Concretely, a consumer's verification order is a directed acyclic
+chain, no step trusting its own output: pin the operator key (assumed, once)
+$\to$ check the head signature (EUF-CMA) $\to$ verify the signing library's
+leaf is included in that head (hashes only, no signature) $\to$ optionally
+rebuild that library from its pinned commit and re-check its certificates
+(Lean kernel). The self-reference is only that the code producing signatures
+also \emph{appears as a subject} in the log; no check consumes the result it
+is establishing. The self-check always references the \emph{newest} leaf
 attesting the signing library: after the re-attestation of
 \S\ref{sec:deployment}, the referenced index advanced from~4 to~8
 automatically, the loop re-anchoring itself to the fresh attestation
