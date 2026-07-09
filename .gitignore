@@ -22,3 +22,4 @@ dogfood/quorum/*/Cargo.toml
 dogfood/quorum/*/Cargo.lock
 dogfood/quorum/*/target/
 dogfood/state/quorum/
+paper/eprint-submission.md
