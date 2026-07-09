@@ -230,7 +230,7 @@ the proof-attested Ed25519 code path itself (<code>--require-verified-verifier</
 
 <h2>API</h2>
 <pre>GET {base}/v1/sth                      latest Signed Tree Head
-GET {base}/v1/sth-history              every head ever signed (witness material)
+GET {base}/v1/sth-history              the published head history (witness material)
 GET {base}/v1/sth-consistency?first=N  consistency proof from your pinned size
 GET {base}/v1/proof?component=NAME     inclusion proof (artifact 3, freshly issued)
 GET {base}/v1/attestation?component=NAME   the claim (artifact 2)

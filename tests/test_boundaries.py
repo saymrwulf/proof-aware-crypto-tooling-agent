@@ -66,3 +66,27 @@ def test_full_fixture_scores_r4_and_partial_scores_r3(tmp_path):
     card = build_claim_card(partial, tmp_path, offline_fixture=True)
     assert card["risk"]["level"] == "R3"
     assert any("R4 requires the full apex tier set" in b for b in card["risk"]["blockers"])
+
+
+def test_verdict_never_copies_operator_labels():
+    """Prop 2 (verdict integrity), literally: the cleanliness verdict is a
+    function of (observed cone, local allowed set) in EVERY branch. The
+    operator's axiom_status label is never copied - not even for
+    non-proven certificates - and a missing cone is always unverifiable."""
+    profile = get_profile("ed25519", _repo())
+    failed_flattered = {
+        "name": "CurveFieldProofs.verify_accepts_iff",
+        "status": "failed",
+        "axiom_status": "clean",  # operator flattery, must not pass through
+    }
+    out = _normalize_certificate(failed_flattered, profile)
+    assert out["axiom_status"] == "unverifiable"
+    assert out["provider_axiom_verdict"] == "clean"  # recorded, not believed
+
+    failed_with_cone = {
+        "name": "CurveFieldProofs.verify_accepts_iff",
+        "status": "failed",
+        "axiom_status": "clean",
+        "observed_axioms": ["propext", "sorryAx"],
+    }
+    assert _normalize_certificate(failed_with_cone, profile)["axiom_status"] == "dirty"

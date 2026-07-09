@@ -129,19 +129,29 @@ def validate_attestation(
                 if not fresh:
                     diagnostics.append(error or "Signed tree head fails the freshness policy.")
             if sth_store_path:
-                proof_hex = None
-                if consistency_proof_path:
-                    raw_proof = load_data(consistency_proof_path)
-                    proof_hex = [str(item) for item in (raw_proof.get("proof") if isinstance(raw_proof, dict) else raw_proof) or []]
-                sth_check = check_sth_against_store(
-                    sth,
-                    sth_store_path,
-                    consistency_proof_hex=proof_hex,
-                    consistency_from=receipt.get("consistency"),
-                )
-                transparency_evidence.update(sth_check.evidence())
-                if not sth_check.ok:
-                    diagnostics.extend("STH store: " + note for note in sth_check.diagnostics)
+                # The pin-store state machine (including permanent poisoning
+                # on equivocation) only ever runs on a VALIDLY SIGNED head;
+                # an unauthenticated head must not be able to mutate - let
+                # alone poison - the consumer's pin.
+                if receipt_result.signatures.get("ed25519") != "verified":
+                    transparency_evidence["sth_store"] = "skipped_unverified_head"
+                    diagnostics.append(
+                        "STH store: head signature did not verify; pin store not consulted or updated."
+                    )
+                else:
+                    proof_hex = None
+                    if consistency_proof_path:
+                        raw_proof = load_data(consistency_proof_path)
+                        proof_hex = [str(item) for item in (raw_proof.get("proof") if isinstance(raw_proof, dict) else raw_proof) or []]
+                    sth_check = check_sth_against_store(
+                        sth,
+                        sth_store_path,
+                        consistency_proof_hex=proof_hex,
+                        consistency_from=receipt.get("consistency"),
+                    )
+                    transparency_evidence.update(sth_check.evidence())
+                    if not sth_check.ok:
+                        diagnostics.extend("STH store: " + note for note in sth_check.diagnostics)
 
     accepted = not diagnostics
     evidence = {
@@ -190,13 +200,16 @@ def _normalize_certificate(cert: dict[str, Any], profile: Any) -> dict[str, Any]
     status = str(cert.get("status") or "unknown")
     observed = [str(a) for a in (cert.get("observed_axioms") or [])]
     expected = profile.expected_axioms_for(name)
-    if status == "proven" and observed:
+    # The cleanliness verdict is a function of (observed cone, local allowed
+    # set) ONLY - in every branch. The provider's status label still gates
+    # acceptance elsewhere (only status=="proven" certificates can count),
+    # but it can only deny, never grant, and the provider's own axiom_status
+    # label is never copied into the verdict.
+    if observed:
         axiom_status = "clean" if sorted(observed) == sorted(expected) else "dirty"
-    elif status == "proven":
-        # proven with no observed axioms reported: cannot re-derive; distrust.
-        axiom_status = "unverifiable"
     else:
-        axiom_status = str(cert.get("axiom_status") or "not_checked")
+        # no observed cone: nothing to re-derive from; distrust.
+        axiom_status = "unverifiable"
     provider_verdict = str(cert.get("axiom_status") or "not_stated")
     return {
         "name": name,

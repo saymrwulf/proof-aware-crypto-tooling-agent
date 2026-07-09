@@ -1,7 +1,7 @@
 % LTL paper, revised version (v2) addressing ePrint acceptance criteria:
 % self-containedness, formal model, proofs for the system's own claims,
-% honest title, no marketing. Author TODOs are marked \authortodo{...}
-% and MUST be resolved before resubmission.
+% honest title, no marketing. All \authortodo markers have been resolved;
+% the macro remains defined in case future edits need it.
 \documentclass[11pt]{article}
 \usepackage[a4paper,margin=1.1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
@@ -497,11 +497,13 @@ $(n', r')$:
 \item $n' < n_{\mathrm{pin}}$: reject (rollback).
 \end{itemize}
 A freshness policy bounds head age. The full log is also published as a git
-repository (one file per leaf, plus every head ever signed), so any cloner
-can recompute every prefix root from the public leaves and audit the
-complete head history without consistency proofs---a low-infrastructure
-witness mechanism~\cite{ct2}; a standalone ${\approx}150$-line
-standard-library verifier ships in the mirror.
+repository: one file per leaf, plus the signed head history since
+publication began (heads signed before the mirror existed were not
+retained). Any cloner can therefore recompute every prefix root from the
+public leaves and check every published head against its prefix root and
+signature without consistency proofs---a low-infrastructure witness
+mechanism~\cite{ct2}; a standalone ${\approx}150$-line standard-library
+verifier ships in the mirror.
 
 \section{Security analysis}\label{sec:security}
 
@@ -708,8 +710,12 @@ asserts.
 \end{proposition}
 \begin{proof}
 By construction of the consumer tooling: the verdict function takes
-$(\obs_a, \allowed)$ and ignores the label fields; an attestation lacking
-observed cones is mapped to \textsf{unverifiable}, not to a verdict.
+$(\obs_a, \allowed)$ and ignores the label fields in every branch; a
+certificate lacking an observed cone is mapped to \textsf{unverifiable},
+not to a verdict. The operator's proven/failed \texttt{status} label is
+consulted separately by the acceptance policy, but only
+\emph{negatively}---a certificate the operator does not itself mark proven
+can never count---so no operator assertion can upgrade any verdict.
 \end{proof}
 
 \paragraph{What is \emph{not} proven.} Propositions~\ref{prop:pin} and
@@ -740,6 +746,10 @@ signing\_library\_leaf\_index: 8\\
 signing\_library\_certificates\_proven: 16/16\\
 self\_inclusion: verified
 \end{quote}
+(These provenance fields ride alongside the signature as operator-provided
+context; they are not part of the signed payload, and a consumer relies on
+none of them---the acyclic chain below rests only on the signature and the
+leaf's inclusion.)
 The signature vouches for the tree; the tree vouches for the code that
 produced the signature; and the two vouchings are different proof modalities
 (cryptographic and deductive), so the loop is self-referential without being
@@ -798,8 +808,12 @@ append-only ledger is the point of the system:
   changed their commit hashes. Because a leaf pins an exact commit
   (\S\ref{sec:leaves}), the operator re-ran the full corpus and appended
   fresh attestations at the new commits rather than editing leaves 4--7.
-  The proof \emph{files} are unchanged across the rewrite---independently
-  checkable by diffing the two commit trees---and the replay confirms it.
+  That the proof \emph{files} survived the rewrite unchanged is
+  corroborated from the log itself: leaves 4--7 and 8--11 carry identical
+  certificate lists and identical observed axiom cones, re-checked by the
+  kernel at both commit generations. (The pre-rewrite trees themselves are
+  no longer distributed, so a direct tree diff is not among the public
+  artifacts.)
 \end{itemize}
 
 \noindent This last event is a live exercise of the append-only
@@ -906,9 +920,10 @@ byte-identical across all four; extraction-facing proof scripts diverge
 sharply where the forks' code or the extractor's naming differs (e.g., 215
 changed lines for the byte-parser proofs on the two forks whose extraction
 produces a closure-based loader; 121 lines for the signature-glue proofs on
-the same-crate fork; 27 lines---all annotation---between the two
-structurally closest forks, documenting one fork's \texttt{black\_box}
-optimization barrier). Per-target verification, in other words, is doing
+the same-crate fork; 27 lines between the two structurally closest forks,
+tracking one fork's \texttt{black\_box} optimization barrier---its
+axiom-list entries and the operation reordering it induces). Per-target
+verification, in other words, is doing
 measurable work exactly where the targets actually differ.
 
 \section{Limitations}\label{sec:limitations}
@@ -959,7 +974,7 @@ check scripts.
 % Review every proof in Section 6 line by line and re-run every number in
 % Section 8 yourself.}
 
-\begin{thebibliography}{19}
+\begin{thebibliography}{20}
 \itemsep2pt
 
 \bibitem{ct1} B. Laurie, A. Langley, E. K\"asper. Certificate Transparency.
@@ -969,7 +984,7 @@ RFC 6962, 2013.
 Version 2.0. RFC 9162, 2021.
 
 \bibitem{crosby} S. A. Crosby, D. S. Wallach. Efficient Data Structures for
-Tamper-Evident Logging. USENIX Security, 2009.
+Tamper-Evident Logging. USENIX Security, pp. 317--334, 2009.
 
 \bibitem{dghs} B. Dowling, F. G\"unther, U. Herath, D. Stebila. Secure
 Logging Schemes and Certificate Transparency. ESORICS, LNCS 9879, pp.
@@ -980,17 +995,18 @@ Software Signing for Everybody. ACM CCS, pp. 2353--2367, 2022.
 
 \bibitem{intoto} S. Torres-Arias, H. Afzali, T. K. Kuppusamy, R. Curtmola,
 J. Cappos. in-toto: Providing farm-to-table guarantees for bits and bytes.
-USENIX Security, 2019.
+USENIX Security, pp. 1393--1410, 2019.
 
 \bibitem{coniks} M. S. Melara, A. Blankstein, J. Bonneau, E. W. Felten,
 M. J. Freedman. CONIKS: Bringing Key Transparency to End Users. USENIX
-Security, 2015.
+Security, pp. 383--398, 2015.
 
 \bibitem{pcc} G. C. Necula. Proof-Carrying Code. ACM POPL, pp. 106--119,
 1997.
 
 \bibitem{cheval} V. Cheval, J. Moreira, M. Ryan. Automatic verification of
-transparency protocols. IEEE EuroS\&P, 2023. arXiv:2303.04500.
+transparency protocols. IEEE EuroS\&P, pp. 107--121, 2023.
+arXiv:2303.04500.
 
 \bibitem{easycrypt} G. Barthe, B. Gr\'egoire, S. Heraud, S. Zanella
 B\'eguelin. Computer-Aided Security Proofs for the Working Cryptographer.
@@ -1004,10 +1020,10 @@ Programming Language. CADE-28, LNCS 12699, pp. 625--635, 2021.
 
 \bibitem{hacl} J.-K. Zinzindohou\'e, K. Bhargavan, J. Protzenko,
 B. Beurdouche. HACL*: A Verified Modern Cryptographic Library. ACM CCS,
-2017.
+pp. 1789--1806, 2017.
 
 \bibitem{evercrypt} J. Protzenko et al. EverCrypt: A Fast, Verified,
-Cross-Platform Cryptographic Provider. IEEE S\&P, 2020.
+Cross-Platform Cryptographic Provider. IEEE S\&P, pp. 983--1002, 2020.
 
 \bibitem{fiatcrypto} A. Erbsen, J. Philipoom, J. Gross, R. Sloan,
 A. Chlipala. Simple High-Level Code for Cryptographic Arithmetic---With
@@ -1040,10 +1056,10 @@ Each leaf is the canonical JSON serialization (sorted keys, no
 insignificant whitespace, UTF-8) of an attestation. Below is leaf~8 of
 the deployed log---the re-attestation of the upstream fork. The
 16-certificate array is elided to its first (foundational) and last
-(apex) entries, and long values (hashes, timestamps, version strings,
-paths) are shortened with ellipses; field names, structure, and the
-axiom lists are verbatim, and the unelided leaf is one \texttt{jq}
-invocation away in the public mirror.
+(apex) entries; long values (hashes, timestamps, version strings,
+paths) are shortened, and omitted fields are marked, with ellipses. The
+field names and values shown, and the axiom lists, are verbatim, and the
+unelided leaf is one \texttt{jq} invocation away in the public mirror.
 \begin{quote}\ttfamily\scriptsize
 \{ "type": "pacta.attestation", "schema\_version": 1,\\
 \hspace*{0.6em}"attestation": \{\\
@@ -1051,14 +1067,18 @@ invocation away in the public mirror.
 \hspace*{1.2em}"issued\_at": "2026-07-07T...Z",\\
 \hspace*{1.2em}"subject": \{ "component": "dalek-ed25519-verified",\\
 \hspace*{2.4em}"repo\_commit": "33fb8bb2311c70ead2e83c0...",\\
-\hspace*{2.4em}"repo\_url": ..., "verified\_backend": "serial" \},\\
-\hspace*{1.2em}"environment": \{ "lean\_version": "4.x.y",\\
+\hspace*{2.4em}"repo\_url": ..., "verified\_backend": "serial/u64",\\
+\hspace*{2.4em}... \},\\
+\hspace*{1.2em}"environment": \{\\
+\hspace*{2.4em}"lean\_version": "Lean (version 4.30.0-rc2, ...)",\\
 \hspace*{2.4em}"lake\_version": ..., "env\_script": ...,\\
 \hspace*{2.4em}"lean\_project\_dir": ... \},\\
 \hspace*{1.2em}"machine\_protection": \{ "lean\_guard": ...,\\
-\hspace*{2.4em}"note": "memory cap, core pinning, single-flight" \},\\
+\hspace*{2.4em}"note": "All Lean compiles route through the\\
+\hspace*{2.4em}repo's lean-guard (memory cap, core pinning,\\
+\hspace*{2.4em}timeout, single-flight lock) ..." \},\\
 \hspace*{1.2em}"replay": \{ "checked\_files": 64, "failed\_files": [],\\
-\hspace*{2.4em}"check\_ok": true, "axiom\_ok": true \},\\
+\hspace*{2.4em}"check\_ok": true, "axiom\_ok": true, ... \},\\
 \hspace*{1.2em}"certificates": [\\
 \hspace*{2.4em}\{ "name": "CurveFieldProofs.fieldImplementation",\\
 \hspace*{3.0em}"status": "proven", "axiom\_status": "clean",\\
@@ -1071,19 +1091,23 @@ invocation away in the public mirror.
 \hspace*{3.0em}"status": "proven", "axiom\_status": "clean",\\
 \hspace*{3.0em}"observed\_axioms": ["propext","Classical.choice",\\
 \hspace*{3.6em}"Quot.sound","ed25519.Signature","sha2.Sha512",\\
-\hspace*{3.6em}"verifying.sha512\_new","verifying.sha512\_update",\\
 \hspace*{3.6em}"verifying.sha512\_finalize\_bytes",\\
+\hspace*{3.6em}"verifying.sha512\_new","verifying.sha512\_update",\\
 \hspace*{3.6em}"ed25519.Signature.to\_bytes",\\
 \hspace*{3.6em}"signature.error.Error",\\
 \hspace*{3.6em}"signature.error.Error.new"] \} ],\\
-\hspace*{1.2em}"signature": \{ "scheme": "ed25519", ... \} \} \}
+\hspace*{1.2em}"signature": \{ "scheme": "openssl-ed25519", ... \} \} \}
 \end{quote}
 The \texttt{observed\_axioms} field is the exact output of
 \texttt{\#print axioms} for that theorem. Operator labels
 (\texttt{replay.check\_ok}, per-certificate \texttt{status} and
-\texttt{axiom\_status}) are recorded for the audit trail but are not
-inputs to any consumer verdict (Proposition~\ref{prop:verdict}); the
-consumer's verdict is $\obs = \allowed$ computed against its own table.
+\texttt{axiom\_status}) are recorded for the audit trail, but the
+cleanliness verdict is $\obs = \allowed$ computed against the consumer's
+own table in every case, with a missing cone mapped to
+\textsf{unverifiable} (Proposition~\ref{prop:verdict}). The
+\texttt{status} label is consulted only \emph{negatively}: a certificate
+the operator itself does not mark proven can never count toward
+acceptance, so labels can deny but never grant.
 
 \section{The consumer verifier}\label{app:verifier}
 
@@ -1139,8 +1163,8 @@ above, plus):
 this fork exposes SHA-512 as three streaming operations):
 \begin{quote}\ttfamily\scriptsize
 ed25519.Signature \quad sha2.Sha512\\
-verifying.sha512\_new \quad verifying.sha512\_update\\
 verifying.sha512\_finalize\_bytes\\
+verifying.sha512\_new \quad verifying.sha512\_update\\
 ed25519.Signature.to\_bytes\\
 signature.error.Error \quad signature.error.Error.new
 \end{quote}

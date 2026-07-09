@@ -475,6 +475,7 @@ def cmd_receipt_verify(args: argparse.Namespace) -> int:
         sth_store=args.sth_store,
         consistency_proof_path=args.consistency_proof,
         max_sth_age_seconds=args.max_sth_age_seconds,
+        head_signature_verified=result.signatures.get("ed25519") == "verified",
     )
     if args.require_verified_verifier and result.signatures.get("ed25519_backend") != "verified-dalek-serial":
         accountability_diagnostics.append(
@@ -575,6 +576,7 @@ def _log_accountability_checks(
     sth_store: str | None,
     consistency_proof_path: str | None,
     max_sth_age_seconds: int | None,
+    head_signature_verified: bool = False,
 ) -> list[str]:
     diagnostics: list[str] = []
     sth = receipt.get("sth") or {}
@@ -582,7 +584,13 @@ def _log_accountability_checks(
         fresh, error = check_sth_freshness(sth, max_sth_age_seconds)
         if not fresh:
             diagnostics.append(error or "Signed tree head fails the freshness policy.")
-    if sth_store:
+    if sth_store and not head_signature_verified:
+        # Only a validly signed head may drive the pin-store state machine;
+        # an unauthenticated head must not be able to poison the pin.
+        diagnostics.append(
+            "STH store: head signature did not verify; pin store not consulted or updated."
+        )
+    elif sth_store:
         proof_hex = None
         if consistency_proof_path:
             from .yamlio import load_data
