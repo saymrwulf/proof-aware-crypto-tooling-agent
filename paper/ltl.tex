@@ -94,7 +94,8 @@ software, and post-hoc verification pipelines such as Aeneas~\cite{aeneas}
 make it possible to state and prove theorems about existing production Rust
 code. The corpus underlying this paper is of the latter kind: four production
 Ed25519 implementations---upstream \texttt{curve25519-dalek}/%
-\texttt{ed25519-dalek} and three deployed forks (Solana, RISC~Zero,
+\texttt{ed25519-dalek} (one implementation: the curve crate and the
+signature crate atop it) and three deployed forks (Solana, RISC~Zero,
 Betrusted)---each carry Lean~4~\cite{lean4} certificates, proven against that
 fork's own extracted model, covering field arithmetic over $\Fp$, the
 complete twisted Edwards laws~\cite{edwards,twisted}, scalar arithmetic
@@ -331,6 +332,14 @@ use; \S\ref{sec:limitations}).
 
 \subsection{Security goals}\label{sec:model:goals}
 
+These goals are what per-item signatures alone cannot supply: a set of
+individually signed attestations cannot evidence a silent deletion
+(nothing commits to completeness), cannot expose two-faced service
+(independently valid views are incomparable), and offers no single value
+a consumer can pin and demand extensions of. The Merkle tree is chosen
+for these dishonesty-evidence properties, not for proof-size scaling,
+which at this deployment's size is immaterial.
+
 \begin{description}[itemsep=2pt]
 \item[G1 (Membership).] If a consumer accepts a receipt for attestation $a$
   against a signed head, then $a$ is a leaf of the tree committed by that
@@ -421,8 +430,10 @@ operator's opinion: labels act, if at all, only as a conservative veto.
 \subsection{Leaves: replay attestations}\label{sec:leaves}
 
 A leaf is the canonical JSON serialization of an attestation recording: the
-subject repository URL and git commit (which cryptographically pins the
-entire source tree); the toolchain versions; the resource-control regime
+subject repository URL and git commit (which pins the entire source
+tree through git's object identifiers---hardened SHA-1, noted here
+because it is a weaker primitive than the log's own SHA-256); the
+toolchain versions; the resource-control regime
 under which the replay ran; and, per certificate, its name, replay status,
 and the \emph{observed axiom cone}---the exact output of Lean's
 \texttt{\#print axioms} for that theorem. For the corpus of
@@ -882,7 +893,10 @@ The underlying proof corpora are in the
 paper is re-checkable from these artifacts.} with twelve leaves,
 produced by three full replay runs (one attestation per fork per run;
 58--64 Lean files and ${\approx}1{,}800$\,s per fork, under hard memory
-caps and core pinning). Each successful run reports 16/16 certificates
+caps and core pinning; the per-fork duration is corroborated by the
+inter-leaf \texttt{issued\_at} spacing in the published log, whose
+uninterrupted within-run gaps fall between 29m35s and 30m40s). Each
+successful run reports 16/16 certificates
 proven with boundary-exact cones, pinned to exact commits. The three runs
 correspond to three states of the world, and their coexistence in one
 append-only ledger is the point of the system:
@@ -1034,7 +1048,11 @@ the public git mirror rather than an independent witness network. Key
 distribution is trust-on-first-use. The signing path of the dogfood binary
 is unverified (declared, not proven). The residual trust of
 \S\ref{sec:model:residual}---honesty of the operator's kernel
-observations---is mitigated only by targeted independent replay. The corpus
+observations---is mitigated only by targeted independent replay, and
+replayability presupposes retrievability: a leaf whose pinned commit is
+no longer distributed (leaves 0--7 after the subject-history rewrite,
+\S\ref{sec:deployment}) decays from a replayable claim to a historical
+record, and consumers act on the newest, retrievable attestations. The corpus
 itself stops at source-level assurance: reproducible builds and side-channel
 evidence remain open, and ML-DSA slots in the head format are deliberately
 recorded as unavailable rather than backed by an unverified implementation.
@@ -1159,7 +1177,9 @@ insignificant whitespace, UTF-8) of an attestation. Below is leaf~8 of
 the deployed log---the re-attestation of the upstream fork. The
 16-certificate array is elided to its first (foundational) and last
 (apex) entries; long values (hashes, timestamps, version strings,
-paths) are shortened, and omitted fields are marked, with ellipses. The
+paths) are shortened, and omitted fields are marked, with ellipses; and
+fields are shown in logical rather than canonical (sorted-key) order
+for readability. The
 field names and values shown, and the axiom lists, are verbatim, and the
 unelided leaf is one \texttt{jq} invocation away in the public mirror.
 \begin{quote}\ttfamily\scriptsize
@@ -1186,8 +1206,8 @@ unelided leaf is one \texttt{jq} invocation away in the public mirror.
 \hspace*{3.0em}"status": "proven", "axiom\_status": "clean",\\
 \hspace*{3.0em}"observed\_axioms": ["propext",\\
 \hspace*{3.6em}"Classical.choice","Quot.sound"],\\
-\hspace*{3.0em}"expected\_axioms": [...] \},\\
-\hspace*{2.4em}... \; \emph{(14 more)} \; ...\\
+\hspace*{3.0em}"expected\_axioms": [...], ... \},\\
+\hspace*{2.4em}... \; \emph{(14 certificates elided)} \; ...\\
 \hspace*{2.4em}\{ "name":\\
 \hspace*{3.0em}"CurveFieldProofs.verify\_accepts\_iff\_decompress",\\
 \hspace*{3.0em}"status": "proven", "axiom\_status": "clean",\\
@@ -1197,8 +1217,9 @@ unelided leaf is one \texttt{jq} invocation away in the public mirror.
 \hspace*{3.6em}"verifying.sha512\_new","verifying.sha512\_update",\\
 \hspace*{3.6em}"ed25519.Signature.to\_bytes",\\
 \hspace*{3.6em}"signature.error.Error",\\
-\hspace*{3.6em}"signature.error.Error.new"] \} ],\\
-\hspace*{1.2em}"signature": \{ "scheme": "openssl-ed25519", ... \} \} \}
+\hspace*{3.6em}"signature.error.Error.new"], ... \} ],\\
+\hspace*{1.2em}"signature": \{ "scheme": "openssl-ed25519", ... \},\\
+\hspace*{1.2em}... \} \}
 \end{quote}
 The \texttt{observed\_axioms} field is the exact output of
 \texttt{\#print axioms} for that theorem. Operator labels

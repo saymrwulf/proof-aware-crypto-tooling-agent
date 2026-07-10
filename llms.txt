@@ -18,7 +18,7 @@
 ## Live evidence
 
 - Transparency log (RFC 9162): https://ltl.zkdefi.org — signed replay attestations of the Lean proofs, one leaf per fork.
-- The paper: https://ltl.zkdefi.org/paper — "The Lean Transparency Log: Distributing Kernel-Checked Correctness Evidence for Deployed Ed25519 Implementations" (revised, with security proofs, 18 pages; prior version at /paper/v0.1).
+- The paper: https://ltl.zkdefi.org/paper — "The Lean Transparency Log: Distributing Kernel-Checked Correctness Evidence for Deployed Ed25519 Implementations" (revised, with security proofs, 19 pages; prior version at /paper/v0.1).
 
 ## For agents
 
