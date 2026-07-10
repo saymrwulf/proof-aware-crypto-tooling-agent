@@ -273,7 +273,7 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>The Lean Transparency Log: Distributing
 Kernel-Checked Correctness Evidence for Deployed Ed25519 Implementations</strong></a>
-(PDF, 17 pages, revised) — the trust model with an explicit malicious-operator adversary,
+(PDF, 18 pages, revised) — the trust model with an explicit malicious-operator adversary,
 security proofs for every consumer-facing claim (inclusion soundness as an explicit
 SHA-256-collision extractor, pin-store safety with transferable equivocation evidence,
 verdict integrity), the self-referential signing loop, the twelve-leaf deployment with

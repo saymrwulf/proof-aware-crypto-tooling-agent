@@ -1,7 +1,12 @@
-% LTL paper, revised version (v2) addressing ePrint acceptance criteria:
-% self-containedness, formal model, proofs for the system's own claims,
-% honest title, no marketing. All \authortodo markers have been resolved;
-% the macro remains defined in case future edits need it.
+% LTL paper, v4 = merge of two independent hostile reviews (2026-07-10).
+% Review A (second Fable instance): frontier hash-fold framework (the
+% lemma did not cover its own uses as written), dangling R4/R5 labels,
+% deny-only label semantics, Table 1 caption, r_1 as raw bytes, exact
+% RFC 9162 figure. Review B (GPT-5.6): G2/abstract narrowed to what
+% Prop 1 proves, residual-trust sentence at honest width, freshness and
+% self-reference disclaimers, softened novelty/mechanization claims,
+% head-encoding documented, claim-matrix table. Both reviews' findings
+% independently re-verified before adoption.
 \documentclass[11pt]{article}
 \usepackage[a4paper,margin=1.1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
@@ -64,8 +69,9 @@ security claims. We define the attestation-transparency setting, give an
 explicit adversary model in which the operator may be malicious, and prove:
 completeness and soundness of the inclusion verifier (soundness via an
 explicit reduction extracting a SHA-256 collision), the analogous consistency
-statement, safety of the consumer's head-pinning state machine (equivocation
-by the operator yields publicly verifiable evidence), and \emph{verdict
+statement, safety of the consumer's head-pinning state machine (same-size
+equivocation yields transferable evidence, and local pinning rejects
+inconsistent extensions), and \emph{verdict
 integrity}---consumers re-derive verification verdicts locally from observed
 axiom cones, so the operator is trusted only for \emph{observations}, never
 for \emph{verdicts}. A further design choice ties the log to its own subject
@@ -133,7 +139,7 @@ contributions are:
   instance} (\S\ref{sec:selfref}, \S\ref{sec:deployment}): tree heads are
   signed by a binary built from the pinned source of exactly the Ed25519
   implementation attested in the log, with the operator's own Merkle
-  self-check of that leaf embedded in every signature; and a small,
+  self-check of that leaf published alongside every signed head; and a small,
   reproducible production deployment over the four-fork corpus, including a
   measurement of proof portability across real forks.
 \end{enumerate}
@@ -143,9 +149,10 @@ proofs---that bridge is being built by EasyCrypt and its
 relatives~\cite{easycrypt}. It does not establish correctness of any binary,
 of SHA-512, of wire-format parsers, of the signing path, or any side-channel
 property; \S\ref{sec:deployment} enumerates the assumption set in full. It
-bridges an adjacent, mostly empty gap: type-theory-certified artifacts have
-no distribution infrastructure, and cryptographic transparency
-infrastructure has never carried kernel-checked mathematics.\footnote{The
+bridges an adjacent, mostly empty gap: type-theory-certified artifacts
+lack distribution infrastructure, and we are unaware of a deployed
+transparency log designed to carry kernel-replay attestations together
+with theorem-level assumption boundaries.\footnote{The
 acronym LTL collides with linear temporal logic~\cite{pnueli}; the collision
 is acknowledged.}
 
@@ -181,12 +188,13 @@ one to a stronger domain; the payload the log distributes is the
 residual hypotheses legible. Write $\accept(A,m,R,s)$ for ``the extracted
 verifier returns \textsf{ok}'', let $k$ be the scalar produced by the hash
 oracle $H(R,A,m)$ with \emph{no properties assumed of $H$}, and let $r_1$
-be the canonical byte encoding of the signature's declared point $R$. Each
+be the 32-byte $R$ component exactly as it appears in the signature (raw
+bytes; no canonicity of them is presupposed). Each
 tier is proven for the extracted code under the wire-format
 hypotheses~$\mathcal{W}$ (the signature parses to an internal
 representation and the relevant compressed points re-encode; these
-outcomes are assumed, not proven---their byte-level specifications are the
-R5 frontier of \S\ref{sec:limitations}).
+outcomes are assumed, not proven---their byte-level specifications are
+part of the open frontier recorded in \S\ref{sec:limitations}).
 \begin{description}[itemsep=3pt,leftmargin=1.6em]
 \item[T1 (byte apex).] $\accept(A,m,R,s) \Leftrightarrow
   \mathsf{compress}([s]B-[k]A) = r_1$. Acceptance is byte-equality of the
@@ -206,8 +214,11 @@ R5 frontier of \S\ref{sec:limitations}).
   \mathsf{decompress}(R) = [k](-A)+[s]B$, with the extracted
   $\mathsf{decompress}$ proven to realize the mathematical inverse of
   $\mathsf{enc}$: exact byte parsing, the $(p+3)/8$-power square root, and
-  sign-bit root selection (the two roots $x$ and $p-x$ differ in parity
-  since $p$ is odd, so the stored sign bit selects correctly).
+  sign-bit root selection (for $x \neq 0$ the two roots $x$ and $p-x$
+  differ in parity since $p$ is odd, so the stored sign bit selects
+  correctly; at $x = 0$ the roots coincide and a set sign bit is rejected,
+  per RFC~8032---the theorem, an \emph{iff} over the extracted code,
+  covers this branch by construction).
 \end{description}
 The lift is monotone in strength---T1 is about bytes the code emits, T4 is
 about the group element a third party would recover from $R$---and each
@@ -262,8 +273,11 @@ The system has exactly two roles with deliberately asymmetric costs and
 capabilities. The \emph{operator} (one per log) owns a Lean toolchain,
 replays proof corpora, holds the log's signing key, and bears append-only
 obligations. \emph{Consumers} (unbounded in number) hold the operator's
-public key, receive small evidence files, and verify with roughly 25 lines
-of standard-library code (Appendix~\ref{app:verifier}). Nothing a consumer
+public key, receive small evidence files, and verify: the Merkle
+inclusion core is roughly 25 lines of standard-library code
+(Appendix~\ref{app:verifier}); the full standalone consumer---head
+signature, consistency, mirror audit---is ${\approx}150$ lines
+(\S\ref{sec:pinstore}), atop an Ed25519 backend. Nothing a consumer
 does requires a theorem prover.
 
 We phrase the system as an \emph{attestation-transparency scheme}, in the
@@ -321,22 +335,33 @@ use; \S\ref{sec:limitations}).
   head---any other outcome exhibits a SHA-256 collision or an Ed25519
   forgery. (Theorem~\ref{thm:sound}, Proposition~\ref{prop:pin}.)
 \item[G2 (Append-only with fork evidence).] A consumer's accepted view of
-  the log only ever grows by extension; if the operator presents conflicting
-  views to two consumers, the union of their pin stores contains publicly
-  verifiable evidence of equivocation (two validly signed conflicting
-  heads). (Theorem~\ref{thm:consistency}, Proposition~\ref{prop:pin}.)
+  the log only ever grows by extension, and two accepted heads of
+  \emph{equal} tree size with different roots are, together, transferable
+  publicly verifiable evidence of equivocation. Unequal-size split views
+  are not exposed by the head pair alone; they are exposed by the public
+  leaf mirror (\S\ref{sec:pinstore}), from which any party recomputes
+  every prefix root, or by an external witness.
+  (Theorem~\ref{thm:consistency}, Proposition~\ref{prop:pin}.)
 \item[G3 (Verdict integrity).] The verdict a consumer derives for a
   certificate depends only on the observed axiom cone in the leaf and the
   consumer's \emph{own} copy of the allowed axiom sets; the operator's
-  pass/fail labels have no influence. (Proposition~\ref{prop:verdict}.)
+  pass/fail labels can deny (a certificate the operator does not itself
+  mark proven never counts) but can never grant.
+  (Proposition~\ref{prop:verdict}.)
 \end{description}
 
 \subsection{The residual trust, isolated}\label{sec:model:residual}
 
-Goals G1--G3 reduce the operator's trusted role to a single sentence:
-\emph{``the reported \texttt{\#print axioms} output is what the kernel
-printed for this commit.''} Everything else---membership, history,
-verdicts---is either cryptographically enforced or locally re-derived. An
+Goals G1--G3 reduce the operator's trusted role to a single sentence,
+which we state at its honest width: \emph{``the operator executed the
+declared replay procedure against the exact pinned source and dependency
+state, using the declared toolchain, and bound the resulting kernel
+outputs faithfully to the correct theorem entries of the attestation.''}
+Checkout, dependency state, theorem-to-entry binding, and output parsing
+are all inside this observation pipeline---the first deployed run failed
+on precisely such a defect (\S\ref{sec:deployment}). Everything
+else---membership, history, verdicts---is either cryptographically
+enforced or locally re-derived. An
 operator that labels a dirty cone ``clean'' gains nothing (G3); an
 attestation that omits observed cones is treated as unverifiable; an
 operator that rewrites history is caught with transferable evidence (G2).
@@ -361,16 +386,19 @@ against the consumer's own table $\allowed$. Concretely:
 \item The allowed set $\allowed(c)$ is not shipped by the operator at
   verification time; it is part of the consumer's tooling, small enough to
   audit by hand (Appendix~\ref{app:axioms}: 7--11 axiom names per fork),
-  and \emph{re-derivable from first principles}---Lean's foundational
-  three, plus, for the apex tiers, named placeholders for exactly those
-  primitives the theorem deliberately leaves opaque (the hash, the wire
-  format).
+  and re-derivable \emph{up to naming} from the theorem statements---%
+  Lean's foundational three, plus, for the apex tiers, placeholders for
+  exactly those primitives the theorem deliberately leaves opaque (the
+  hash, the wire format); the placeholder \emph{names} themselves are
+  fixed by the fork's extracted surface and read off from
+  Appendix~\ref{app:axioms}.
 \item That an independently written $\allowed$ meets the deployed
   observations \emph{exactly} is engineered, not coincidental: the corpus
   is minimized so that every axiom in a cone earns its place, and any
   reasonable reconstruction of ``what a correct proof of this statement
-  must assume'' lands on the same finite set. When the consumer's
-  requirement meets the supply exactly, verification is a set equality.
+  must assume,'' once the fork's extraction naming is fixed, lands on the
+  same finite set. When the consumer's requirement meets the supply
+  exactly, verification is a set equality.
 \item When it does not---a consumer who additionally requires SHA-512
   itself proven, say---the gap is exact and itemized (the boundary axioms
   of Appendix~\ref{app:axioms}), and the consumer's options are honest:
@@ -382,8 +410,8 @@ against the consumer's own table $\allowed$. Concretely:
 The operator, in this picture, is not a judge whose verdict one trusts but
 a witness whose \emph{observations} one re-adjudicates. G3
 (\S\ref{sec:model:goals}, Proposition~\ref{prop:verdict}) is the formal
-statement that this re-adjudication ignores the operator's opinion
-entirely.
+statement that this re-adjudication takes no positive input from the
+operator's opinion: labels act, if at all, only as a conservative veto.
 
 \section{The log construction}\label{sec:construction}
 
@@ -412,9 +440,13 @@ $\obs(c)$ for the observed cone recorded in the leaf, define
 \quad\text{(equality of finite sets).}
 \]
 Deviation in \emph{either} direction---an unexpected axiom, or a missing
-boundary axiom---falsifies $\clean$. The second direction matters: a missing
-boundary axiom means the theorem proved is not the theorem documented (e.g.,
-a hash oracle discharged by a placeholder rather than kept opaque). Each
+boundary axiom---falsifies $\clean$. The second direction matters for
+these \emph{oracle} boundaries: a missing boundary axiom signals that the
+theorem no longer consumes a primitive it deliberately left opaque. The
+verifier does not attempt to distinguish the readings of that drift (a
+genuinely strengthened proof; a changed theorem; a hash oracle discharged
+by a placeholder rather than kept opaque; stale policy): it refuses to
+classify, and rejects. Each
 source repository enforces the same discipline in its own check scripts; the
 log mirrors those sets, and consumers carry their own copies.
 
@@ -480,7 +512,13 @@ full agreement. The inclusion verifier of Appendix~\ref{app:verifier} was
 checked the same way ($164{,}479$ invocations over all $m < n \le 256$).
 
 The operator signs tree heads $(n, \MTH(D), t)$ with Ed25519; a
-\emph{receipt} for a leaf is its index, its sibling path, and a signed head.
+\emph{receipt} for a leaf is its index, its sibling path, and a signed
+head. The signed payload is not the bare triple but the canonical JSON
+serialization (sorted keys, fixed separators, UTF-8---injective on the
+field set) of the head record, which additionally carries a protocol
+version tag (\texttt{...signed\_tree\_head.v1}) and the log identity;
+a head signature therefore transfers neither across logs nor across
+protocol versions.
 
 \subsection{The consumer pin store}\label{sec:pinstore}
 
@@ -496,7 +534,11 @@ $(n', r')$:
   the pin.
 \item $n' < n_{\mathrm{pin}}$: reject (rollback).
 \end{itemize}
-A freshness policy bounds head age. The full log is also published as a git
+A freshness policy bounds head age; freshness, however, is an
+availability policy, not an append-only property---the construction
+detects rollback relative to a persisted pin, but does not prove that a
+consumer sees the newest issued head (an operator can re-issue fresh
+timestamps over a frozen tree). The full log is also published as a git
 repository: one file per leaf, plus the signed head history since
 publication began (heads signed before the mirror existed were not
 retained). Any cloner can therefore recompute every prefix root from the
@@ -540,9 +582,9 @@ The first byte differs.
 Lemma~\ref{lem:domsep} forecloses the classic cross-type confusion in which
 an adversary presents an interior node's 64-byte child concatenation as a
 ``leaf'' (or vice versa) to move a value between levels of the
-tree~\cite{crosby,dghs}; in the proofs below it guarantees that when two
-preimages of the same hash value are compared, a leaf/node type mismatch
-already constitutes inequality of strings, hence a collision.
+tree~\cite{crosby,dghs}; it guarantees that whenever a leaf preimage and
+a node preimage are compared, they already differ as strings, so equal
+hash values across the two types constitute a collision.
 
 \begin{theorem}[Inclusion completeness]\label{thm:complete}
 For every non-empty leaf list $D$ with $|D| = n$ and every $m < n$,
@@ -565,39 +607,48 @@ $\hnode(\MTH(D[0{:}k]), \MTH(D[k{:}n])) = \MTH(D)$.
 \end{proof}
 
 Both soundness theorems below rest on a single collision-extraction fact,
-which we isolate first. Call a reconstruction a \emph{hash-fold over $T$}
-if it computes its output by emitting $\hnode(\cdot,\cdot)$ at every
-internal node of the honest tree $T$ and the leaf hash at each leaf. The
-inclusion reconstruction $\Root(\hleaf(\cdot), \cdot, n, \cdot)$ is a
-hash-fold over the size-$n$ tree; so is the size-$n_1$ component of the
-consistency verifier $\ConsRec$ (\S\ref{sec:tree}). The values folded in
-may be adversarial; only the \emph{shape} matches $T$.
+which we isolate first. Fix the honest Merkle tree $T$ of a leaf list $D$.
+A \emph{hash-fold over $T$} is a computation shaped by a connected
+sub-tree $S$ of $T$ containing $T$'s root: at every internal node of $T$
+lying in $S$ it emits $\hnode$ of its two children's values; each child
+lying outside $S$ is an \emph{input}, consumed as an opaque value; at
+every leaf of $T$ lying in $S$ it emits $\hleaf$ of an input leaf value.
+All inputs may be adversarial; only the shape is $T$'s. Three
+instantiations recur below: the inclusion reconstruction
+$\Root(\hleaf(\cdot), m, n, \cdot)$ ($S$ is the root path of leaf $m$;
+the consumed inputs are the path's siblings); the new-root component of
+the consistency verifier $\ConsRec$ (\S\ref{sec:tree}) ($S$ reaches down
+to the perfect subtrees covering $[0, n_0)$; the consumed inputs are the
+proof nodes and, on the leftmost spine, the pinned root); and the honest
+computation of $\MTH(D')$ for any $D'$ with $|D'| = |D|$ ($S$ is all of
+$T$; the inputs are the leaves of $D'$).
 
 \begin{lemma}[Root binding]\label{lem:bind}
 Let $F$ be a hash-fold over the honest Merkle tree $T$ of a leaf list $D$,
-run on otherwise adversarial inputs (a leaf value and sibling nodes it
-folds in), and suppose $F$'s output equals $\MTH(D)$. Then either (i)~at
-some internal node $F$'s $\hnode$ argument pair differs from $T$'s while the
-two $\hnode$ values agree---an explicit SHA-256 collision---or (ii)~$F$'s
-computation coincides with $T$ node-for-node: every value $F$ emits and
-\emph{every sibling node $F$ consumes} equals the corresponding node of
-$T$, and $F$'s leaf inputs are the true leaves of $D$.
+and suppose $F$'s output equals $\MTH(D)$. Then either (i)~at some node of
+$S$, $F$'s hash argument differs from $T$'s while the two hash values
+agree---an explicit SHA-256 collision---or (ii)~$F$'s computation
+coincides with $T$ node-for-node: every value $F$ emits, \emph{every
+input it consumes}, and every leaf input it takes equals, respectively,
+the corresponding node value of $T$ and the corresponding leaf of $D$.
 \end{lemma}
 \begin{proof}
-Induction on the height of $T$. At the root both values equal $\MTH(D)$ by
-hypothesis, and each is $\hnode$ of an argument pair---for $F$ that pair is
-(its recursive child value, the sibling it consumed there); for $T$ it is
-$(\MTH$ of the left block, $\MTH$ of the right block$)$. Equal $\hnode$
-values of \emph{distinct} argument pairs are a collision (case i);
-otherwise the two pairs coincide \emph{as pairs}, so simultaneously $F$'s
-recursive child value equals $T$'s child \emph{and the sibling $F$ consumed
-equals $T$'s other child}, and the hypothesis applies to the child subtree.
-At a leaf, $F$ folds $\hleaf(d')$ where $T$ has $\hleaf(D[j])$; equality
-with $d' \neq D[j]$ is again a collision, and Lemma~\ref{lem:domsep} rules
-out a leaf value coinciding with an internal-node value by type, so the two
-cases are exhaustive and exclusive. In case (ii) the argument-pair
-coincidence at every level is exactly the claim that both emitted values
-and consumed siblings match $T$.
+Top-down induction on $S$, maintaining at each visited node the invariant
+that $F$'s value there equals $T$'s. At the root both equal $\MTH(D)$ by
+hypothesis. At an internal node of $S$ where the invariant holds, both
+values are $\hnode$ of an argument pair (65-byte preimages); if the pairs
+differ we are in case (i); if they coincide, each child's value is
+pinned: a child inside $S$ inherits the invariant and we recurse, while a
+child outside $S$ is a consumed input now known to equal $T$'s node value
+there---no descent needed. At a leaf of $S$ the invariant reads
+$\hleaf(d') = \hleaf(D[j])$: either $d' = D[j]$, or the two leaf preimages
+differ and we are in case (i). If case (i) never fires, the accumulated
+equalities at every node of $S$ are exactly claim (ii). Because $F$'s
+shape is $T$'s, every comparison above is leaf-to-leaf or node-to-node;
+Lemma~\ref{lem:domsep} additionally ensures that even a cross-type value
+coincidence would be a collision of distinct strings, which matters in
+the deployed protocol, where the same hash function commits leaves and
+nodes across trees of attacker-influenced sizes~\cite{crosby,dghs}.
 \end{proof}
 
 \begin{theorem}[Inclusion soundness: position binding]\label{thm:sound}
@@ -609,14 +660,12 @@ SHA-256 collision.
 \end{theorem}
 \begin{proof}
 $F = \Root(\hleaf(d), m, n, \cdot)$ applied to $P$ is a hash-fold over the
-honest tree $T_D$ (it has the size-$n$ tree's shape; its inputs---the leaf
-$d$ and the siblings in $P$---are adversarial), and by hypothesis its
-output is $\MTH(D)$. Apply Lemma~\ref{lem:bind}. Case (ii) is impossible:
-it would require $F$'s emitted leaf at position $m$, namely $\hleaf(d)$, to
-equal $T_D$'s leaf $\hleaf(D[m])$, which for $d \neq D[m]$ is itself a
-collision. So case (i) fires; $\mathcal{E}$ recomputes $T_D$ ($O(n)$
-hashes), replays the fold to locate the differing $\hnode$ (or leaf) pair,
-and outputs it.
+honest tree $T_D$ whose sub-tree $S$ is the root path of leaf $m$, with
+consumed inputs the entries of $P$ and leaf input $d$; by hypothesis its
+output is $\MTH(D)$. Apply Lemma~\ref{lem:bind}. Case (ii) includes the
+claim that the leaf input equals $D[m]$, contradicting $d \neq D[m]$; so
+case (i) fires. $\mathcal{E}$ recomputes $T_D$ ($O(n)$ hashes), replays
+the fold to locate the disagreeing pair, and outputs it.
 \end{proof}
 
 \begin{remark}
@@ -642,30 +691,36 @@ $\mathcal{E}'(D_0, D_1, C)$ outputs a SHA-256 collision.
 \begin{proof}
 $\ConsRec$ returns a pair; acceptance equates its second component with
 $\MTH(D_1)$ and its first with $\MTH(D_0)$. Reading the four cases, the
-second component emits $\hnode$ at every split of the size-$n_1$ tree---it
-is a hash-fold over the honest tree $T_1$---while the first component reuses
-a sub-list of the very same proof nodes, namely those covering the index
-range $[0, n_0)$, and folds \emph{only} those. We use the two components
+second component emits $\hnode$ at every split it traverses of the
+size-$n_1$ tree and bottoms out on consumed values---it is a hash-fold
+over the honest tree $T_1$, with consumed inputs the proof nodes and, on
+the leftmost spine, the pinned root---while the first component reuses a
+sub-list of those same values, namely the ones covering the index range
+$[0, n_0)$, and folds \emph{only} those. We use the two components
 differently, so the delicate first component never enters the lemma.
 
-\emph{Step 1 (the transcript nodes are genuine).} Apply
+\emph{Step 1 (the transcript values are genuine).} Apply
 Lemma~\ref{lem:bind} to the second component against $T_1$. Either it hits
-case (i)---output that collision---or (case ii) every value it emitted, in
-particular every proof node it consumed, equals the corresponding node of
-$T_1$. Assume the latter; the proof nodes are now known to be genuine nodes
-of the honest tree $T_1$.
+case (i)---output that collision---or (case ii) every value it emitted and
+every input it consumed---each proof node, and the pinned root where the
+fold bottoms out on it---equals the corresponding node of $T_1$. Assume
+the latter; the consumed values are now known to be genuine nodes of the
+honest tree $T_1$.
 
-\emph{Step 2 (the prefix roots collide).} The nodes covering $[0, n_0)$
-are the canonical RFC~9162 decomposition of that range into maximal perfect
-subtrees of $T_1$; by Step~1 they are genuine, so folding them---which is
-exactly what the first component does---yields the root of $D_1[0{:}n_0]$,
+\emph{Step 2 (the prefix roots collide).} The consumed values covering
+$[0, n_0)$ sit at the canonical RFC~9162 decomposition of that range into
+maximal perfect subtrees of $T_1$; by Step~1 they are genuine, so folding
+them---which is exactly what the first component does (degenerately, when
+the old tree is itself a perfect subtree of $T_1$, the ``fold'' is the
+consumed pinned root alone)---yields the root of $D_1[0{:}n_0]$,
 i.e.\ the first component equals $\MTH(D_1[0{:}n_0])$. But acceptance also
 equates the first component with $\MTH(D_0)$. Hence
 $\MTH(D_0) = \MTH(D_1[0{:}n_0])$ while $D_0 \neq D_1[0{:}n_0]$.
 
 \emph{Step 3 (descend).} Since $|D_0| = |D_1[0{:}n_0]| = n_0$, the two
-honest trees have identical shape, so $T_{D_1[0{:}n_0]}$ is a hash-fold
-over $T_{D_0}$ (same shape; its leaf inputs are the leaves of
+honest trees have identical shape, so the honest computation of
+$\MTH(D_1[0{:}n_0])$ is a hash-fold over $T_{D_0}$ ($S$ the whole tree;
+leaf inputs the leaves of
 $D_1[0{:}n_0]$). Its output is $\MTH(D_1[0{:}n_0]) = \MTH(D_0)$ by Step~2,
 so Lemma~\ref{lem:bind} applies with $D = D_0$. Case (ii) would force the
 leaf inputs to equal $D_0$, i.e.\ $D_1[0{:}n_0] = D_0$, contradicting the
@@ -701,21 +756,22 @@ verification requires only the public key.
 
 \begin{proposition}[Verdict integrity]\label{prop:verdict}
 Fix a consumer with local allowed-set table $\allowed(\cdot)$. For every
-attestation leaf $a$ and certificate $c$ in it, the consumer's verdict is
+attestation leaf $a$ and certificate $c$ in it, the consumer's
+\emph{cleanliness verdict} is
 the predicate $\clean(c) \Leftrightarrow \obs_a(c) = \allowed(c)$, a
-function of the leaf's observed cones and the consumer's table only. In
-particular, the operator's embedded pass/fail labels are not an input, and
-for fixed leaf content the verdict is independent of anything the operator
-asserts.
+function of the leaf's observed cones and the consumer's table only; the
+operator's embedded pass/fail labels are not an input to it. The
+consumer's \emph{acceptance policy} consults those labels at most
+negatively: no operator assertion can upgrade any verdict or acceptance.
 \end{proposition}
 \begin{proof}
 By construction of the consumer tooling: the verdict function takes
 $(\obs_a, \allowed)$ and ignores the label fields in every branch; a
 certificate lacking an observed cone is mapped to \textsf{unverifiable},
-not to a verdict. The operator's proven/failed \texttt{status} label is
-consulted separately by the acceptance policy, but only
-\emph{negatively}---a certificate the operator does not itself mark proven
-can never count---so no operator assertion can upgrade any verdict.
+not to a verdict. The acceptance policy applies the operator's
+proven/failed \texttt{status} label only as a veto---a certificate the
+operator does not itself mark proven can never count---and a veto cannot
+upgrade; hence labels can deny but never grant.
 \end{proof}
 
 \paragraph{What is \emph{not} proven.} Propositions~\ref{prop:pin} and
@@ -727,6 +783,33 @@ whose guarantees rest on the Lean kernel and the assumption set enumerated
 in \S\ref{sec:deployment}. The division of labor is deliberate: the
 cryptographic layer makes the operator's claims \emph{exact, immutable, and
 attributable}; the deductive layer is what makes them \emph{true}.
+Table~\ref{tab:claims} decomposes the end-to-end chain: each consumer
+conclusion, the mechanism that establishes it, and the assumption that
+remains. The architecture does not pretend to eliminate trust; it
+decomposes trust into independently visible components---including two
+rows it deliberately does \emph{not} establish.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}p{0.31\textwidth}p{0.28\textwidth}p{0.33\textwidth}@{}}
+\toprule
+consumer conclusion & established by & remaining assumption \\
+\midrule
+leaf bytes sit at index $m$ under head $h$ & inclusion proof (Thm~\ref{thm:sound}) & SHA-256 collision resistance; authentic head \\
+head was authorized under the log key & Ed25519 verification & correct key pin; EUF-CMA \\
+new local head extends the old one & consistency proof (Thm~\ref{thm:consistency}) & SHA-256 collision resistance \\
+equal-size heads conflict: equivocation & two valid signatures, unequal roots (Prop~\ref{prop:pin}) & correct key pin \\
+observed cone matches local policy & set equality (Prop~\ref{prop:verdict}) & semantic identity of the named declarations at the pinned commit \\
+the kernel produced the observation & operator replay attestation & replay-pipeline honesty, or independent replay (\S\ref{sec:model:residual}) \\
+deployed binary matches verified source & \emph{not established} & reproducible build / binary attestation \\
+signing binary is the claimed implementation & \emph{not established} & execution provenance (\S\ref{sec:selfref}) \\
+\bottomrule
+\end{tabular}
+\caption{The end-to-end claim matrix. Every consumer conclusion, what
+establishes it, and what remains assumed. The last two rows are
+deliberate non-claims (\S\ref{sec:intro}, \S\ref{sec:limitations}).}
+\label{tab:claims}
+\end{table}
 
 \section{The self-referential signing loop}\label{sec:selfref}
 
@@ -769,9 +852,15 @@ without operator intervention.
 \paragraph{The honest extent of this claim.} The Lean certificates cover
 the \emph{verification} path of the library (the theorems' subject is the
 extraction image of that path); the \emph{signing} path is not covered by
-any certificate and is declared trusted base. The design merely ensures the
-trusted signing code is the attested artifact rather than an unrelated third
-implementation, and that consumers can check as much. Signature verification
+any certificate and is declared trusted base. The deployed operator
+\emph{enforces and records} the invariant that the signing binary is
+built from the attested artifact rather than an unrelated third
+implementation; a consumer can check that the claimed source is attested
+in the signed tree, but---an Ed25519 signature reveals nothing about the
+program that produced it---cannot independently establish that this
+binary produced a given signature. Establishing that would require
+reproducible builds or execution attestation
+(\S\ref{sec:limitations}). Signature verification
 on consumer machines can optionally run through the same certified-source
 binary, with the backend that actually ran recorded in every result and a
 fail-closed policy flag available. First-append bootstrapping is handled
@@ -836,18 +925,23 @@ trust model, not clutter to be pruned (Figure~\ref{fig:tree}).
   % leaves 0..11
   \foreach \i in {0,...,3} \node[fail] (l\i) at (\i,0) {\i};
   \foreach \i in {4,...,11} \node[ok] (l\i) at (\i,0) {\i};
-  % a small internal layer (schematic, not the full RFC shape)
+  % exact RFC 9162 shape for n = 12: root splits 8 | 4
   \foreach \i/\a/\b in {0/0/1, 1/2/3, 2/4/5, 3/6/7, 4/8/9, 5/10/11}
-    \node[node] (m\i) at ({(\a+\b)/2},1.05) {};
-  \foreach \i/\a/\b in {0/0/1, 1/2/3, 2/4/5} \node[node] (n\i) at ({(\a*2+1)/1},2.05) {};
-  \node[node, minimum size=0.4cm] (root) at (5.5,3.05) {};
-  \node[right=1pt of root, font=\small] {\ signed tree head $\;\sigma = \mathrm{Sig}(sk,(12,\Root,t))$};
-  % edges leaf->m
+    \node[node] (m\i) at ({(\a+\b)/2},1.0) {};
+  \node[node] (q0) at (1.5,1.95) {};   % leaves 0-3
+  \node[node] (q1) at (5.5,1.95) {};   % leaves 4-7
+  \node[node] (q2) at (9.5,1.95) {};   % leaves 8-11
+  \node[node] (o0) at (3.5,2.9)  {};   % leaves 0-7
+  \node[node, minimum size=0.4cm] (root) at (6.5,3.85) {};
+  \node[right=1pt of root, font=\small] {\ signed tree head $\;\sigma = \mathrm{Sig}(sk,(12,r,t))$};
+  % edges
   \foreach \i/\a/\b in {0/0/1, 1/2/3, 2/4/5, 3/6/7, 4/8/9, 5/10/11}
     { \draw[edge] (l\a)--(m\i); \draw[edge] (l\b)--(m\i); }
-  \foreach \i/\a/\b in {0/0/1, 1/2/3, 2/4/5}
-    { \draw[edge] (m\a)--(n\i); \draw[edge] (m\b)--(n\i); }
-  \foreach \i in {0,1,2} \draw[edge] (n\i)--(root);
+  \draw[edge] (m0)--(q0); \draw[edge] (m1)--(q0);
+  \draw[edge] (m2)--(q1); \draw[edge] (m3)--(q1);
+  \draw[edge] (m4)--(q2); \draw[edge] (m5)--(q2);
+  \draw[edge] (q0)--(o0); \draw[edge] (q1)--(o0);
+  \draw[edge] (o0)--(root); \draw[edge] (q2)--(root);
   % brackets under leaf ranges
   \draw[decorate,decoration={brace,mirror,raise=3pt}, black!45]
     (l0.south west) -- (l3.south east)
@@ -862,9 +956,9 @@ trust model, not clutter to be pruned (Figure~\ref{fig:tree}).
 \caption{The deployed twelve-leaf log. Grey leaves 0--3 record the first
 run's audit failure (retained, not erased); leaves 4--7 and 8--11 are two
 clean runs, at commit generations $g_1$ and $g_2$ across a subject-history
-rewrite. The internal layer is drawn schematically; the true shape is the
-RFC~9162 tree of \S\ref{sec:tree}. Every value in the figure is recomputable
-from the public leaves.}
+rewrite. The interior is the exact RFC~9162 shape of \S\ref{sec:tree} for
+$n = 12$ (root split $8 \mid 4$; $r$ denotes the root value). Every value
+in the figure is recomputable from the public leaves.}
 \label{fig:tree}
 \end{figure}
 
@@ -872,7 +966,7 @@ from the public leaves.}
 \centering\small
 \begin{tabular}{@{}lrrl@{}}
 \toprule
-fork & Lean files & apex-boundary axioms & SHA-512 in the boundary \\
+fork & Lean files & apex cone (axioms, total) & SHA-512 in the boundary \\
 \midrule
 upstream \texttt{dalek} & 64 & 11 & 3-call streaming (\texttt{new/update/finalize}) \\
 Solana (\texttt{anza})  & 58 & \phantom{0}7 & one \texttt{ed\_sigs.sha512\_hash3} \\
@@ -882,7 +976,8 @@ Betrusted               & 63 & \phantom{0}8 & one \texttt{verifying.sha512\_hash
 \end{tabular}
 \caption{The four subject implementations. Each replay re-checks 16
 certificates in ${\approx}1{,}800$\,s under memory caps and core pinning.
-The apex-boundary count is the size of the fork's enumerated oracle
+The apex-cone count is the full allowed axiom set at the signature
+tiers---Lean's three standard axioms plus the fork's enumerated oracle
 boundary (Appendix~\ref{app:axioms}); it differs by fork because the
 SHA-512 surface and the byte-accessor shape differ. Proof-script
 divergence across forks is quantified in the portability paragraph below;
@@ -921,8 +1016,8 @@ sharply where the forks' code or the extractor's naming differs (e.g., 215
 changed lines for the byte-parser proofs on the two forks whose extraction
 produces a closure-based loader; 121 lines for the signature-glue proofs on
 the same-crate fork; 27 lines between the two structurally closest forks,
-tracking one fork's \texttt{black\_box} optimization barrier---its
-axiom-list entries and the operation reordering it induces). Per-target
+tracking one fork's \texttt{black\_box} optimization barrier and the
+operation reordering it induces). Per-target
 verification, in other words, is doing
 measurable work exactly where the targets actually differ.
 
@@ -944,8 +1039,9 @@ recorded as unavailable rather than backed by an unverified implementation.
 
 The natural continuation applies the corpus's own discipline to the log's
 cryptographic half. Theorems~\ref{thm:complete}--\ref{thm:consistency} and
-Proposition~\ref{prop:pin} were stated so that their mechanization is a
-translation task, not a research task: (i) inclusion completeness
+Proposition~\ref{prop:pin} were stated so as to make their mechanization
+direct; we expect the principal work to be specification alignment and
+proof engineering rather than new cryptographic argument: (i) inclusion completeness
 (Theorem~\ref{thm:complete}) is assumption-free; (ii) inclusion soundness
 becomes the explicit extractor of Theorem~\ref{thm:sound}, with SHA-256
 collision resistance a documented boundary axiom audited exactly like the
@@ -1006,7 +1102,7 @@ Security, pp. 383--398, 2015.
 
 \bibitem{cheval} V. Cheval, J. Moreira, M. Ryan. Automatic verification of
 transparency protocols. IEEE EuroS\&P, pp. 107--121, 2023.
-arXiv:2303.04500.
+doi:10.1109/EuroSP57164.2023.00016. arXiv:2303.04500.
 
 \bibitem{easycrypt} G. Barthe, B. Gr\'egoire, S. Heraud, S. Zanella
 B\'eguelin. Computer-Aided Security Proofs for the Working Cryptographer.
@@ -1151,7 +1247,8 @@ propext \quad Classical.choice \quad Quot.sound
 \end{quote}
 The four signature-tier certificates additionally carry a per-fork
 enumerated boundary: an opaque SHA-512 oracle and opaque wire-format
-types (the signature type, its byte accessors, and the error type). The
+types (the signature type, its byte accessors, and---where the fork's
+API surfaces it---the error type). The
 boundary is not identical across forks---it reflects each fork's actual
 extracted surface---and auditing is exact against the fork's own set. The
 three distinct boundaries in the deployed corpus, verbatim from the
@@ -1194,8 +1291,9 @@ $\clean$ in the ``unexpected axiom'' direction.
 
 The lifting ladder T1--T4 and the mathematical facts it turns on are
 stated in \S\ref{sec:corpus}. For reproducibility we record here the
-verbatim Lean theorem name backing each tier in the upstream corpus (the
-forks use the same names against their own extractions); a reader can
+verbatim Lean theorem name backing each tier in the upstream corpus
+(namespace \texttt{CurveFieldProofs} elided; the forks use the same names
+against their own extractions); a reader can
 \texttt{\#print axioms} any of these to reproduce the cones of
 Appendix~\ref{app:axioms}.
 \begin{center}\small
@@ -1211,8 +1309,9 @@ T4 \enspace constructive full lift & \texttt{verify\_accepts\_iff\_decompress} \
 \end{tabular}
 \end{center}
 All four are proven under the wire-format hypotheses $\mathcal{W}$ of
-\S\ref{sec:corpus}; their conjunction is what an R4 consumer relies on,
-and all four cones are audited against the same per-fork boundary of
+\S\ref{sec:corpus}; a consumer reasoning about the underlying group
+element relies on their conjunction (the ladder up to T4), and all four
+cones are audited against the same per-fork boundary of
 Appendix~\ref{app:axioms}.
 
 \end{document}
