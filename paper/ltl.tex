@@ -340,7 +340,8 @@ use; \S\ref{sec:limitations}).
   publicly verifiable evidence of equivocation. Unequal-size split views
   are not exposed by the head pair alone; they are exposed by the public
   leaf mirror (\S\ref{sec:pinstore}), from which any party recomputes
-  every prefix root, or by an external witness.
+  every prefix root (itself operator-published, hence witness-dependent;
+  \S\ref{sec:limitations}), or by an external witness.
   (Theorem~\ref{thm:consistency}, Proposition~\ref{prop:pin}.)
 \item[G3 (Verdict integrity).] The verdict a consumer derives for a
   certificate depends only on the observed axiom cone in the leaf and the
@@ -516,7 +517,8 @@ The operator signs tree heads $(n, \MTH(D), t)$ with Ed25519; a
 head. The signed payload is not the bare triple but the canonical JSON
 serialization (sorted keys, fixed separators, UTF-8---injective on the
 field set) of the head record, which additionally carries a protocol
-version tag (\texttt{...signed\_tree\_head.v1}) and the log identity;
+version tag (\texttt{pacta.transparency.signed\_tree\_head.v1}) and the
+log identity;
 a head signature therefore transfers neither across logs nor across
 protocol versions.
 
@@ -1062,7 +1064,9 @@ extraction pipeline, and one key.
 
 The author designed the system, directed the verification effort, and is
 solely accountable for every claim in this paper. Claude (Anthropic) was
-used as an assistant in developing the proof corpora, tooling, and text; all
+used as an assistant in developing the proof corpora, tooling, and text,
+and adversarial reviews by both Claude and GPT (OpenAI) shaped the final
+manuscript; all
 proofs, measurements, and claims have been reviewed by the author and are
 independently re-checkable from the public artifacts and the referenced
 check scripts.
