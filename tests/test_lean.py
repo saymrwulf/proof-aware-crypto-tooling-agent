@@ -41,6 +41,79 @@ def test_parse_axiom_output_axiom_free_cert_does_not_steal_next_cone():
     assert parsed["LTLAcc.eq_dropLast_append_of_getLast?"] == ["propext"]
 
 
+def test_classify_absent_axiom_free_cert_is_not_clean():
+    # Regression (round-6 Claude R6-B1, executed end-to-end by the
+    # reviewer): domsep's line deleted from otherwise-pristine output
+    # still yielded 61/61 because a whole-output "no axioms" sentence +
+    # ([] == []) scored the ABSENT cert proven+clean. Provenness must be
+    # the cert's own anchor, i.e. membership in the parsed dict.
+    from pacta.lean import classify_certificates
+
+    output = (
+        "'LTLAcc.Hash' does not depend on any axioms\n"
+        "'LTLAcc.MTH' depends on axioms: [propext, LTLAcc.sha256, Quot.sound]\n"
+    )
+    certs = ["LTLAcc.Hash", "LTLAcc.domsep", "LTLAcc.MTH"]
+    parsed = parse_axiom_output(output, certs)
+    results = classify_certificates(parsed, certs, 0, lambda c: [])
+    by_name = {r.name: r for r in results}
+    assert by_name["LTLAcc.Hash"].status == "proven"
+    assert by_name["LTLAcc.domsep"].status == "unknown"
+    assert by_name["LTLAcc.domsep"].axiom_status == "not_checked"
+    assert not all(r.axiom_status == "clean" for r in results)
+
+
+def test_parse_missing_bracket_does_not_steal_next_record():
+    # GPT round-6 §6: a cone-bearing anchor with a MISSING bracket must
+    # not consume the next certificate's bracket.
+    output = (
+        "'A.a' depends on axioms:\n"
+        "'B.b' depends on axioms: [propext]\n"
+    )
+    parsed = parse_axiom_output(output, ["A.a", "B.b"])
+    assert "A.a" not in parsed
+    assert parsed["B.b"] == ["propext"]
+
+
+def test_parse_truncated_cone_is_missing():
+    output = "'A.a' depends on axioms: [propext, Classical.choice\n"
+    parsed = parse_axiom_output(output, ["A.a"])
+    assert "A.a" not in parsed
+
+
+def test_parse_long_wrapped_cone_beyond_old_window():
+    # The ed25519 apex tiers carry 11 axioms; the old fixed 16-line
+    # window was a latent overflow. Records now extend to the next
+    # anchor regardless of length.
+    items = [f"Ax{i}" for i in range(11)]
+    wrapped = "[\n" + ",\n".join(items) + "\n" * 10 + "]"
+    output = f"'A.a' depends on axioms: {wrapped}\n'B.b' does not depend on any axioms\n"
+    parsed = parse_axiom_output(output, ["A.a", "B.b"])
+    assert parsed["A.a"] == items
+    assert parsed["B.b"] == []
+
+
+def test_parse_duplicate_anchor_first_wins():
+    output = (
+        "'A.a' depends on axioms: [propext]\n"
+        "'A.a' depends on axioms: [Quot.sound]\n"
+    )
+    parsed = parse_axiom_output(output, ["A.a"])
+    assert parsed["A.a"] == ["propext"]
+
+
+def test_parse_interleaved_diagnostics_inside_record():
+    output = (
+        "'A.a' depends on axioms:\n"
+        "warning: something unrelated\n"
+        "[propext, Quot.sound]\n"
+        "'B.b' does not depend on any axioms\n"
+    )
+    parsed = parse_axiom_output(output, ["A.a", "B.b"])
+    assert parsed["A.a"] == ["propext", "Quot.sound"]
+    assert parsed["B.b"] == []
+
+
 def test_parse_axiom_output_exact_name_not_prefix():
     # 'LTLAcc.MTH' must not match the line for 'LTLAcc.MTH_single' even
     # when the latter comes first in the output.

@@ -296,16 +296,7 @@ def run_axiom_audit(
             return_code = 124
     logs.write_text(output, encoding="utf-8")
     parsed = parse_axiom_output(output, certificates)
-    cert_results: list[CertificateAxiomResult] = []
-    for cert in certificates:
-        observed = parsed.get(cert, [])
-        if return_code != 0 and not observed:
-            status = "failed"
-            axiom_status = "not_checked"
-        else:
-            status = "proven" if observed or _mentions_no_axioms(output) else "unknown"
-            axiom_status = "clean" if sorted(observed) == sorted(expected_for(cert)) else "dirty"
-        cert_results.append(CertificateAxiomResult(cert, status, axiom_status, observed, expected_for(cert)))
+    cert_results = classify_certificates(parsed, certificates, return_code, expected_for)
     return AxiomAuditResult(
         attempted=True,
         ok=return_code == 0 and all(cert.axiom_status == "clean" for cert in cert_results),
@@ -316,38 +307,77 @@ def run_axiom_audit(
     )
 
 
+# Anchor lines as Lean prints them: 'Name' depends on axioms: …  /
+# 'Name' does not depend on any axioms. The name is captured between the
+# first pair of quotes (an identifier that itself CONTAINS a quote, e.g.
+# Foo', would mis-capture — no such name exists on this estate; the old
+# substring matching was strictly worse).
+_AXIOM_ANCHOR = re.compile(r"'([^']+)'\s+(depends on axioms|does not depend on any axioms)")
+
+
 def parse_axiom_output(output: str, certificates: list[str]) -> dict[str, list[str]]:
-    results: dict[str, list[str]] = {}
+    """Record-scoped parsing (review round 6, GPT §6 / Claude R6-B).
+
+    The output is split into RECORDS: each anchor line starts one, the
+    next anchor line ends it. A cone bracket is accepted only inside its
+    own record; a record whose bracket is missing or truncated yields a
+    MISSING certificate (fail closed at the caller), never a bracket
+    borrowed from the next record. Cones may wrap arbitrarily many lines
+    (the ed25519 apex tiers carry 11 axioms — the old fixed 16-line
+    window was a latent overflow for them). Duplicate anchors: first one
+    wins, deterministically.
+    """
     lines = output.splitlines()
-    for cert in certificates:
-        # Anchor on the exact quoted name Lean prints ('X' depends on … /
-        # 'X' does not depend on any axioms). A bare substring match would
-        # let 'Foo' hit the line for 'Foo_bar' first.
-        needle = f"'{cert}'"
-        cert_results: list[str] | None = None
-        for i, line in enumerate(lines):
-            if needle not in line:
-                continue
-            # Axiom-free certificates print a bracketless sentence. Decide
-            # on THIS line before opening any window: a window would reach
-            # into the NEXT certificate's bracket and steal its cone (found
-            # by the entry-13 rehearsal — the accumulator corpus is the
-            # first subject with axiom-free certificates).
-            if _mentions_no_axioms(line):
-                cert_results = []
-                break
-            # Lean wraps long axiom lists (the apex tiers carry 11 axioms)
-            # across many lines; take a window wide enough for the largest
-            # documented boundary and flatten it before matching, the same
-            # move the corpus' check scripts make (tr '\n' ' ').
-            window = "\n".join(lines[i : i + 16])
-            bracket = re.search(r"\[([^\]]*)\]", window, re.DOTALL)
-            if bracket:
-                cert_results = [item.strip() for item in bracket.group(1).split(",") if item.strip()]
-                break
-        if cert_results is not None:
-            results[cert] = cert_results
+    anchors: list[tuple[int, str, bool]] = []  # (line index, name, axiom-free?)
+    for i, line in enumerate(lines):
+        m = _AXIOM_ANCHOR.search(line)
+        if m:
+            anchors.append((i, m.group(1), "does not depend" in m.group(2)))
+    wanted = set(certificates)
+    results: dict[str, list[str]] = {}
+    for k, (i, name, axiom_free) in enumerate(anchors):
+        if name not in wanted or name in results:
+            continue
+        if axiom_free:
+            results[name] = []
+            continue
+        end = anchors[k + 1][0] if k + 1 < len(anchors) else len(lines)
+        record = "\n".join(lines[i:end])
+        bracket = re.search(r"\[([^\]]*)\]", record, re.DOTALL)
+        if bracket:
+            results[name] = [item.strip() for item in bracket.group(1).split(",") if item.strip()]
+        # else: no complete bracket before the next record — leave MISSING.
     return results
+
+
+def classify_certificates(
+    parsed: dict[str, list[str]],
+    certificates: list[str],
+    return_code: int,
+    expected_for,
+) -> list[CertificateAxiomResult]:
+    """Fail-closed per-certificate classification (review round 6, R6-B1).
+
+    Provenness is decided by the certificate's OWN anchor having been
+    found (membership in `parsed` — which includes axiom-free certs as
+    []), never by a whole-output "no axioms" sentence: an ABSENT
+    axiom-free certificate previously scored proven+clean because some
+    OTHER certificate's bracketless sentence satisfied the global check
+    and [] == [] satisfied the cone comparison. Absent certificates are
+    never clean.
+    """
+    out: list[CertificateAxiomResult] = []
+    for cert in certificates:
+        if cert in parsed:
+            observed = parsed[cert]
+            status = "proven"
+            axiom_status = "clean" if sorted(observed) == sorted(expected_for(cert)) else "dirty"
+        else:
+            observed = []
+            status = "failed" if return_code != 0 else "unknown"
+            axiom_status = "not_checked"
+        out.append(CertificateAxiomResult(cert, status, axiom_status, observed, expected_for(cert)))
+    return out
 
 
 def _mentions_no_axioms(text: str) -> bool:
