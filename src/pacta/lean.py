@@ -320,10 +320,22 @@ def parse_axiom_output(output: str, certificates: list[str]) -> dict[str, list[s
     results: dict[str, list[str]] = {}
     lines = output.splitlines()
     for cert in certificates:
+        # Anchor on the exact quoted name Lean prints ('X' depends on … /
+        # 'X' does not depend on any axioms). A bare substring match would
+        # let 'Foo' hit the line for 'Foo_bar' first.
+        needle = f"'{cert}'"
         cert_results: list[str] | None = None
         for i, line in enumerate(lines):
-            if cert not in line:
+            if needle not in line:
                 continue
+            # Axiom-free certificates print a bracketless sentence. Decide
+            # on THIS line before opening any window: a window would reach
+            # into the NEXT certificate's bracket and steal its cone (found
+            # by the entry-13 rehearsal — the accumulator corpus is the
+            # first subject with axiom-free certificates).
+            if _mentions_no_axioms(line):
+                cert_results = []
+                break
             # Lean wraps long axiom lists (the apex tiers carry 11 axioms)
             # across many lines; take a window wide enough for the largest
             # documented boundary and flatten it before matching, the same
@@ -332,9 +344,6 @@ def parse_axiom_output(output: str, certificates: list[str]) -> dict[str, list[s
             bracket = re.search(r"\[([^\]]*)\]", window, re.DOTALL)
             if bracket:
                 cert_results = [item.strip() for item in bracket.group(1).split(",") if item.strip()]
-                break
-            if _mentions_no_axioms(window):
-                cert_results = []
                 break
         if cert_results is not None:
             results[cert] = cert_results

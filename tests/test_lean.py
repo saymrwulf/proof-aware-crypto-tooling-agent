@@ -24,6 +24,34 @@ def test_parse_axiom_output_no_axioms_wording():
     assert parsed["CurveFieldProofs.fieldImplementation"] == []
 
 
+def test_parse_axiom_output_axiom_free_cert_does_not_steal_next_cone():
+    # Regression (found by the entry-13 rehearsal, 2026-07-16): an
+    # axiom-free certificate is followed by a cone-carrying one. The old
+    # windowed search reached past the bracketless "does not depend"
+    # sentence and attributed the NEXT certificate's cone. The
+    # accumulator corpus is the first subject with axiom-free
+    # certificates (domsep, Hash, instDecidableEqHash, take_append_drop),
+    # so no fork attestation ever exercised this path.
+    output = (
+        "'LTLAcc.domsep' does not depend on any axioms\n"
+        "'LTLAcc.eq_dropLast_append_of_getLast?' depends on axioms: [propext]\n"
+    )
+    parsed = parse_axiom_output(output, ["LTLAcc.domsep", "LTLAcc.eq_dropLast_append_of_getLast?"])
+    assert parsed["LTLAcc.domsep"] == []
+    assert parsed["LTLAcc.eq_dropLast_append_of_getLast?"] == ["propext"]
+
+
+def test_parse_axiom_output_exact_name_not_prefix():
+    # 'LTLAcc.MTH' must not match the line for 'LTLAcc.MTH_single' even
+    # when the latter comes first in the output.
+    output = (
+        "'LTLAcc.MTH_single' depends on axioms: [propext, LTLAcc.sha256, Quot.sound]\n"
+        "'LTLAcc.MTH' depends on axioms: [propext, LTLAcc.sha256, Quot.sound]\n"
+    )
+    parsed = parse_axiom_output(output, ["LTLAcc.MTH"])
+    assert parsed["LTLAcc.MTH"] == ["propext", "LTLAcc.sha256", "Quot.sound"]
+
+
 def test_mac_safe_lean_command_is_argument_list():
     tools = LeanTools(lean="/usr/local/bin/lean", lake=None)
     cmd = build_lean_invocation(Path("Proofs/A.lean"), tools, output_path=Path("Proofs/A.olean"), root_path=Path("."))
