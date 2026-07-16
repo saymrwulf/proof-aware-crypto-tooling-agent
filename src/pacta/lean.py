@@ -380,11 +380,6 @@ def classify_certificates(
     return out
 
 
-def _mentions_no_axioms(text: str) -> bool:
-    lowered = text.lower()
-    return "no axioms" in lowered or "does not depend on any axioms" in lowered
-
-
 def _version(cmd: list[str | None], env: dict[str, str] | None = None) -> str | None:
     if not cmd[0]:
         return None
