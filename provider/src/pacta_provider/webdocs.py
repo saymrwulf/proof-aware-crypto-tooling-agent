@@ -115,8 +115,11 @@ def _trust_anchor_html(log: TransparencyLog, metadata: dict[str, Any], base: str
         )
     pem = escape(key_path.read_text(encoding="utf-8").strip())
     return f"""<div class="card">
-<p style="margin-top:0">This key is <strong>the only thing you take on trust, once</strong>.
-Everything else on this page - every attestation, every tree head - is verified against it.
+<p style="margin-top:0">This key is the <strong>sole cryptographic identity anchor</strong>: it
+authenticates that these statements were made by the operator. It does not, by itself, make
+those statements true — each attestation's truth additionally rests on the replay, theorem,
+extraction and toolchain assumptions stated in that leaf. Every tree head and attestation is
+signature-checked against this key.
 Pin it, and compare this copy byte-for-byte with the independently hosted
 <a href="{mirror}/blob/main/provider.ed25519.pub">mirror copy</a>; they must be identical.</p>
 <pre style="margin-bottom:.4rem">{pem}</pre>
@@ -135,18 +138,27 @@ def render_docs(log: TransparencyLog, base_path: str) -> str:
     ed = (latest.get("signatures") or {}).get("ed25519") or {}
     provenance = ed.get("signing_provenance") or {}
     signing_backend = str(ed.get("signing_backend", "openssl"))
-    components = sorted({
-        component
-        for entry in entries
-        if _leaf_ok(entry)
-        and (component := ((entry.leaf.get("attestation") or {}).get("subject") or {}).get("component"))
-    })
+    # newest entry per component, with its real proven/total from the leaf
+    newest: dict[str, Any] = {}
+    for entry in entries:
+        if not _leaf_ok(entry):
+            continue
+        comp = ((entry.leaf.get("attestation") or {}).get("subject") or {}).get("component")
+        if comp:
+            newest[comp] = entry
+    def _counts(entry) -> str:
+        certs = ((entry.leaf.get("attestation") or {}).get("certificates")) or []
+        total = len(certs)
+        proven = sum(1 for c in certs
+                     if c.get("status") == "proven" and c.get("axiom_status") == "clean")
+        return f"{proven}/{total} proven"
+    components = sorted(newest)
     mirror = "https://github.com/saymrwulf/lean-transparency-log"
     rows = "".join(
         f"<tr><td><code>{escape(c)}</code></td>"
         f"<td><a href='{base}/v1/attestation?component={escape(c)}'>attestation</a></td>"
         f"<td><a href='{base}/v1/proof?component={escape(c)}'>inclusion proof</a></td>"
-        f"<td><span class='pill ok'>16/16 proven</span></td></tr>"
+        f"<td><span class='pill ok'>{escape(_counts(newest[c]))}</span></td></tr>"
         for c in components
     )
     tree_svg = _svg_tree(entries, str(latest.get("root_hash", "")), signing_backend)
@@ -181,8 +193,10 @@ internal nodes, the root, and the signature are the real ones. Before signing th
 root, the provider Merkle-verified its own signing library's leaf
 (index {provenance.get('signing_library_leaf_index','?')},
 certificates {escape(str(provenance.get('signing_library_certificates_proven','?')))})
-against this very tree — the signature vouches for the code that produced it, and
-the tree vouches for the signature's code. Tree size {latest.get('tree_size',0)},
+against this very tree — so the signed tree <em>contains</em> an attestation of the source the
+operator reports its signing binary was built from. (An Ed25519 signature cannot by itself prove
+which binary generated it; execution provenance is reported, not proven, and the provenance
+fields live in the unsigned signature metadata.) Tree size {latest.get('tree_size',0)},
 log id <code>{escape(str(metadata.get('log_id',''))[:16])}…</code>.</p>
 
 <h2>What do I download? — the three artifacts, unambiguously</h2>
@@ -191,9 +205,10 @@ library, plus optionally the whole mirror. Nothing else.</p>
 <table>
 <tr><th>#</th><th>Artifact</th><th>What it is</th><th>Where</th></tr>
 <tr><td><b>1</b></td><td><code>provider.ed25519.pub</code></td>
-<td><strong>The trust anchor.</strong> The provider's public key — the only thing you
-take on trust, once. Fetch it from BOTH independent locations and compare; the copies
-must be identical.</td>
+<td><strong>The identity anchor.</strong> The provider's public key — the sole cryptographic
+identity you pin. It authenticates the operator's statements; their truth rests on each leaf's
+stated assumptions. Fetch it from BOTH independent locations and compare; the copies must be
+identical.</td>
 <td><a href="{base}/log-public-key">this site</a> · <a href="{mirror}/blob/main/provider.ed25519.pub">mirror</a></td></tr>
 <tr><td><b>2</b></td><td><code>&lt;library&gt;.attestation.json</code></td>
 <td><strong>The claim.</strong> Which repo, which exact git commit, which theorems,
@@ -206,8 +221,10 @@ leaf index, sibling hashes, the Signed Tree Head. ~25 lines of stdlib Python ver
 <tr><td>+</td><td>the full mirror clone</td>
 <td><strong>Maximal benefit: become a witness.</strong> Every leaf + every signed head
 ever issued + <code>verify.py</code> (stdlib-only). <code>python3 verify.py --all</code>
-recomputes the entire tree and every historical head — you then hold proof the log
-never equivocated within your clone.</td>
+recomputes the entire tree and every historical head — you then hold a retained view that can
+later EXPOSE a conflicting head shown to someone else. (A single clone cannot by itself prove the
+log never split its view toward another consumer; that requires comparing heads across
+consumers.)</td>
 <td><code>git clone {mirror}</code></td></tr>
 </table>
 
@@ -241,11 +258,13 @@ GET {base}/healthz</pre>
 <h2>What a verified inclusion means — and what it does not</h2>
 <div class="card"><span class="pill ok">means</span> The provider whose key you hold
 attests: the Lean proofs of the named repository at the named git commit re-check with
-exactly the documented assumptions — and that statement is irrevocably part of the log
-every other customer and witness sees.</div>
+exactly the documented assumptions — and this signed head irrevocably commits that statement to
+this view. Consumers who compare heads, or retain the public mirror, can expose any conflicting
+view.</div>
 <div class="card"><span class="pill warn">does not mean</span> A verified binary. The
-proofs cover Rust <em>source</em>; clone the attested commit (the git hash <em>is</em>
-the content hash) and build it yourself — compiler and build are declared trusted base
+proofs cover Rust <em>source</em>; clone the attested commit (the commit id identifies the
+committed git tree — not external dependencies, toolchain downloads, or generated artifacts) and
+build it yourself — compiler and build are declared trusted base
 until the reproducible-builds program (R5) lands. Every attestation carries its full
 residual-risk list. Honesty about the boundary is the product.</div>
 
@@ -276,7 +295,7 @@ Kernel-Checked Correctness Evidence for Deployed Ed25519 Implementations</strong
 (PDF, 19 pages, revised) — the trust model with an explicit malicious-operator adversary,
 security proofs for every consumer-facing claim (inclusion soundness as an explicit
 SHA-256-collision extractor, pin-store safety with transferable equivocation evidence,
-verdict integrity), the self-referential signing loop, the twelve-leaf deployment with
+verdict integrity), the self-referential signing loop, the live deployment with
 its retained failure leaves, and appendices with the leaf schema, the full ~25-line
 consumer verifier, and the verbatim per-fork axiom boundaries.
 <span class="muted">Previous version: <a href="{base}/paper/v0.1">v0.1</a> (4 pages).</span></div>
