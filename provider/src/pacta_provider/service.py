@@ -109,6 +109,18 @@ def build_attestation(
             "axiom_log_path": axiom.log_path if axiom else None,
             "axiom_diagnostics": axiom.diagnostics if axiom else [],
         },
+        # Scope block: the human-readable honesty carried BY THE LEAF
+        # itself (review round 6). Previously the profile's
+        # guarantees/exclusions/deployment_constraints reached only the
+        # claim card, never the published leaf — so a leaf could not
+        # carry its own scoped-claim wording (the required entry-13
+        # attestation-scope text lives in known_status →
+        # deployment_constraints). Pure text; safe to publish.
+        "scope": {
+            "guarantees": list(profile.guarantees),
+            "exclusions": list(profile.exclusions),
+            "deployment_constraints": list(profile.deployment_constraints),
+        },
         "certificates": certs,
     }
     signed = sign_attestation(unsigned, private_key, public_key)
