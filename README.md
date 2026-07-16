@@ -146,6 +146,16 @@ The log uses:
 - OpenSSL Ed25519 signatures today.
 - An explicit `ML-DSA-65` / FIPS 204 signature slot that is `unavailable` unless the host has a real backend. If an agent policy requires both signatures, verification fails closed.
 
+The deployed instance ([ltl.zkdefi.org](https://ltl.zkdefi.org),
+mirror [`lean-transparency-log`](https://github.com/saymrwulf/lean-transparency-log))
+is live at **13 leaves**. Entry 13 (2026-07-16) attests the log's own
+accumulator machinery — a kernel-checked mechanization of the log's
+security analysis ([`ltl-accumulator-verified`](https://github.com/saymrwulf/ltl-accumulator-verified)),
+appended into the log itself and scoped to the mechanized model. The
+producer path that generated it now emits a `scope` block into each leaf
+(guarantees / exclusions / deployment-constraints), so a leaf carries its
+own honest scope, not just a claim card.
+
 Example:
 
 ```bash
