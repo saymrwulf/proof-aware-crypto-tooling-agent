@@ -65,3 +65,159 @@ repos:
     known_exclusions:
       - full fieldImplementation certificate unless present and axiom-clean
       - production-ready Pallas arithmetic unless add/mul/reduce/square/invert are proven
+
+  - name: ltl-accumulator-verified
+    url: https://github.com/saymrwulf/ltl-accumulator-verified.git
+    kind: merkle_accumulator
+    verification_dir: verification
+    verified_backend: rfc9162-sha256/lean-model
+    env_script: ~/aeneas-toolchain/env.sh
+    lean_project_dir: $AENEAS_HOME/backends/lean
+    lean_guard: verification/lean-guard
+    known_status: >-
+      Attestation scope: this corpus kernel-checks the listed theorems about
+      the mechanized recursive accumulator model. Correspondence with the
+      deployed inclusion verifier is supported by finite differential testing
+      over the pinned families. The deployed consistency verifier is not
+      extensionally equal to the model; applying the mechanized soundness
+      result to the deployed consumer flow additionally relies on an
+      unmechanized authentic-size/root invariant (KNOWN-GAPS 14/15).
+    known_exclusions:
+      - SHA-256 collision resistance (the single opaque boundary axiom; soundness theorems CONSTRUCT collisions)
+      - deployed-verifier extensional equality (KNOWN-GAPS 14/15 - lied-size divergence, one-sided; refinement invariant unmechanized)
+      - signature/STH layer and evidence transferability (gap 4)
+      - asymptotic cost claims (gap 9)
+    axiom_imports:
+      - Proofs.Basic
+      - Proofs.Completeness
+      - Proofs.Extract
+      - Proofs.Descent
+      - Proofs.Consistency
+      - Proofs.Binding3
+      - Proofs.Refactor
+      - Proofs.Theorem3
+      - Proofs.PinStore
+    certificates:
+      - LTLAcc.ConsRec
+      - LTLAcc.Hash
+      - LTLAcc.IsCollision
+      - LTLAcc.MTH
+      - LTLAcc.MTH_single
+      - LTLAcc.MTH_split
+      - LTLAcc.Path
+      - LTLAcc.Root
+      - LTLAcc.Root_left
+      - LTLAcc.Root_one
+      - LTLAcc.Root_one_cons
+      - LTLAcc.Root_right
+      - LTLAcc.acceptCons
+      - LTLAcc.acceptCons_sound
+      - LTLAcc.acceptIncl
+      - LTLAcc.acceptIncl_complete
+      - LTLAcc.acceptIncl_sound
+      - LTLAcc.consRecBinding
+      - LTLAcc.consRec_base_false_eq
+      - LTLAcc.consRec_base_true_eq
+      - LTLAcc.consRec_some_le
+      - LTLAcc.domsep
+      - LTLAcc.eq_dropLast_append_of_getLast?
+      - LTLAcc.exists_singleton_of_length_one
+      - LTLAcc.extractCons
+      - LTLAcc.extractConsNode
+      - LTLAcc.extractCons_correct
+      - LTLAcc.extractCons_correct_paper
+      - LTLAcc.extractCons_nonvacuous
+      - LTLAcc.extractIncl
+      - LTLAcc.extractIncl_correct
+      - LTLAcc.extractIncl_nonvacuous
+      - LTLAcc.extractMTH
+      - LTLAcc.extractMTH_correct
+      - LTLAcc.extractMTH_nonvacuous
+      - LTLAcc.fork_distinct
+      - LTLAcc.getD_drop
+      - LTLAcc.getD_take
+      - LTLAcc.hleaf
+      - LTLAcc.hnode
+      - LTLAcc.hnode_preimage_inj
+      - LTLAcc.incl_complete
+      - LTLAcc.instDecidableEqHash
+      - LTLAcc.instInhabitedHash
+      - LTLAcc.kbelow
+      - LTLAcc.kbelow_eq_of_pow2_between
+      - LTLAcc.kbelow_lt
+      - LTLAcc.kbelow_pos
+      - LTLAcc.kbelow_pow2
+      - LTLAcc.kbelow_prefix_eq
+      - LTLAcc.le_two_kbelow
+      - LTLAcc.pinAccept
+      - LTLAcc.pinAccept_monotone
+      - LTLAcc.pinExtract
+      - LTLAcc.pin_prefix_correct
+      - LTLAcc.pin_prefix_nonvacuous
+      - LTLAcc.pow2_exp_unique
+      - LTLAcc.take_all
+      - LTLAcc.take_append_drop
+      - LTLAcc.take_drop_prefix
+      - LTLAcc.take_take_le
+    certificate_axioms:
+      LTLAcc.ConsRec: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.Hash: []
+      LTLAcc.IsCollision: ["LTLAcc.sha256"]
+      LTLAcc.MTH: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.MTH_single: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.MTH_split: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.Path: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.Root: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.Root_left: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.Root_one: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.Root_one_cons: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.Root_right: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.acceptCons: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.acceptCons_sound: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.acceptIncl: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.acceptIncl_complete: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.acceptIncl_sound: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.consRecBinding: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.consRec_base_false_eq: ["propext", "Classical.choice", "Quot.sound"]
+      LTLAcc.consRec_base_true_eq: ["propext"]
+      LTLAcc.consRec_some_le: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.domsep: []
+      LTLAcc.eq_dropLast_append_of_getLast?: ["propext"]
+      LTLAcc.exists_singleton_of_length_one: ["propext", "Classical.choice", "Quot.sound"]
+      LTLAcc.extractCons: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractConsNode: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractCons_correct: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractCons_correct_paper: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractCons_nonvacuous: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractIncl: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractIncl_correct: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractIncl_nonvacuous: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractMTH: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractMTH_correct: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.extractMTH_nonvacuous: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.fork_distinct: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.getD_drop: ["propext", "Quot.sound"]
+      LTLAcc.getD_take: ["propext", "Quot.sound"]
+      LTLAcc.hleaf: ["LTLAcc.sha256"]
+      LTLAcc.hnode: ["LTLAcc.sha256"]
+      LTLAcc.hnode_preimage_inj: ["propext"]
+      LTLAcc.incl_complete: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.instDecidableEqHash: []
+      LTLAcc.instInhabitedHash: ["propext"]
+      LTLAcc.kbelow: ["propext", "Quot.sound"]
+      LTLAcc.kbelow_eq_of_pow2_between: ["propext", "Quot.sound"]
+      LTLAcc.kbelow_lt: ["propext", "Quot.sound"]
+      LTLAcc.kbelow_pos: ["propext", "Quot.sound"]
+      LTLAcc.kbelow_pow2: ["propext", "Quot.sound"]
+      LTLAcc.kbelow_prefix_eq: ["propext", "Quot.sound"]
+      LTLAcc.le_two_kbelow: ["propext", "Quot.sound"]
+      LTLAcc.pinAccept: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.pinAccept_monotone: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.pinExtract: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.pin_prefix_correct: ["propext", "Classical.choice", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.pin_prefix_nonvacuous: ["propext", "LTLAcc.sha256", "Quot.sound"]
+      LTLAcc.pow2_exp_unique: ["propext", "Quot.sound"]
+      LTLAcc.take_all: ["propext"]
+      LTLAcc.take_append_drop: []
+      LTLAcc.take_drop_prefix: ["propext", "Classical.choice", "Quot.sound"]
+      LTLAcc.take_take_le: ["propext", "Quot.sound"]
