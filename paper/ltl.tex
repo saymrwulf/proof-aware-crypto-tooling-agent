@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \quad (v0.3)}
+\date{July 2026 \quad (v0.4)}
 
 \begin{document}
 \maketitle
@@ -63,11 +63,11 @@ verifier and without reducing the result to an opaque provider label?
 We define \emph{accountable replay attestation}. A specialized operator performs
 an expensive replay once and publishes a structured observation through a
 signed append-only log. Consumers verify a signed tree head and logarithmic
-inclusion proof, pin history, and apply their own policy to the exact assumptions
-reported for each theorem. The construction does not prove that the operator's
+inclusion proof, pin history, and apply their own policy to the exact reported axiom-name sets
+for each theorem. The construction does not prove that the operator's
 observation is true. It makes the claim immutable within a signed view,
-comparable across consumers, and attributable when incompatible views are
-presented.
+comparable across consumers, and attributable when incompatible signed views
+are compared.
 
 We instantiate the model as the Lean Transparency Log (LTL), using Lean~4 replay
 attestations and an RFC~9162 Merkle tree. We give explicit
@@ -76,9 +76,9 @@ consumer pinning and policy boundaries, and evaluate a live deployment over four
 production Ed25519 codebases. The public log contains thirteen leaves; its thirteenth
 leaf attests a Lean mechanization of the accumulator's own security arguments
 (222 inventoried environment constants, 61 human-reviewed assumption cones,
-and a single uninterpreted SHA-256 axiom). The mechanization also exposed a nontrivial implementation
-boundary: the deployed iterative consistency verifier is not extensionally
-equal to the stricter recursive model on malformed size claims. The leaf records
+and a single uninterpreted SHA-256 axiom). The mechanization effort also exposed, via differential testing, a nontrivial
+implementation boundary: the deployed iterative consistency verifier is not
+extensionally equal to the recursive model on malformed size claims. The leaf records
 this limitation explicitly. The resulting contribution is a cryptographic
 distribution model for machine-checked correctness evidence, together with an
 end-to-end deployed instantiation that carries scoped proofs about its own
@@ -167,9 +167,11 @@ constants, 61 human-reviewed certificate cones, and a single uninterpreted
 SHA-256 axiom.
 \item \textbf{A negative deployment result.}
 Differential testing found that the deployed iterative RFC-style consistency
-verifier accepts strictly more malformed size/root combinations than the
-recursive model proved in Lean. We characterize 3,867 one-sided divergences in
-73,573 boundary tests and scope the public attestation accordingly.
+verifier and the recursive model proved in Lean are not extensionally equal:
+there are malformed size/root combinations accepted only by the deployed
+verifier. We characterize 3,867 divergences in 73,573 pinned boundary tests
+--- every one deployed-accepts-only --- and scope the public attestation
+accordingly.
 \end{enumerate}
 
 \paragraph{Non-claims.}
@@ -212,7 +214,9 @@ an individual record follows from signature verification, but four properties
 are absent:
 \begin{enumerate}[leftmargin=1.7em,itemsep=2pt]
 \item no signed value commits to the ordered set of all records;
-\item deletion or replacement of an old result leaves no cryptographic trace;
+\item the signer commits to no complete ordered history, so omission or
+replacement is not detectable by a fresh consumer and carries no compact
+consistency proof;
 \item two consumers cannot compare a single compact view identifier;
 \item a consumer cannot demand that its previously accepted history only grow.
 \end{enumerate}
@@ -222,6 +226,17 @@ deployment size, logarithmic proof size is not the decisive benefit;
 
 \subsection{Design alternatives}
 
+Table~\ref{tab:alternatives} places the construction among the natural
+alternatives, read as a design taxonomy rather than an empirical comparison.
+Local replay and proof transport keep semantic checking with the consumer at
+high operational cost; detached signatures and committees lower consumer cost
+but commit to no ordered history (a committee distributes trust in the
+observation; it does not by itself make the record's history accountable);
+succinct proofs of replay would upgrade accountability to validity at the
+price of proving the prover. LTL occupies the low-consumer-cost point that
+still binds an ordered, signed, pinnable history --- and deliberately does not
+buy validity of the observation itself.
+
 \begin{table}[t]
 \centering\small
 \begin{tabularx}{\textwidth}{@{}lXXXX@{}}
@@ -230,8 +245,8 @@ Mechanism & Consumer cost & Semantic checker & History accountability & Main res
 \midrule
 Local replay & high & consumer & local only & prover/toolchain deployment \\
 Proof transport / PCC & medium--high & consumer checker & optional & proof/checker portability \\
-Detached signed result & low & provider & none & replaceable history \\
-Committee replay & low & committee & threshold-dependent & membership trust \\
+Detached signed result & low & provider & statement-level only & replaceable history \\
+Committee replay & low & committee & none without an additional log & membership trust \\
 Succinct proof of replay & low & circuit/VM verifier & optional & proving the prover \\
 LTL & low & provider observes; consumer applies policy & signed append-only views & observation honesty \\
 \bottomrule
@@ -290,6 +305,8 @@ policy, not of an operator verdict.
 The definition is intentionally an accountability property, not a validity
 property. It says when conflicting claims become attributable; it does not
 cryptographically prove that the replay observation was honestly produced.
+Throughout, ``accountability'' means signed-view and history accountability;
+observation validity remains external to the mechanism.
 
 \begin{figure}[t]
 \centering
@@ -451,7 +468,10 @@ the corpus pins a machine-checked non-vacuity guard for every extractor.
 \subsection{Inclusion}
 
 Let $\Root(v,m,n,P)$ recursively fold value $v$ at position $m$ through proof
-path $P$ using the same largest-power-of-two decomposition as $\MTH$.
+path $P$ using the same largest-power-of-two decomposition as $\MTH$. Both
+$\Root$ and $\ConsRec$ are partial (the mechanization's \code{Option}):
+malformed shapes return a distinguished rejection value, and an equation such
+as $\Root(\cdot)=\MTH(D)$ asserts acceptance with that output.
 
 \begin{lemma}[Domain separation]
 For all byte strings $d$ and 32-byte values $x,y$,
@@ -519,6 +539,10 @@ through their identically shaped honest trees to extract the first hash
 collision.
 \end{proof}
 
+The theorem's hypothesis pins the honest old root $\MTH(D_0)$. The deployed
+flow has no mechanized supplier of that pin; the next subsection measures what
+the iterative verifier does when size claims alone steer its walk.
+
 \begin{proposition}[Pin-store safety]
 Assume EUF-CMA security of the head signature and collision resistance of
 SHA-256. A consumer following the pin transition accepts only a nondecreasing
@@ -527,7 +551,10 @@ heads under the same key with equal size and unequal roots are transferable
 evidence that the key holder signed incompatible views.
 \end{proposition}
 \begin{proof}
-Rollback is rejected syntactically. A larger head is accepted only after a
+Rollback is rejected syntactically. At equal size the transition is accepted
+only with equal roots; if the two exhibited equal-length leaf lists differed,
+whole-tree binding would extract a SHA-256 collision, so under collision
+resistance the lists are equal. A larger head is accepted only after a
 consistency proof, so non-prefix acceptance yields a collision by the previous
 theorem. Equal-size unequal roots with valid signatures are two conflicting
 statements attributable to the key holder, except under signature forgery.
@@ -548,8 +575,9 @@ a veto cannot grant acceptance.
 
 The Lean theorem covers the recursive predicate above. The deployed iterative
 verifier follows the familiar RFC bit-navigation algorithm. Differential
-testing discovered that the iterative verifier accepts a strict superset on
-malformed size claims: for example, a valid proof for a $2\to3$ transition can
+testing discovered that the two verifiers are not extensionally equal on
+malformed size claims, every observed divergence being accepted only by the
+iterative verifier: for example, a valid proof for a $2\to3$ transition can
 be accepted under the false old-size claim $1\to3$ when paired with the size-2
 root. The mechanism is elementary: the iterative algorithm seeds its
 reconstruction with the supplied old root and consults the size claims only as
@@ -574,9 +602,9 @@ three deployed forks: Solana/Anza, RISC~Zero, and Betrusted --- all
 implementations of Ed25519~\cite{eddsa,rfc8032}. Aeneas
 provides a functional translation route from Rust to theorem-prover models;
 its design uses Rust ownership information to avoid explicit memory reasoning
-for a large class of safe Rust programs~\cite{aeneas}. Recent independent
-experience reports likewise show increasing use of Rust-to-Lean pipelines for
-cryptographic code~\cite{klaus2026}.
+for a large class of safe Rust programs~\cite{aeneas}. A recent independent
+experience report likewise applies a Rust-to-Lean pipeline to cryptographic
+code~\cite{klaus2026}.
 
 Each fork's corpus contains sixteen reviewed certificates covering:
 \begin{itemize}[leftmargin=1.6em,itemsep=2pt]
@@ -720,15 +748,16 @@ Inclusion & completeness and named collision extractor & collision resistance in
 Consistency & recursive-model soundness and extractor & no general consistency-completeness theorem \\
 Pinning & per-step monotonicity and prefix correctness & signature layer and multi-step closure external \\
 Deployment refinement & finite differential harness & no theorem for iterative verifier under authentic-pair invariant \\
+Policy separation & deterministic tooling logic and regression tests & not mechanized in the entry-13 corpus \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
 \subsection{Cost and reproducibility}
 
-A replay of one Ed25519 fork requires approximately 30 minutes of Lean kernel
-time under the pinned environment, a figure corroborated by the inter-leaf
-issuance spacing visible in the published log. Receipt verification requires one Ed25519
+A replay of one Ed25519 fork requires approximately 30 minutes of end-to-end
+guarded replay time under the pinned environment, a figure corroborated by the
+inter-leaf issuance spacing visible in the published log. Receipt verification requires one Ed25519
 signature and a logarithmic number of SHA-256 node computations. The
 accumulator corpus is independently reviewable with a pinned public Lean
 release; an environment-derived inventory fails closed on added, removed, or
@@ -752,33 +781,37 @@ valuable purpose: it falsified an overbroad equivalence claim and supplied a
 stable regression boundary.
 
 \begin{remark}[Model/deployment seam]
-For malformed size claims, the deployed iterative verifier accepts a strict
-superset of the recursive model. In all 3,867 observed divergences the deployed
-verifier accepted and the model rejected; the reverse direction did not occur.
+For malformed size claims, the deployed iterative verifier and the recursive
+model are not extensionally equal. In all 3,867 divergences observed across
+the pinned families the deployed verifier accepted and the model rejected; the
+reverse direction was not observed, and no global inclusion relation between
+the two acceptance sets is claimed.
 The public attestation therefore scopes soundness to the recursive model and
 states the additional operational assumption: roots and sizes must be bound by
 the authenticated pin-store and signed-head flow. This invariant is not
 mechanized in the present corpus.
 \end{remark}
 
-\subsection{Consumers}
+\subsection{Consumer prototypes and version exactness}
 
-The deployed internal consumer is a quorum-custody signing service: its
+The implemented internal consumer is a quorum-custody signing prototype: its
 inbound boundary accepts a log-derived statement only when independently
 attested verifier backends agree, and its policy consumes recorded
-observations, never operator labels. A prospective external study
-examined a production codebase whose vendored Ed25519 dependency matches an
-attested subject at family level but not at the attested version. The model
-treats that as a useful negative: attestations are version-exact by
-construction, and a family-level match confers nothing.
+observations, never operator labels. Separately, an informal check found a
+production codebase whose vendored Ed25519 dependency matches an attested
+subject at family level but not at the attested version; the model treats a
+family-level match as conferring nothing, because attestations are
+version-exact by construction. Neither observation is an evaluation claim;
+both indicate how the policy boundary is consumed in practice.
 
 \subsection{Proof portability across forks}
 
 Pure mathematical lemmas are largely reusable, while extraction-facing scripts
 diverge where code structure and generated names diverge. In the deployed
-corpora, selected parser and signature-glue files show tens to hundreds of
-changed lines across forks, whereas pure carry and field lemmas can remain
-byte-identical. This supports a practical conclusion: verification is portable
+corpora, the RISC~Zero and Betrusted signature-layer proof files differ by 27
+changed lines (tracking one fork's optimization barrier and the forks'
+differing operation order), other extraction-facing files differ by tens to
+hundreds of lines, and pure carry and field lemmas remain byte-identical. This supports a practical conclusion: verification is portable
 above the representation boundary and target-specific where implementation
 structure actually differs.
 
@@ -819,16 +852,6 @@ mechanizes accumulator arguments and then logs that replay result. The
 remaining refinement from the deployed state machine to the recursive model is
 explicitly open.
 
-\paragraph{Optimistic accountability.}
-Architecturally the model is closest to optimistic designs that substitute
-accountability for validity: a claim is accepted by default, and safety rests
-on any observer's ability to produce compact transferable evidence of a
-specific fault. The extractors of Section~\ref{sec:security} play the role of
-fraud proofs --- a false inclusion or consistency opening does not merely fail
-verification, it yields a concrete SHA-256 collision attributable to the log.
-LTL occupies the same design point for verification evidence, with targeted
-independent replay as the challenge mechanism.
-
 \section{Limitations and research agenda}\label{sec:limitations}
 
 The subject corpus maintains a numbered ledger of fifteen known gaps together
@@ -858,8 +881,8 @@ isolated clients to receive that view. Independent witnesses or gossip are the
 natural next deployment step.
 
 \paragraph{Consistency refinement.}
-The recursive model is proved; the iterative deployment has a larger malformed-
-input acceptance set. The strongest closure is either to deploy
+The recursive model is proved; the iterative deployment diverges from it on
+malformed inputs, every observed divergence being deployed-accepts-only. The strongest closure is either to deploy
 $\ConsRec$-equivalent semantics or to mechanize the signed-head and pin-store
 flow and prove the authentic-pair refinement theorem.
 
@@ -916,9 +939,11 @@ The public artifacts are available at:
 \item accumulator mechanization: \href{https://github.com/saymrwulf/ltl-accumulator-verified}{\texttt{saymrwulf/ltl-accumulator-verified}};
 \item provider and consumer tooling: \href{https://github.com/saymrwulf/proof-aware-crypto-tooling-agent}{\texttt{saymrwulf/proof-aware-crypto-tooling-agent}}.
 \end{itemize}
-A clone of the mirror re-verifies every head, leaf, and receipt offline via
-\code{python3 verify.py --all} (Python standard library plus an \code{openssl}
-binary; the verifier fails closed if signature checking is unavailable).
+A clone of the mirror re-verifies every numbered leaf, every published signed
+head, and every published receipt offline via \code{python3 verify.py --all}
+(Python standard library plus an \code{openssl} binary; the verifier fails
+closed if signature checking is unavailable, and its adversarial self-test
+ships beside it).
 
 \section*{Acknowledgments}
 The author designed the system and is responsible for every claim. Claude
@@ -1012,12 +1037,13 @@ Verification Pipeline with AI Provers: An Experience Report. arXiv:2605.30106,
 \toprule
 Consumer conclusion & Established by & Remaining assumption \\
 \midrule
-Leaf occupies index $m$ under head $h$ & inclusion proof and signed head & SHA-256 collision resistance; correct public key \\
+Leaf occupies index $m$ under head $h$ & inclusion proof and signed head & SHA-256 collision resistance; correct public key; EUF-CMA of the head signature \\
 Head was authorized by the log identity & Ed25519 verification & correct key acquisition; EUF-CMA \\
-New pinned head extends old pinned head & consistency proof & recursive-model soundness; authentic size/root pairing for deployment \\
-Equal-size unequal roots conflict & two valid signatures & both heads compared by a retaining observer \\
+New pinned head extends old pinned head & consistency proof & SHA-256 collision resistance; recursive-model soundness; authentic size/root pairing for deployment \\
+Equal-size unequal roots conflict & two valid signatures & correct public key; EUF-CMA; operationally, a retaining observer must compare the heads \\
 Observed cone matches local boundary policy & exact set equality & semantic identity of named declarations \\
-Kernel produced the recorded observation & replay attestation & operator/replay-pipeline honesty or independent replay \\
+Operator claims the kernel produced the observation & attestation signature and leaf inclusion & correct provider key; EUF-CMA \\
+Kernel actually produced the recorded observation & not cryptographically established; independently checkable by replay & operator and replay-pipeline honesty, or faithful independent replay \\
 Source corresponds to deployed binary & not established & reproducible build and compiler assurance \\
 Claimed signer implementation produced STH & not established & execution provenance \\
 \bottomrule
@@ -1044,7 +1070,9 @@ The following code is only the Merkle inclusion core. A complete receipt
 verifier must additionally validate the signed tree head, log identifier,
 tree-size binding, public-key fingerprint or pinned key, leaf hash, and receipt
 schema. The published log-repository verifier implements that full binding
-list and fails closed when signature checking is unavailable.
+list for every published receipt --- the binding fields are required, never
+compare-if-present --- and fails closed when signature checking is
+unavailable.
 \begin{lstlisting}[language=Python]
 import hashlib
 
@@ -1060,17 +1088,20 @@ def h_node(left, right):
 def split_below(n):
     return 1 << ((n - 1).bit_length() - 1)
 
+def take(path, used):
+    if used >= len(path):
+        raise ValueError("proof exhausted")
+    return path[used]
+
 def root(value, index, size, path, used=0):
     if size == 1:
         return value, used
     k = split_below(size)
-    if used >= len(path):
-        raise ValueError("proof exhausted")
     if index < k:
         left, used = root(value, index, k, path, used)
-        return h_node(left, path[used]), used + 1
+        return h_node(left, take(path, used)), used + 1
     right, used = root(value, index-k, size-k, path, used)
-    return h_node(path[used], right), used + 1
+    return h_node(take(path, used), right), used + 1
 
 def verify_inclusion(leaf, index, size, path, expected_root):
     if size <= 0 or index < 0 or index >= size:

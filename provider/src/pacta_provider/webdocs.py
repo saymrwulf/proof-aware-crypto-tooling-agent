@@ -292,13 +292,14 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 16 pages, v0.3) — the trust decomposition (expensive verification produces an
-observation; transparency makes the observation accountable; consumer-local policy decides
-acceptance), collision-extracting soundness for inclusion and consistency, the policy
-boundary where operator labels can veto but never grant acceptance, the live thirteen-leaf
-deployment whose entry 13 attests the accumulator's own mechanized model, and the measured
-model/deployment seam (3,867 one-sided lied-size divergences) reported as a result rather
-than hidden.
+(PDF, 17 pages, v0.4 — revised after two independent round-12 reviews) — the trust
+decomposition (expensive verification produces an observation; transparency makes the
+observation accountable; consumer-local policy decides acceptance), collision-extracting
+soundness for inclusion and consistency, the policy boundary where operator labels can veto
+but never grant acceptance, the live thirteen-leaf deployment whose entry 13 attests the
+accumulator's own mechanized model, and the measured model/deployment divergence (3,867
+lied-size cases, every one accepted only by the deployed verifier) reported as a result
+rather than hidden.
 <span class="muted">Previous versions: <a href="{base}/paper/v0.2">v0.2</a> (19 pages, the
 system report) · <a href="{base}/paper/v0.1">v0.1</a> (4 pages).</span></div>
 
