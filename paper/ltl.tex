@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \quad (v0.6)}
+\date{July 2026 \quad (v0.7)}
 
 \begin{document}
 \maketitle
@@ -297,9 +297,11 @@ does not consume an operator verdict as positive evidence.
 \begin{definition}[Accountable replay distribution]
 Fix an operator public key and a consumer that persists accepted signed heads.
 A replay-distribution scheme is \emph{accountable} if the following hold:
-(i) every accepted attestation is position-bound to a signed view; (ii) a
+(i) every accepted attestation has a unique accepted opening at its claimed
+position under an authentic signed view; (ii) a
 consumer accepts a later view only as the same view or a verified extension;
-(iii) two valid equal-size heads with unequal roots form transferable evidence
+(iii) two valid equal-size heads with unequal roots, in one log and protocol
+context, form transferable evidence
 that the key holder signed incompatible views; and (iv) positive acceptance of
 a theorem boundary is a function of recorded observations and consumer-local
 policy, not of an operator verdict.
@@ -558,8 +560,9 @@ the iterative verifier does when size claims alone steer its walk.
 Assume EUF-CMA security of the head signature and collision resistance of
 SHA-256. A consumer following the pin transition accepts only a nondecreasing
 sequence of sizes whose exhibited leaf lists are prefix-related. Two accepted
-heads under the same key with equal size and unequal roots are transferable
-evidence that the key holder signed incompatible views.
+heads under the same key, in one log context, with equal size and unequal
+roots are transferable evidence that the key holder signed incompatible
+views.
 \end{proposition}
 \begin{proof}
 Rollback is rejected syntactically. At equal size the transition is accepted
@@ -567,8 +570,9 @@ only with equal roots; if the two exhibited equal-length leaf lists differed,
 whole-tree binding would extract a SHA-256 collision, so under collision
 resistance the lists are equal. A larger head is accepted only after a
 consistency proof, so non-prefix acceptance yields a collision by the previous
-theorem. Equal-size unequal roots with valid signatures are two conflicting
-statements attributable to the key holder, except under signature forgery.
+theorem. Equal-size unequal roots in one log context, with valid signatures, are two
+conflicting statements attributable to the key holder, except under signature
+forgery.
 \end{proof}
 
 \begin{proposition}[Policy separation]
@@ -606,24 +610,30 @@ unmechanized authentic-size/root invariant.
 \subsection{Scheme-level games and a composition theorem}\label{sec:games}
 
 The theorems above bind single artifacts to a reference leaf list. This
-subsection lifts them to the scheme. Fix once, for the entire subsection, a
-\emph{context}
-\[\chi=(\text{log identifier},\ \text{schema and type tags},\
-\text{hash-algorithm identifier},\ pk);\]
-every head below is required to encode $\chi$ in its canonical payload,
-matching the deployed head format of \S4.2.
+subsection lifts them to the scheme. Fix once, for the entire subsection, an
+\emph{encoded context}
+\[\chi_{\rm enc}=(\text{log identifier},\ \text{schema and type tags},\
+\text{hash-algorithm identifier});\]
+every head below is required to encode $\chi_{\rm enc}$ in its canonical
+payload, matching the deployed head format of \S4.2. The verification key is
+deliberately \emph{not} part of the payload: it is an external verification
+parameter, and we write $\chi=(\chi_{\rm enc},pk)$ for the full context once
+a key exists --- the keyed games below fix $\chi_{\rm enc}$, run
+$\mathsf{KeyGen}$, and then set $\chi$.
 The results come in two deliberately separated levels. First,
 \emph{collision-extractable accountability}: unconditional theorems whose
 proofs are explicit algorithms turning any winning transcript into a concrete
 SHA-256 collision, and reductions whose signature losses are exactly one
 EUF-CMA forgery. Second, a \emph{security corollary}: SHA-256 is a fixed,
 unkeyed function, so collision resistance cannot be a probability statement
-over a key space; following the human-ignorance treatment~\cite{rogaway}, the
-hardness premise is that no feasible collision finder for SHA-256 is known,
-and the corollary states what the explicit reductions then rule out. (A
+over a key space; following the human-ignorance treatment~\cite{rogaway}, the hardness
+premise --- that no feasible SHA-256 collision finder is known --- is an
+epistemic engineering judgment, and the corollary states only the
+constructive consequence: an explicit winner yields an explicit collision
+finder. (A
 keyed-family restatement is routine and omitted.) Extractability does not by
-itself assert hardness; the corollary is where hardness enters, and only
-there.
+itself assert hardness; the corollary's explicitly labeled interpretation
+sentence is where the judgment enters, and only there.
 
 The position-binding and history games are non-interactive, and the right
 reason is not merely that the operator-adversary holds the signing key: the
@@ -639,7 +649,7 @@ wins.
 
 \paragraph{Accepted-artifact syntax.}
 A head is $h=(n,r,t;\sigma)$, with $t$ a timestamp; its canonical payload is
-$\mathsf{EncodeHead}_\chi(n,r,t)$ as in \S4.2, and $\mathsf{Vf}_{pk}(h)=1$
+$\mathsf{EncodeHead}_{\chi_{\rm enc}}(n,r,t)$ as in \S4.2, and $\mathsf{Vf}_{pk}(h)=1$
 iff its Ed25519 signature verifies. An \emph{opening}
 of leaf $d$ at index $m$ under $(n,r)$ is a path $P$ with $m<n$ and
 $\Root(\hleaf(d),m,n,P)=r$ (acceptance in the Option sense of \S5.1); write
@@ -658,14 +668,17 @@ Immediate from the two disjuncts of $\mathsf{Ext}$.
 \end{proof}
 
 \begin{lemma}[Payload injectivity]\label{lem:inj}
-For fixed $\chi$, $\mathsf{EncodeHead}_\chi$ is injective on $(n,r,t)$; in
-particular, distinct $(n,r)$ pairs yield distinct payload byte strings.
+For fixed $\chi_{\rm enc}$, $\mathsf{EncodeHead}_{\chi_{\rm enc}}$ is
+injective on $(n,r,t)$; in particular, distinct $(n,r)$ pairs yield distinct
+payload byte strings.
 \end{lemma}
 \begin{proof}
 The canonical serialization emits a fixed set of keys in sorted order with
-fixed separators; the size is a decimal integer and the root a fixed-length
-lowercase hex string under distinct fixed keys, so the encoding parses back
-uniquely.
+fixed separators; the size is a decimal integer, the root a fixed-length
+lowercase hex string, and the timestamp a JSON string with injective
+escaping, all under distinct fixed keys, so the encoding parses back
+uniquely. This is injectivity of the specified serializer over the restricted
+head schema, not a claim about arbitrary JSON.
 \end{proof}
 
 \paragraph{Game $\mathsf{PB}$ (position binding).}
@@ -733,7 +746,8 @@ replaying the two accepted transcripts.
 \begin{proof}
 If $n_0=n_1$ then $r_0=r_1$ and $P_0=P$. Otherwise
 $\ConsRec(n_0,n_1,C,\top,r_0)=(r_0,r_1)$, and we prove the following claim by
-induction on $n$, for every sub-call arising in the accepted transcript:
+strong induction on $n$ --- both sub-calls strictly decrease it --- for every
+sub-call arising in the accepted transcript:
 
 \emph{Claim.} If $\ConsRec(n_0',n,C',b,\cdot)$ accepts with output $(x,y)$,
 and $\mathsf{Open}(d,m',n,P',\rho)=1$ with $m'<n_0'$ and $\rho=y$, then
@@ -758,8 +772,7 @@ component passes through this branch unchanged.
 returned $(x_R,y_R)$, so $x=\hnode(s,x_R)$ and $y=\hnode(s,y_R)$. Because
 $k<n_0'\le n$ and $k$ is the largest power of two below $n$, $k$ is also the
 largest power of two below $n_0'$ (there is no power of two strictly between
-$k$ and $n$; the corpus mechanizes this prefix stability as its
-\code{kbelow} lemma), so the $n_0'$-tree splits at $k$ as well and
+$k$ and $n$; mechanized in the corpus as \code{kbelow_prefix_eq}), so the $n_0'$-tree splits at $k$ as well and
 $x=\hnode(s,x_R)$ is precisely its root form.
 \emph{If} $m'<k$: the opening's top step is $\rho=\hnode(u,s_P)$ with
 $u=\Root(\hleaf(d),m',k,\cdot)$ accepted on the remaining path
@@ -785,11 +798,12 @@ sub-call output value, all present in the replayed transcripts.
 \end{proof}
 
 \paragraph{Game $\mathsf{HIST}$ (local history binding).}
-$\mathcal{A}$ outputs a chain of heads $h_0,\dots,h_k$ and transition
-proofs $C_1,\dots,C_k$ with $\mathsf{Ext}(n_{i-1},r_{i-1},n_i,r_i,C_i)=1$ for every
-$1\le i\le k$ --- precisely a state sequence a consumer's pin can traverse;
-signature checks are irrelevant here because the properties quantify over
-accepted transcripts --- together with indices $0\le a<b\le k$, an index
+$\mathcal{A}$ outputs a chain of head values $h_0,\dots,h_k$ (the
+Merkle-level content; authentication is $\mathsf{HEAD}$'s job) and
+transition proofs $C_1,\dots,C_k$ with $\mathsf{Ext}(n_{i-1},r_{i-1},n_i,r_i,C_i)=1$ for every
+$1\le i\le k$ --- the Merkle-level state sequence a consumer's pin traverses after head
+authentication; the binding properties quantify over accepted transcripts
+regardless of provenance --- together with indices $0\le a<b\le k$, an index
 $m<n_a$, and openings with
 $\mathsf{Open}(d,m,n_a,P,r_a)=\mathsf{Open}(d',m,n_b,P',r_b)=1$ and
 $d\neq d'$. $\mathcal{A}$ wins iff everything verifies.
@@ -807,14 +821,18 @@ the opening carries over unchanged; if $n_{t-1}<n_t$, apply
 Lemma~\ref{lem:transport} to $C_t$ and the current opening, obtaining a
 collision (done) or an accepting opening under $(n_{t-1},r_{t-1})$. Arriving
 at $h_a$ yields two accepting openings of $d\neq d'$ at $m$ under
-$(n_a,r_a)$, and Theorem~\ref{thm:pb} extracts the collision.
+$(n_a,r_a)$, and Theorem~\ref{thm:pb} extracts the collision. Accepted
+transcripts have their RFC-determined logarithmic length --- malformed
+lengths reject --- so the walk costs at most the evaluations of replaying the
+$k$ transition transcripts and the two openings.
 \end{proof}
 
 \paragraph{Game $\mathsf{HEAD}$ (head authenticity).}
 A challenger runs $\mathsf{KeyGen}$ and signs, on the operator's behalf, the
-canonical payloads the operator issues in context $\chi$ (query set $Q$). The
-adversary, without the key, outputs a head $h$ and wins iff
-$\mathsf{Vf}_{pk}(h)=1$, $h$ encodes $\chi$, and $h$'s payload is not in $Q$.
+canonical payloads the operator issues in context $\chi_{\rm enc}$ (query
+set $Q$). The adversary, without the key, outputs a head $h$ and wins iff
+$\mathsf{Vf}_{pk}(h)=1$, $h$ encodes $\chi_{\rm enc}$, and $h$'s payload is
+not in $Q$.
 
 \begin{theorem}[Head authenticity]\label{thm:head}
 For every $\mathcal{A}$ there is an explicit $\mathcal{B}_{\rm ha}$ with
@@ -826,16 +844,17 @@ forgery, which $\mathcal{B}_{\rm ha}$ outputs.
 
 \paragraph{Game $\mathsf{FORK}$ (fork evidence).}
 Define the context-scoped evidence predicate:
-$\mathsf{Ev}_\chi(h,h')=1$ iff both signatures verify, both heads encode the
-same context $\chi$, the tree sizes are equal, and the roots differ. Heads of
+$\mathsf{Ev}_\chi(h,h')=1$ iff both signatures verify under $pk$, both heads
+encode the same $\chi_{\rm enc}$, the tree sizes are equal, and the roots
+differ. Heads of
 different logs, schema versions, or hash algorithms never form evidence ---
 one key legitimately operating two logs must not be classifiable as
 equivocating. \emph{Completeness} is by construction: if the key holder signs
 two equal-size, unequal-root heads in one context, the pair itself satisfies
 $\mathsf{Ev}_\chi$; producing it requires retention and comparison, not
 cooperation. \emph{Frame resistance} is the game: the challenger signs the
-operator's issued payloads in $\chi$ (query set $Q$); the adversary, without
-the key, outputs $(h,h')$ and wins iff $\mathsf{Ev}_\chi(h,h')=1$ and at
+operator's issued payloads in $\chi_{\rm enc}$ (query set $Q$); the
+adversary, without the key, outputs $(h,h')$ and wins iff $\mathsf{Ev}_\chi(h,h')=1$ and at
 least one of the two payloads is not in $Q$. This is an
 \emph{issued-message attribution} game: a valid evidence pair proves the key
 holder signed both conflicting payloads, except with forgery probability.
@@ -879,14 +898,18 @@ $\mathcal{B}_{\rm ha},\mathcal{B}_{\rm fr}$ of
 Theorems~\ref{thm:pb}--\ref{thm:fork}.
 \end{theorem}
 
-\begin{corollary}[Security consequence]\label{cor:security}
-Assume the human-ignorance premise for SHA-256 --- no feasible collision
-finder is known~\cite{rogaway} --- EUF-CMA security of Ed25519, correct
-initial acquisition of $pk$, and the fixed context $\chi$. Then a feasible
-adversary that wins $\mathsf{PB}$ or $\mathsf{HIST}$ writes down a concrete
-SHA-256 collision via the named algorithms, contradicting the premise; and
-its advantage in $\mathsf{HEAD}$ or $\mathsf{FORK}$ is at most the EUF-CMA
-advantage of the corresponding explicit reduction.
+\begin{corollary}[Constructive security consequence]\label{cor:security}
+For every explicitly given feasible adversary that wins $\mathsf{PB}$ or
+$\mathsf{HIST}$, the explicitly specified $\mathcal{B}_{\rm pb}$ and
+$\mathcal{B}_{\rm hist}$ constitute an explicitly given, equally feasible
+SHA-256 collision finder with the stated costs. For every explicitly given
+feasible $\mathsf{HEAD}$ or $\mathsf{FORK}$ adversary, the stated black-box
+reductions give an Ed25519 EUF-CMA forger with no loss in success
+probability, under correct initial acquisition of $pk$ and the fixed context.
+Under the human-ignorance reading of collision resistance~\cite{rogaway} ---
+no feasible SHA-256 collision finder is presently known --- this yields the
+intended security interpretation; that reading is an engineering judgment
+stated as such, not a mathematical assumption discharged by this corollary.
 \end{corollary}
 
 \paragraph{What the games do and do not formalize.}
@@ -900,15 +923,19 @@ syntactic part --- the pin rule accepts only same-view or verified-extension
 transitions, by construction --- and the semantic part supplied by
 $\mathsf{HIST}$: a position opened in two accepted views cannot change value
 without a collision. Clause (iii) is $\mathsf{FORK}$ completeness and frame
-resistance, scoped to $\chi$. Clause (iv) is Lemma~\ref{lem:policy}.
+resistance, scoped to $\chi$. Clause (iv) is Lemma~\ref{lem:policy}. The
+games are not a bespoke bar: they adapt the established two-transcript
+secure-logging notions~\cite{dghs} to replay attestation --- operator as
+first-class adversary, policy separation added --- rather than introducing a
+new style of security definition.
 
 \begin{remark}[What is mechanized, what is not]\label{rem:gamescope}
 The games are stated for the scheme's specified verifiers --- the recursive
 model whose honest-reference specializations are kernel-checked in entry~13
 (the named extractors and per-step pin safety). The two-transcript
 comparisons and the transport induction are paper-level proofs in the same
-discipline --- the induction reuses the corpus's mechanized split-stability
-fact for \code{kbelow} --- and are not part of the mechanized corpus;
+discipline --- the induction reuses the corpus's mechanized
+\code{kbelow_prefix_eq} fact --- and are not part of the mechanized corpus;
 $\mathsf{HIST}$ supplies, at paper level, the multi-step closure the corpus
 leaves external. Applying any of these statements to the deployed iterative
 verifier inherits the refinement boundary of the previous subsection
@@ -1368,10 +1395,11 @@ Verification Pipeline with AI Provers: An Experience Report. arXiv:2605.30106,
 \toprule
 Consumer conclusion & Established by & Remaining assumption \\
 \midrule
-Leaf occupies index $m$ under head $h$ & inclusion proof and signed head & SHA-256 collision resistance; correct public key; EUF-CMA of the head signature \\
+Leaf has an authentic, position-unique opening at index $m$ under head $h$ & inclusion proof and signed head & SHA-256 collision resistance; correct public key; EUF-CMA of the head signature \\
+Head root commits the published numbered leaf list & full-mirror recomputation (\code{verify.py --all}) & mirror availability and retention \\
 Head was authorized by the log identity & Ed25519 verification & correct key acquisition; EUF-CMA \\
 New pinned head extends old pinned head & consistency proof & SHA-256 collision resistance; recursive-model soundness; authentic size/root pairing for deployment \\
-Equal-size unequal roots conflict & two valid signatures & correct public key; EUF-CMA; operationally, a retaining observer must compare the heads \\
+Equal-size unequal roots in one log context conflict & two valid signatures & correct public key; EUF-CMA; operationally, a retaining observer must compare the heads \\
 Observed cone matches local boundary policy & exact set equality & semantic identity of named declarations \\
 Operator claims the kernel produced the observation & attestation signature and leaf inclusion & correct provider key; EUF-CMA \\
 Kernel actually produced the recorded observation & not cryptographically established; independently checkable by replay & operator and replay-pipeline honesty, or faithful independent replay \\
