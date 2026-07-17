@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \quad (v0.8)}
+\date{July 2026 \quad (v0.9)}
 
 \begin{document}
 \maketitle
@@ -75,8 +75,8 @@ collision-extracting arguments for inclusion and consistency, lift them to
 scheme-level accountability games with a composition theorem, and evaluate a
 live deployment over four production Ed25519 codebases. The public log
 contains thirteen leaves; the thirteenth attests a Lean mechanization of the
-accumulator's own security arguments (61 human-reviewed certificates over a
-single uninterpreted SHA-256 axiom). The mechanization effort also exposed,
+accumulator's own security arguments (61 human-reviewed certificates with one
+project-specific uninterpreted SHA-256 boundary axiom). The mechanization effort also exposed,
 via differential testing, a nontrivial implementation boundary --- the
 deployed iterative consistency verifier is not extensionally equal to the
 recursive model on malformed size claims --- and the leaf records this
@@ -242,7 +242,7 @@ buy validity of the observation itself.
 
 \begin{table}[t]
 \centering\small
-\begin{tabularx}{\textwidth}{@{}lXXXX@{}}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
 \toprule
 Mechanism & Consumer cost & Semantic checker & History accountability & Main residual cost \\
 \midrule
@@ -297,8 +297,8 @@ does not consume an operator verdict as positive evidence.
 \begin{definition}[Accountable replay distribution]
 Fix an operator public key and a consumer that persists accepted signed heads.
 A replay-distribution scheme is \emph{accountable} if the following hold:
-(i) every accepted attestation has a unique accepted opening at its claimed
-position under an authentic signed view; (ii) a
+(i) every accepted attestation has an authentic signed view and a uniquely
+determined leaf value at its claimed position; (ii) a
 consumer accepts a later view only as the same view or a verified extension;
 (iii) two valid equal-size heads with unequal roots, in one log and protocol
 context, form transferable evidence
@@ -664,7 +664,8 @@ two other parties --- an outsider forging an ordinary head
 ($\mathsf{HEAD}$), and a third party fabricating equivocation evidence
 ($\mathsf{FORK}$); those games have a secret and a signing oracle, and their
 advantage is the probability, over key generation and the adversary's coins,
-of winning.
+of winning. The adversary may query the signing oracle adaptively on
+context-valid payloads; $Q$ denotes the set of exact queried payload bytes.
 
 \paragraph{The games at a glance.}
 \begin{center}\footnotesize
@@ -771,7 +772,7 @@ determined by their integer arguments, not by the adversary, so two
 computations at the same arguments traverse the same nodes and there are no
 mismatched stopping points.
 
-\begin{figure}[t]
+\begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
   every node/.style={font=\scriptsize},
@@ -786,9 +787,9 @@ mismatched stopping points.
 \node[nd,sb] (p01) at (0.475,0.95) {};
 \node[nd,sb] (p23) at (2.375,0.95) {};
 \node[fr] (p45) at (4.275,0.95) {$B$};
-\node[pn] (p67) at (6.175,0.95) {};
+\node[pn] (p67) at (6.175,0.95) {$s$};
 \node[fr] (q03) at (1.425,1.9) {$A$};
-\node[pn] (q47) at (5.225,1.9) {$s$};
+\node[nd] (q47) at (5.225,1.9) {};
 \node[nd] (rt) at (3.325,2.85) {$r_1$};
 \foreach \a/\b in {d0/p01,d1/p01,d2/p23,d3/p23,d4/p45,d5/p45,d6/p67,d7/p67,p01/q03,p23/q03,p45/q47,p67/q47,q03/rt,q47/rt}
   \draw (\a) -- (\b);
@@ -815,6 +816,8 @@ by $B$.}
 \label{fig:transport}
 \end{figure}
 
+
+\begin{samepage}
 \begin{lemma}[Prefix transport]\label{lem:transport}
 Suppose $m<n_0\le n_1$ and
 \[\mathsf{Ext}(n_0,r_0,n_1,r_1,C)=1, \qquad \mathsf{Open}(d,m,n_1,P,r_1)=1.\]
@@ -823,6 +826,7 @@ distinct byte strings with equal SHA-256 digests, or a path $P_0$ with
 $\mathsf{Open}(d,m,n_0,P_0,r_0)=1$, using at most the hash evaluations of
 replaying the two accepted transcripts.
 \end{lemma}
+\end{samepage}
 \begin{proof}
 If $n_0=n_1$ then $r_0=r_1$ and $P_0=P$. Otherwise
 $\ConsRec(n_0,n_1,C,\top,r_0)=(r_0,r_1)$, and we prove the following claim by
@@ -985,8 +989,9 @@ Theorems~\ref{thm:pb}--\ref{thm:fork}.
 \begin{corollary}[Constructive security consequence]\label{cor:security}
 For every explicitly given feasible adversary that wins $\mathsf{PB}$ or
 $\mathsf{HIST}$, the explicitly specified $\mathcal{B}_{\rm pb}$ and
-$\mathcal{B}_{\rm hist}$ constitute an explicitly given, equally feasible
-SHA-256 collision finder with the stated costs. For every explicitly given
+$\mathcal{B}_{\rm hist}$ constitute an explicitly given SHA-256 collision
+finder, feasible with the explicit overhead stated in
+Theorems~\ref{thm:pb} and~\ref{thm:hist}. For every explicitly given
 feasible $\mathsf{HEAD}$ or $\mathsf{FORK}$ adversary, the stated black-box
 reductions give an Ed25519 EUF-CMA forger with no loss in success
 probability, under correct initial acquisition of $pk$ and the fixed context.
@@ -1002,16 +1007,16 @@ Against Definition~2: clause (i) is delivered as head authenticity
 distinct leaf can also be opened at an accepted position. Whether a root
 moreover commits a complete published leaf list is a system property, not a
 game property: the log publishes its leaves, and a consumer holding the
-mirror checks membership against the actual list. Clause (ii) splits into a
+mirror checks membership against the actual list. In short,
+$\mathsf{PB}$ proves leaf-value binding; mirror recomputation proves
+equality to the published list. Clause (ii) splits into a
 syntactic part --- the pin rule accepts only same-view or verified-extension
 transitions, by construction --- and the semantic part supplied by
 $\mathsf{HIST}$: a position opened in two accepted views cannot change value
 without a collision. Clause (iii) is $\mathsf{FORK}$ completeness and frame
-resistance, scoped to $\chi$. Clause (iv) is Lemma~\ref{lem:policy}. The
-games are not a bespoke bar: they adapt the established two-transcript
-secure-logging notions~\cite{dghs} to replay attestation --- operator as
-first-class adversary, policy separation added --- rather than introducing a
-new style of security definition.
+resistance, scoped to $\chi$. Clause (iv) is Lemma~\ref{lem:policy}. The games adapt the established
+two-transcript secure-logging notions~\cite{dghs} to replay attestation ---
+operator as first-class adversary, policy separation added.
 
 \begin{remark}[What is mechanized, what is not]\label{rem:gamescope}
 The games are stated for the scheme's specified verifiers --- the recursive
@@ -1481,7 +1486,7 @@ Verification Pipeline with AI Provers: An Experience Report. arXiv:2605.30106,
 \toprule
 Consumer conclusion & Established by & Remaining assumption \\
 \midrule
-Leaf has an authentic, position-unique opening at index $m$ under head $h$ & inclusion proof and signed head & SHA-256 collision resistance; correct public key; EUF-CMA of the head signature \\
+Leaf has an authentic opening with a position-bound leaf value at index $m$ under head $h$ & inclusion proof and signed head & SHA-256 collision resistance; correct public key; EUF-CMA of the head signature \\
 Head root commits the published numbered leaf list & full-mirror recomputation (\code{verify.py --all}) & mirror availability and retention \\
 Head was authorized by the log identity & Ed25519 verification & correct key acquisition; EUF-CMA \\
 New pinned head extends old pinned head & consistency proof & SHA-256 collision resistance; recursive-model soundness; authentic size/root pairing for deployment \\
@@ -1510,6 +1515,7 @@ additionally relies on an unmechanized authentic-size/root invariant
 Its exclusions name SHA-256 collision resistance, deployed-verifier extensional
 equality, the signature/STH layer, and asymptotic cost claims.
 
+\clearpage
 \section{Compact receipt-verification core}\label{app:verifier}
 The following code is only the Merkle inclusion core. A complete receipt
 verifier must additionally validate the signed tree head, log identifier,
