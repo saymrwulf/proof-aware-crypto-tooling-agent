@@ -292,11 +292,12 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 19 pages, v0.5) — the trust decomposition (expensive verification produces an
+(PDF, 21 pages, v0.6) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
-accountability GAMES with an explicit composition theorem (position binding, history
-binding, fork evidence — all discharged by named reductions), the policy boundary where
+accountability GAMES with an explicit composition theorem (head authenticity, position
+binding, history binding with a fully proved prefix-transport induction, context-scoped
+fork evidence — all discharged by named reductions), the policy boundary where
 operator labels can veto but never grant acceptance, the live thirteen-leaf deployment
 whose entry 13 attests the accumulator's own mechanized model, and the measured
 model/deployment divergence (3,867 lied-size cases, every one accepted only by the

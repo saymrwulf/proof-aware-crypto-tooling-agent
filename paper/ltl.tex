@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \quad (v0.5)}
+\date{July 2026 \quad (v0.6)}
 
 \begin{document}
 \maketitle
@@ -382,14 +382,18 @@ enough for a third party to replay.
 Each goal below is formalized as a game in Section~\ref{sec:games}.
 
 \begin{description}[leftmargin=1.5em,itemsep=5pt]
-\item[G1: Position-bound membership.] If a consumer accepts leaf $d$ at index
-$m$ against signed head $(n,r)$, then $d$ occupies position $m$ in a leaf list
-committed by $r$, except under hash collision or signature forgery.
+\item[G1: Authentic position binding.] If a consumer accepts leaf $d$ at
+index $m$ under signed head $(n,r)$: the head was issued by the key holder
+except under signature forgery, and no leaf distinct from $d$ can also be
+opened at position $m$ under that head except under hash collision.
 \item[G2: Local append-only history.] A consumer that persists $(n,r)$ accepts
 a later view only if it is the same view or a verified extension. Two valid
-heads of equal size and unequal roots are transferable evidence that the key
-holder signed incompatible views. Unequal-size forks require retained
-history, gossip, or a witness.
+heads of equal size and unequal roots, in one log context, are transferable
+evidence that the key holder signed incompatible views. Unequal-size forks
+require retained history, gossip, or a witness. The transition discipline
+itself is syntactic, enforced by the pin rule by construction; the semantic
+content --- an opened position cannot change value across accepted views ---
+is a theorem (\S\ref{sec:games}).
 \item[G3: Policy separation.] The operator's positive label cannot make a
 certificate acceptable. The consumer recomputes boundary conformance from
 observations and local policy. Operator failure labels may be treated as a
@@ -602,33 +606,67 @@ unmechanized authentic-size/root invariant.
 \subsection{Scheme-level games and a composition theorem}\label{sec:games}
 
 The theorems above bind single artifacts to a reference leaf list. This
-subsection lifts them to the scheme: precise experiments for the accountability
-clauses of Definition~2, and a theorem that the construction satisfies them.
-Two modeling choices deserve emphasis. First, the replay operator \emph{is} the
-adversary and legitimately holds the signing key, so the position-binding and
-history games contain no secrets and no oracles; any adaptive interaction can
-be replayed into a single output, and the games are therefore non-interactive
---- mirroring the deployment, in which receipt verification itself is
-non-interactive. Signatures constrain a different party: the frame-resistance
-game, in which a third party attempts to fabricate equivocation evidence
-against a key holder who never equivocated. Second, SHA-256 is a fixed,
-unkeyed function, so ``collision resistance'' cannot be a probability
-statement over a key space; following the human-ignorance
-treatment~\cite{rogaway}, every hash statement below is an \emph{explicit
-reduction} --- a named algorithm transforming a winning transcript into a
-concrete collision --- which is the scheme-level continuation of the corpus's
-named-extractor discipline.
+subsection lifts them to the scheme. Fix once, for the entire subsection, a
+\emph{context}
+\[\chi=(\text{log identifier},\ \text{schema and type tags},\
+\text{hash-algorithm identifier},\ pk);\]
+every head below is required to encode $\chi$ in its canonical payload,
+matching the deployed head format of \S4.2.
+The results come in two deliberately separated levels. First,
+\emph{collision-extractable accountability}: unconditional theorems whose
+proofs are explicit algorithms turning any winning transcript into a concrete
+SHA-256 collision, and reductions whose signature losses are exactly one
+EUF-CMA forgery. Second, a \emph{security corollary}: SHA-256 is a fixed,
+unkeyed function, so collision resistance cannot be a probability statement
+over a key space; following the human-ignorance treatment~\cite{rogaway}, the
+hardness premise is that no feasible collision finder for SHA-256 is known,
+and the corollary states what the explicit reductions then rule out. (A
+keyed-family restatement is routine and omitted.) Extractability does not by
+itself assert hardness; the corollary is where hardness enters, and only
+there.
+
+The position-binding and history games are non-interactive, and the right
+reason is not merely that the operator-adversary holds the signing key: the
+properties are universal statements over \emph{accepted transcripts},
+independent of how a transcript was obtained, so adaptive interaction with
+any proof-issuing service can be collapsed into the adversary's final output.
+Signatures constrain two different parties: an outsider forging an ordinary
+head ($\mathsf{HEAD}$), and a third party fabricating equivocation evidence
+($\mathsf{FORK}$); those two games have a secret and are stated with a
+signing oracle and an advantage, defined as the probability, over the
+challenger's key generation and the adversary's coins, that the adversary
+wins.
 
 \paragraph{Accepted-artifact syntax.}
-Fix the algorithms of Section~\ref{sec:construction}. A head $h=(n,r;\sigma)$
-carries the canonical signed payload of \S4.2; $\mathsf{Vf}_{pk}(h)=1$ iff its
-signature verifies. An \emph{opening} of leaf $d$ at index $m$ under $(n,r)$
-is a path $P$ with $m<n$ and $\Root(\hleaf(d),m,n,P)=r$ (acceptance in the
-Option sense of \S\ref{sec:security}); write $\mathsf{Open}(d,m,n,P,r)=1$. An
-\emph{extension} from $(n_0,r_0)$ to $(n_1,r_1)$ is exactly a pin-rule
-transition: either $n_0=n_1$ and $r_0=r_1$, or $n_0<n_1$ and
-$\ConsRec(n_0,n_1,C,\top,r_0)=(r_0,r_1)$ for the supplied proof $C$; write
+A head is $h=(n,r,t;\sigma)$, with $t$ a timestamp; its canonical payload is
+$\mathsf{EncodeHead}_\chi(n,r,t)$ as in \S4.2, and $\mathsf{Vf}_{pk}(h)=1$
+iff its Ed25519 signature verifies. An \emph{opening}
+of leaf $d$ at index $m$ under $(n,r)$ is a path $P$ with $m<n$ and
+$\Root(\hleaf(d),m,n,P)=r$ (acceptance in the Option sense of \S5.1); write
+$\mathsf{Open}(d,m,n,P,r)=1$. An \emph{extension} from $(n_0,r_0)$ to
+$(n_1,r_1)$ by proof $C$ is exactly a pin-rule transition: either $n_0=n_1$,
+$r_0=r_1$, and $C$ is empty, or $n_0<n_1$ and
+$\ConsRec(n_0,n_1,C,\top,r_0)=(r_0,r_1)$; write
 $\mathsf{Ext}(n_0,r_0,n_1,r_1,C)=1$.
+
+\begin{lemma}[Monotone extensions]\label{lem:mono}
+If $\mathsf{Ext}(n_0,r_0,n_1,r_1,C)=1$ then $n_0\le n_1$; accepted chains of
+extensions have nondecreasing sizes.
+\end{lemma}
+\begin{proof}
+Immediate from the two disjuncts of $\mathsf{Ext}$.
+\end{proof}
+
+\begin{lemma}[Payload injectivity]\label{lem:inj}
+For fixed $\chi$, $\mathsf{EncodeHead}_\chi$ is injective on $(n,r,t)$; in
+particular, distinct $(n,r)$ pairs yield distinct payload byte strings.
+\end{lemma}
+\begin{proof}
+The canonical serialization emits a fixed set of keys in sorted order with
+fixed separators; the size is a decimal integer and the root a fixed-length
+lowercase hex string under distinct fixed keys, so the encoding parses back
+uniquely.
+\end{proof}
 
 \paragraph{Game $\mathsf{PB}$ (position binding).}
 $\mathcal{A}$ outputs $(n,r,m,d,P,d',P')$ and wins iff $d\neq d'$ and
@@ -636,15 +674,16 @@ $\mathcal{A}$ outputs $(n,r,m,d,P,d',P')$ and wins iff $d\neq d'$ and
 
 \begin{theorem}[Scheme position binding]\label{thm:pb}
 There is an explicit algorithm $\mathcal{B}_{\rm pb}$ that, whenever
-$\mathcal{A}$ wins $\mathsf{PB}$, outputs two distinct byte strings with equal
-SHA-256 digests, using at most the $2(\lceil\log_2 n\rceil{+}1)$ hash
-evaluations of replaying the two openings.
+$\mathcal{A}$ wins $\mathsf{PB}$, outputs two distinct byte strings with
+equal SHA-256 digests, using at most the $2(\lceil\log_2 n\rceil{+}1)$ hash
+evaluations of replaying the two openings, with their intermediate values
+retained.
 \end{theorem}
 \begin{proof}
 Both accepting folds have the shape determined by $(m,n)$ and output the same
 root $r$. Walk from the root downward along the path of $m$, maintaining that
-the two transcripts agree on the current node's value. At an internal node the
-transcripts present preimages $\mathtt{0x01}\|a\|b$ and
+the two transcripts agree on the current node's value. At an internal node
+the transcripts present preimages $\mathtt{0x01}\|a\|b$ and
 $\mathtt{0x01}\|a'\|b'$ with equal digests; since child values have fixed
 32-byte width, the argument pairs are recoverable from the preimages, so
 unequal pairs are a collision and equal pairs propagate agreement one level
@@ -655,39 +694,103 @@ separation would in addition make any cross-type coincidence itself a
 collision of distinct strings.
 \end{proof}
 
+\paragraph{The transport algorithm.}
+For the history theorem we need to move an opening backward through an
+accepted extension. Recall the recursive verifiers (\S4.1, the mechanized
+form; malformed shapes reject). With $k$ the largest power of two below $n$:
+\[
+\Root(v,m,n,P)=
+\begin{cases}
+v & n=1,\ P\ \text{exhausted}\\
+\hnode(\Root(v,m,k,P'),\,s) & m<k\\
+\hnode(s,\,\Root(v,m{-}k,n{-}k,P')) & m\ge k,
+\end{cases}
+\]
+where $s$ is the sibling $P$ supplies for the current level, and
+\[
+\ConsRec(n_0,n,C,b,r)=
+\begin{cases}
+(v,v),\ \ v=r\ \text{if}\ b\ \text{else the next value of}\ C & n_0=n\\
+(x,\ \hnode(y,s)) & n_0\le k\\
+(\hnode(s,x),\ \hnode(s,y)) & n_0>k,
+\end{cases}
+\]
+where in the second branch $(x,y)=\ConsRec(n_0,k,C,b,r)$ and $s$ is the next
+value of $C$, and in the third branch $s$ is the next value of $C$ and
+$(x,y)=\ConsRec(n_0{-}k,n{-}k,C,\bot,r)$. Both recursions' shapes are
+determined by their integer arguments, not by the adversary, so two
+computations at the same arguments traverse the same nodes and there are no
+mismatched stopping points.
+
 \begin{lemma}[Prefix transport]\label{lem:transport}
-Suppose $n_0<n_1$ and $m<n_0$, and that
+Suppose $m<n_0\le n_1$ and
 \[\mathsf{Ext}(n_0,r_0,n_1,r_1,C)=1, \qquad \mathsf{Open}(d,m,n_1,P,r_1)=1.\]
-There is an explicit algorithm
-returning either a SHA-256 collision or a path $P_0$, assembled from the
-values of $C$ and $P$, such that $\mathsf{Open}(d,m,n_0,P_0,r_0)=1$.
+There is an explicit algorithm $\mathsf{Transport}$ returning either two
+distinct byte strings with equal SHA-256 digests, or a path $P_0$ with
+$\mathsf{Open}(d,m,n_0,P_0,r_0)=1$, using at most the hash evaluations of
+replaying the two accepted transcripts.
 \end{lemma}
-\begin{proof}[Proof sketch]
-The accepted $\ConsRec$ transcript reconstructs $r_1$ as a fold over the
-$n_1$-tree down to a frontier: the maximal perfect subtrees canonically
-covering $[0,n_0)$ and the proof nodes covering $[n_0,n_1)$; its consumed
-values are the entries of $C$ and, where the recursion bottoms out on the old
-side, the pinned $r_0$ itself. Compare the opening's fold with this transcript
-from the root down, as in Theorem~\ref{thm:pb}: either some shared node splits
-into unequal recoverable argument pairs --- a collision --- or agreement
-propagates until the path of $m$ enters the frontier subtree $T^*$ containing
-$m$, at which point the opening's value at $T^*$ equals the transcript's value
-$s^*$ there. Below $T^*$, the tail of $P$ is an accepting opening of $d$
-within $T^*$ against $s^*$. Above $T^*$, the transcript's old-root component
-folds the frontier values covering $[0,n_0)$ to $r_0$, and the siblings of
-$T^*$ on the path to the root of the $n_0$-tree are all among the inputs and
-intermediate values of that fold. Concatenating the tail of $P$ with those values yields
-$P_0$; $\Root$ replays the same computation and outputs $r_0$. When $n_0$ is a
-power of two, $T^*$ is the whole old tree, the spine is empty, and $P_0$ is
-the tail of $P$ alone. Same-size extensions ($r_0=r_1$) transport identically.
+\begin{proof}
+If $n_0=n_1$ then $r_0=r_1$ and $P_0=P$. Otherwise
+$\ConsRec(n_0,n_1,C,\top,r_0)=(r_0,r_1)$, and we prove the following claim by
+induction on $n$, for every sub-call arising in the accepted transcript:
+
+\emph{Claim.} If $\ConsRec(n_0',n,C',b,\cdot)$ accepts with output $(x,y)$,
+and $\mathsf{Open}(d,m',n,P',\rho)=1$ with $m'<n_0'$ and $\rho=y$, then
+either an explicit collision is output, or a path $P_0'$ with
+$\mathsf{Open}(d,m',n_0',P_0',x)=1$.
+
+\emph{Base} ($n_0'=n$): the transcript gives $x=y=\rho$, and $P_0'=P'$.
+
+\emph{Case} $n_0'\le k$, $k$ the split of $n$: the transcript's second
+component is $y=\hnode(y_L,s)$ with $(x,y_L)$ the left sub-call's output.
+Since $m'<n_0'\le k$, the opening's top step is
+$\rho=\hnode(u,s_P)$ with $u=\Root(\hleaf(d),m',k,\cdot)$ accepted on the
+opening's remaining path. The two preimages of $\rho=y$ are
+$\mathtt{0x01}\|y_L\|s$ and $\mathtt{0x01}\|u\|s_P$: if the pairs differ,
+output the collision; otherwise $u=y_L$, and the inductive hypothesis applied
+to the left sub-call (output $(x,y_L)$) and the sub-opening (root value
+$u=y_L$) yields a collision or $P_0'$ with
+$\mathsf{Open}(d,m',n_0',P_0',x)=1$, which is the claim since the first
+component passes through this branch unchanged.
+
+\emph{Case} $n_0'>k$: the transcript consumed $s$ and the right sub-call
+returned $(x_R,y_R)$, so $x=\hnode(s,x_R)$ and $y=\hnode(s,y_R)$. Because
+$k<n_0'\le n$ and $k$ is the largest power of two below $n$, $k$ is also the
+largest power of two below $n_0'$ (there is no power of two strictly between
+$k$ and $n$; the corpus mechanizes this prefix stability as its
+\code{kbelow} lemma), so the $n_0'$-tree splits at $k$ as well and
+$x=\hnode(s,x_R)$ is precisely its root form.
+\emph{If} $m'<k$: the opening's top step is $\rho=\hnode(u,s_P)$ with
+$u=\Root(\hleaf(d),m',k,\cdot)$ accepted on the remaining path
+$P'_{\rm in}$. Compare preimages of $\rho=y$: unequal pairs are a collision;
+otherwise $u=s$ and $s_P=y_R$, so the remaining path opens $d$ at $m'$ in the
+left subtree with root value $s$, and
+$P_0'\coloneqq P'_{\rm in}\,\|\,[x_R]$ satisfies
+$\Root(\hleaf(d),m',n_0',P_0')=\hnode(s,x_R)=x$: an accepting opening,
+assembled from the opening's own inner path and the transcript's right
+first-component. \emph{If} $m'\ge k$: the opening's top step is
+$\rho=\hnode(s_P,u)$ with $u$ accepted at $m'-k$ in the right subtree;
+comparing preimages of $\rho=y$ either yields a collision or $s_P=s$ and
+$u=y_R$, and the inductive hypothesis on the right sub-call (output
+$(x_R,y_R)$, sizes $n_0'-k\le n-k$, index $m'-k<n_0'-k$) gives a collision or
+$P_0''$ opening $d$ at $m'-k$ under $x_R$; then
+$P_0'\coloneqq P_0''\,\|\,[s]$ opens $d$ at $m'$ under $x=\hnode(s,x_R)$.
+
+The top-level instance of the claim has $\rho=r_1=y$ and $x=r_0$ by
+acceptance, which is the lemma. Every comparison is between two explicit
+32-byte-child node preimages, so each disagreement is a concrete collision;
+every assembled path entry is either an entry of $P$, an entry of $C$, or a
+sub-call output value, all present in the replayed transcripts.
 \end{proof}
 
 \paragraph{Game $\mathsf{HIST}$ (local history binding).}
-$\mathcal{A}$ outputs a chain $h_0,\dots,h_k$ with transitions certified by
-$\mathsf{Ext}$ for each consecutive pair --- precisely a state sequence a
-consumer's pin can traverse; signature checks are omitted because the
-adversary holds the key, so they constrain nothing --- together with indices
-$a<b$, an index $m<n_a$, and openings with
+$\mathcal{A}$ outputs a chain of heads $h_0,\dots,h_k$ and transition
+proofs $C_1,\dots,C_k$ with $\mathsf{Ext}(n_{i-1},r_{i-1},n_i,r_i,C_i)=1$ for every
+$1\le i\le k$ --- precisely a state sequence a consumer's pin can traverse;
+signature checks are irrelevant here because the properties quantify over
+accepted transcripts --- together with indices $0\le a<b\le k$, an index
+$m<n_a$, and openings with
 $\mathsf{Open}(d,m,n_a,P,r_a)=\mathsf{Open}(d',m,n_b,P',r_b)=1$ and
 $d\neq d'$. $\mathcal{A}$ wins iff everything verifies.
 
@@ -697,27 +800,45 @@ $\mathcal{A}$ wins $\mathsf{HIST}$, outputs a SHA-256 collision, using
 $O(k\log n_k)$ hash evaluations.
 \end{theorem}
 \begin{proof}
-Sizes along the chain are nondecreasing, so $m<n_a\le n_i$ for all $i\ge a$.
-Apply Lemma~\ref{lem:transport} to the opening under $h_b$ and the transition
-into $h_b$: either a collision, or an accepting opening of $d'$ at $m$ under
-$h_{b-1}$. Iterating down to $h_a$ yields a collision or an accepting opening
-of $d'$ at $m$ under $(n_a,r_a)$; together with the given opening of
-$d\neq d'$ there, Theorem~\ref{thm:pb} extracts the collision.
+By Lemma~\ref{lem:mono}, $m<n_a\le n_i$ for all $i\ge a$. Walk $t$ from $b$
+down to $a{+}1$, maintaining an accepting opening of $d'$ at $m$ under
+$(n_t,r_t)$. If $n_{t-1}=n_t$ then $\mathsf{Ext}$ forces $r_{t-1}=r_t$ and
+the opening carries over unchanged; if $n_{t-1}<n_t$, apply
+Lemma~\ref{lem:transport} to $C_t$ and the current opening, obtaining a
+collision (done) or an accepting opening under $(n_{t-1},r_{t-1})$. Arriving
+at $h_a$ yields two accepting openings of $d\neq d'$ at $m$ under
+$(n_a,r_a)$, and Theorem~\ref{thm:pb} extracts the collision.
 \end{proof}
 
+\paragraph{Game $\mathsf{HEAD}$ (head authenticity).}
+A challenger runs $\mathsf{KeyGen}$ and signs, on the operator's behalf, the
+canonical payloads the operator issues in context $\chi$ (query set $Q$). The
+adversary, without the key, outputs a head $h$ and wins iff
+$\mathsf{Vf}_{pk}(h)=1$, $h$ encodes $\chi$, and $h$'s payload is not in $Q$.
+
+\begin{theorem}[Head authenticity]\label{thm:head}
+For every $\mathcal{A}$ there is an explicit $\mathcal{B}_{\rm ha}$ with
+$\mathbf{Adv}^{\mathsf{HEAD}}(\mathcal{A})\le
+\mathbf{Adv}^{\text{euf-cma}}(\mathcal{B}_{\rm ha})$: a winning head's exact
+payload bytes were never queried, so its valid signature is an existential
+forgery, which $\mathcal{B}_{\rm ha}$ outputs.
+\end{theorem}
+
 \paragraph{Game $\mathsf{FORK}$ (fork evidence).}
-Define the evidence predicate $\mathsf{Ev}(h,h')=1$ iff
-$\mathsf{Vf}_{pk}(h)=\mathsf{Vf}_{pk}(h')=1$, the tree sizes are equal, and
-the roots differ. \emph{Completeness} is by construction: if the key holder
-signs two equal-size heads with unequal roots, the pair itself satisfies
-$\mathsf{Ev}$ --- producing the evidence requires retention and comparison,
-not cooperation. \emph{Frame resistance} is a game: a challenger runs
-$\mathsf{KeyGen}$ and signs, on the operator's behalf, the canonical payloads
-the operator actually issues (query set $Q$); the adversary, without the key,
-outputs $(h,h')$ and wins iff $\mathsf{Ev}(h,h')=1$ and at least one of the
-two canonical payloads is not in $Q$. (If both payloads are in $Q$, the key
-holder really did sign two equal-size heads with unequal roots --- the
-evidence is genuine, not a frame.)
+Define the context-scoped evidence predicate:
+$\mathsf{Ev}_\chi(h,h')=1$ iff both signatures verify, both heads encode the
+same context $\chi$, the tree sizes are equal, and the roots differ. Heads of
+different logs, schema versions, or hash algorithms never form evidence ---
+one key legitimately operating two logs must not be classifiable as
+equivocating. \emph{Completeness} is by construction: if the key holder signs
+two equal-size, unequal-root heads in one context, the pair itself satisfies
+$\mathsf{Ev}_\chi$; producing it requires retention and comparison, not
+cooperation. \emph{Frame resistance} is the game: the challenger signs the
+operator's issued payloads in $\chi$ (query set $Q$); the adversary, without
+the key, outputs $(h,h')$ and wins iff $\mathsf{Ev}_\chi(h,h')=1$ and at
+least one of the two payloads is not in $Q$. This is an
+\emph{issued-message attribution} game: a valid evidence pair proves the key
+holder signed both conflicting payloads, except with forgery probability.
 
 \begin{theorem}[Frame resistance]\label{thm:fork}
 For every $\mathcal{A}$ there is an explicit $\mathcal{B}_{\rm fr}$ with
@@ -725,48 +846,72 @@ $\mathbf{Adv}^{\mathsf{FORK}}(\mathcal{A})\le
 \mathbf{Adv}^{\text{euf-cma}}(\mathcal{B}_{\rm fr})$.
 \end{theorem}
 \begin{proof}
-A winning pair contains a head whose canonical payload was never queried to
-the signing oracle; its valid signature is an existential forgery, which
-$\mathcal{B}_{\rm fr}$ outputs. (Payloads are injective on $(n,r)$ by the
-canonical serialization of \S4.2, so distinct claimed views cannot collapse
-to one queried message.)
+A winning pair contains a head whose exact canonical payload bytes were never
+queried to the signing oracle; its valid signature is an existential forgery,
+which $\mathcal{B}_{\rm fr}$ outputs.
 \end{proof}
 
 \begin{lemma}[Policy separation]\label{lem:policy}
 For every leaf $a$ and certificate $c$, the verdict computed by
 $\mathsf{Verdict}$ equals $[\Obs_a(c)=\Policy(c)]$; it reads no operator
-label, and acceptance consults the operator's status only as a veto. This is a
-deterministic property of the $\mathsf{Verdict}$ algorithm, by construction
+label, and acceptance consults the operator's status only as a veto. This is
+a deterministic property of the $\mathsf{Verdict}$ algorithm, by construction
 (\S\ref{sec:model}); it is not a hardness statement.
 \end{lemma}
 
-\begin{definition}[Accountable replay distribution, formal]\label{def:formal}
-A scheme is \emph{accountable} if explicit reductions
-$\mathcal{B}_{\rm pb},\mathcal{B}_{\rm hist}$ as above exist, fork evidence is
-complete with frame resistance bounded by EUF-CMA, and $\mathsf{Verdict}$
-satisfies policy separation. This formalizes clauses (i)--(iv) of
-Definition~2: $\mathsf{PB}$ gives position binding, $\mathsf{HIST}$ the local
-append-only history, $\mathsf{FORK}$ transferable same-size evidence, and
-Lemma~\ref{lem:policy} policy separation.
+\begin{definition}[Collision-extractable accountability]\label{def:formal}
+A scheme with fixed context $\chi$ is \emph{collision-extractably
+accountable} if there are explicit algorithms, running in time polynomial in
+the transcript size, that map every winning $\mathsf{PB}$ or $\mathsf{HIST}$
+output to two distinct strings with equal hash digests; explicit reductions
+bounding $\mathbf{Adv}^{\mathsf{HEAD}}$ and $\mathbf{Adv}^{\mathsf{FORK}}$
+each by one EUF-CMA advantage; and a $\mathsf{Verdict}$ satisfying policy
+separation.
 \end{definition}
 
-\begin{theorem}[Accountability of the construction]\label{thm:main}
+\begin{theorem}[Collision-extractable accountability of the construction]\label{thm:main}
 The LTL construction --- the RFC~9162 tree, the canonical signed heads of
-\S4.2, the pin rule of \S4.3, and the policy verdict of \S\ref{sec:model} ---
-is an accountable replay-distribution scheme, with
-$\mathcal{B}_{\rm pb}$, $\mathcal{B}_{\rm hist}$, and $\mathcal{B}_{\rm fr}$
-the explicit algorithms of Theorems~\ref{thm:pb}--\ref{thm:fork}.
+\S4.2 in their fixed context $\chi$, the pin rule of \S4.3, and the policy
+verdict of \S\ref{sec:model} --- is collision-extractably accountable, with
+$\mathcal{B}_{\rm pb}$ ($\le 2(\lceil\log_2 n\rceil{+}1)$ hash evaluations),
+$\mathcal{B}_{\rm hist}$ ($O(k\log n_k)$), and the one-forgery reductions
+$\mathcal{B}_{\rm ha},\mathcal{B}_{\rm fr}$ of
+Theorems~\ref{thm:pb}--\ref{thm:fork}.
 \end{theorem}
+
+\begin{corollary}[Security consequence]\label{cor:security}
+Assume the human-ignorance premise for SHA-256 --- no feasible collision
+finder is known~\cite{rogaway} --- EUF-CMA security of Ed25519, correct
+initial acquisition of $pk$, and the fixed context $\chi$. Then a feasible
+adversary that wins $\mathsf{PB}$ or $\mathsf{HIST}$ writes down a concrete
+SHA-256 collision via the named algorithms, contradicting the premise; and
+its advantage in $\mathsf{HEAD}$ or $\mathsf{FORK}$ is at most the EUF-CMA
+advantage of the corresponding explicit reduction.
+\end{corollary}
+
+\paragraph{What the games do and do not formalize.}
+Against Definition~2: clause (i) is delivered as head authenticity
+($\mathsf{HEAD}$) plus opening \emph{uniqueness} ($\mathsf{PB}$) --- no
+distinct leaf can also be opened at an accepted position. Whether a root
+moreover commits a complete published leaf list is a system property, not a
+game property: the log publishes its leaves, and a consumer holding the
+mirror checks membership against the actual list. Clause (ii) splits into a
+syntactic part --- the pin rule accepts only same-view or verified-extension
+transitions, by construction --- and the semantic part supplied by
+$\mathsf{HIST}$: a position opened in two accepted views cannot change value
+without a collision. Clause (iii) is $\mathsf{FORK}$ completeness and frame
+resistance, scoped to $\chi$. Clause (iv) is Lemma~\ref{lem:policy}.
 
 \begin{remark}[What is mechanized, what is not]\label{rem:gamescope}
 The games are stated for the scheme's specified verifiers --- the recursive
 model whose honest-reference specializations are kernel-checked in entry~13
-(the named extractors and per-step pin safety). The two-transcript comparisons
-of Theorems~\ref{thm:pb} and~\ref{thm:hist} and the prefix-transport lemma are
-paper-level proofs in the same discipline, not part of the mechanized corpus;
-Game~$\mathsf{HIST}$ supplies, at paper level, the multi-step closure that the
-corpus leaves external. Applying any of these statements to the deployed
-iterative verifier inherits the refinement boundary of the previous subsection
+(the named extractors and per-step pin safety). The two-transcript
+comparisons and the transport induction are paper-level proofs in the same
+discipline --- the induction reuses the corpus's mechanized split-stability
+fact for \code{kbelow} --- and are not part of the mechanized corpus;
+$\mathsf{HIST}$ supplies, at paper level, the multi-step closure the corpus
+leaves external. Applying any of these statements to the deployed iterative
+verifier inherits the refinement boundary of the previous subsection
 unchanged.
 \end{remark}
 
@@ -1207,7 +1352,7 @@ C. Peters. Twisted Edwards curves. AFRICACRYPT, LNCS 5023, pp. 389--405,
 
 \bibitem{rogaway} P. Rogaway. Formalizing Human Ignorance:
 Collision-Resistant Hashing without the Keys. VIETCRYPT, LNCS 4341, pp.
-211--228, 2006.
+211--228, 2006. doi:10.1007/11958239\_14.
 
 \bibitem{klaus2026} N. Klaus, J. Conejero, P. Tolmach. A Rust-to-Lean
 Verification Pipeline with AI Provers: An Experience Report. arXiv:2605.30106,
