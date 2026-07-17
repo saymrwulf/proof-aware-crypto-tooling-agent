@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \quad (v0.4)}
+\date{July 2026 \quad (v0.5)}
 
 \begin{document}
 \maketitle
@@ -71,9 +71,10 @@ are compared.
 
 We instantiate the model as the Lean Transparency Log (LTL), using Lean~4 replay
 attestations and an RFC~9162 Merkle tree. We give explicit
-collision-extracting arguments for inclusion and consistency, formalize the
-consumer pinning and policy boundaries, and evaluate a live deployment over four
-production Ed25519 codebases. The public log contains thirteen leaves; its thirteenth
+collision-extracting arguments for inclusion and consistency, lift them to
+scheme-level accountability games with an explicit composition theorem,
+formalize the consumer pinning and policy boundaries, and evaluate a live
+deployment over four production Ed25519 codebases. The public log contains thirteen leaves; its thirteenth
 leaf attests a Lean mechanization of the accumulator's own security arguments
 (222 inventoried environment constants, 61 human-reviewed assumption cones,
 and a single uninterpreted SHA-256 axiom). The mechanization effort also exposed, via differential testing, a nontrivial
@@ -153,7 +154,9 @@ what a lightweight consumer learns without executing Lean.
 Using the RFC~9162 tree unchanged, we define signed views, inclusion receipts,
 local history pinning, and transferable same-size fork evidence. We give
 explicit collision-extracting soundness arguments specialized to the consumer
-algorithms.
+algorithms, and lift them to scheme level: concrete games for position
+binding, history binding, and fork evidence, discharged by explicit
+reductions (\S\ref{sec:games}).
 \item \textbf{Boundary-conformance policy.}
 Each leaf records the exact axiom names reported by Lean. Consumers compare
 those observations with their own policy; operator labels can veto but cannot
@@ -307,6 +310,8 @@ property. It says when conflicting claims become attributable; it does not
 cryptographically prove that the replay observation was honestly produced.
 Throughout, ``accountability'' means signed-view and history accountability;
 observation validity remains external to the mechanism.
+Section~\ref{sec:games} states clauses (i)--(iv) as games and explicit
+reductions and proves the construction satisfies them.
 
 \begin{figure}[t]
 \centering
@@ -373,6 +378,8 @@ machine. The mechanism instead makes the claimed execution target precise
 enough for a third party to replay.
 
 \subsection{Consumer goals}
+
+Each goal below is formalized as a game in Section~\ref{sec:games}.
 
 \begin{description}[leftmargin=1.5em,itemsep=5pt]
 \item[G1: Position-bound membership.] If a consumer accepts leaf $d$ at index
@@ -592,6 +599,177 @@ predicate. Consequently the public attestation says exactly this: the model is
 proved; deployment correspondence is finite-tested and relies on an
 unmechanized authentic-size/root invariant.
 
+\subsection{Scheme-level games and a composition theorem}\label{sec:games}
+
+The theorems above bind single artifacts to a reference leaf list. This
+subsection lifts them to the scheme: precise experiments for the accountability
+clauses of Definition~2, and a theorem that the construction satisfies them.
+Two modeling choices deserve emphasis. First, the replay operator \emph{is} the
+adversary and legitimately holds the signing key, so the position-binding and
+history games contain no secrets and no oracles; any adaptive interaction can
+be replayed into a single output, and the games are therefore non-interactive
+--- mirroring the deployment, in which receipt verification itself is
+non-interactive. Signatures constrain a different party: the frame-resistance
+game, in which a third party attempts to fabricate equivocation evidence
+against a key holder who never equivocated. Second, SHA-256 is a fixed,
+unkeyed function, so ``collision resistance'' cannot be a probability
+statement over a key space; following the human-ignorance
+treatment~\cite{rogaway}, every hash statement below is an \emph{explicit
+reduction} --- a named algorithm transforming a winning transcript into a
+concrete collision --- which is the scheme-level continuation of the corpus's
+named-extractor discipline.
+
+\paragraph{Accepted-artifact syntax.}
+Fix the algorithms of Section~\ref{sec:construction}. A head $h=(n,r;\sigma)$
+carries the canonical signed payload of \S4.2; $\mathsf{Vf}_{pk}(h)=1$ iff its
+signature verifies. An \emph{opening} of leaf $d$ at index $m$ under $(n,r)$
+is a path $P$ with $m<n$ and $\Root(\hleaf(d),m,n,P)=r$ (acceptance in the
+Option sense of \S\ref{sec:security}); write $\mathsf{Open}(d,m,n,P,r)=1$. An
+\emph{extension} from $(n_0,r_0)$ to $(n_1,r_1)$ is exactly a pin-rule
+transition: either $n_0=n_1$ and $r_0=r_1$, or $n_0<n_1$ and
+$\ConsRec(n_0,n_1,C,\top,r_0)=(r_0,r_1)$ for the supplied proof $C$; write
+$\mathsf{Ext}(n_0,r_0,n_1,r_1,C)=1$.
+
+\paragraph{Game $\mathsf{PB}$ (position binding).}
+$\mathcal{A}$ outputs $(n,r,m,d,P,d',P')$ and wins iff $d\neq d'$ and
+\[\mathsf{Open}(d,m,n,P,r)=\mathsf{Open}(d',m,n,P',r)=1.\]
+
+\begin{theorem}[Scheme position binding]\label{thm:pb}
+There is an explicit algorithm $\mathcal{B}_{\rm pb}$ that, whenever
+$\mathcal{A}$ wins $\mathsf{PB}$, outputs two distinct byte strings with equal
+SHA-256 digests, using at most the $2(\lceil\log_2 n\rceil{+}1)$ hash
+evaluations of replaying the two openings.
+\end{theorem}
+\begin{proof}
+Both accepting folds have the shape determined by $(m,n)$ and output the same
+root $r$. Walk from the root downward along the path of $m$, maintaining that
+the two transcripts agree on the current node's value. At an internal node the
+transcripts present preimages $\mathtt{0x01}\|a\|b$ and
+$\mathtt{0x01}\|a'\|b'$ with equal digests; since child values have fixed
+32-byte width, the argument pairs are recoverable from the preimages, so
+unequal pairs are a collision and equal pairs propagate agreement one level
+down. If no disagreement occurs, the leaf presents $\mathtt{0x00}\|d$ and
+$\mathtt{0x00}\|d'$ with equal digests and $d\neq d'$ --- a collision. Since
+the shapes coincide, every comparison is leaf-to-leaf or node-to-node; domain
+separation would in addition make any cross-type coincidence itself a
+collision of distinct strings.
+\end{proof}
+
+\begin{lemma}[Prefix transport]\label{lem:transport}
+Suppose $n_0<n_1$ and $m<n_0$, and that
+\[\mathsf{Ext}(n_0,r_0,n_1,r_1,C)=1, \qquad \mathsf{Open}(d,m,n_1,P,r_1)=1.\]
+There is an explicit algorithm
+returning either a SHA-256 collision or a path $P_0$, assembled from the
+values of $C$ and $P$, such that $\mathsf{Open}(d,m,n_0,P_0,r_0)=1$.
+\end{lemma}
+\begin{proof}[Proof sketch]
+The accepted $\ConsRec$ transcript reconstructs $r_1$ as a fold over the
+$n_1$-tree down to a frontier: the maximal perfect subtrees canonically
+covering $[0,n_0)$ and the proof nodes covering $[n_0,n_1)$; its consumed
+values are the entries of $C$ and, where the recursion bottoms out on the old
+side, the pinned $r_0$ itself. Compare the opening's fold with this transcript
+from the root down, as in Theorem~\ref{thm:pb}: either some shared node splits
+into unequal recoverable argument pairs --- a collision --- or agreement
+propagates until the path of $m$ enters the frontier subtree $T^*$ containing
+$m$, at which point the opening's value at $T^*$ equals the transcript's value
+$s^*$ there. Below $T^*$, the tail of $P$ is an accepting opening of $d$
+within $T^*$ against $s^*$. Above $T^*$, the transcript's old-root component
+folds the frontier values covering $[0,n_0)$ to $r_0$, and the siblings of
+$T^*$ on the path to the root of the $n_0$-tree are all among the inputs and
+intermediate values of that fold. Concatenating the tail of $P$ with those values yields
+$P_0$; $\Root$ replays the same computation and outputs $r_0$. When $n_0$ is a
+power of two, $T^*$ is the whole old tree, the spine is empty, and $P_0$ is
+the tail of $P$ alone. Same-size extensions ($r_0=r_1$) transport identically.
+\end{proof}
+
+\paragraph{Game $\mathsf{HIST}$ (local history binding).}
+$\mathcal{A}$ outputs a chain $h_0,\dots,h_k$ with transitions certified by
+$\mathsf{Ext}$ for each consecutive pair --- precisely a state sequence a
+consumer's pin can traverse; signature checks are omitted because the
+adversary holds the key, so they constrain nothing --- together with indices
+$a<b$, an index $m<n_a$, and openings with
+$\mathsf{Open}(d,m,n_a,P,r_a)=\mathsf{Open}(d',m,n_b,P',r_b)=1$ and
+$d\neq d'$. $\mathcal{A}$ wins iff everything verifies.
+
+\begin{theorem}[History binding]\label{thm:hist}
+There is an explicit algorithm $\mathcal{B}_{\rm hist}$ that, whenever
+$\mathcal{A}$ wins $\mathsf{HIST}$, outputs a SHA-256 collision, using
+$O(k\log n_k)$ hash evaluations.
+\end{theorem}
+\begin{proof}
+Sizes along the chain are nondecreasing, so $m<n_a\le n_i$ for all $i\ge a$.
+Apply Lemma~\ref{lem:transport} to the opening under $h_b$ and the transition
+into $h_b$: either a collision, or an accepting opening of $d'$ at $m$ under
+$h_{b-1}$. Iterating down to $h_a$ yields a collision or an accepting opening
+of $d'$ at $m$ under $(n_a,r_a)$; together with the given opening of
+$d\neq d'$ there, Theorem~\ref{thm:pb} extracts the collision.
+\end{proof}
+
+\paragraph{Game $\mathsf{FORK}$ (fork evidence).}
+Define the evidence predicate $\mathsf{Ev}(h,h')=1$ iff
+$\mathsf{Vf}_{pk}(h)=\mathsf{Vf}_{pk}(h')=1$, the tree sizes are equal, and
+the roots differ. \emph{Completeness} is by construction: if the key holder
+signs two equal-size heads with unequal roots, the pair itself satisfies
+$\mathsf{Ev}$ --- producing the evidence requires retention and comparison,
+not cooperation. \emph{Frame resistance} is a game: a challenger runs
+$\mathsf{KeyGen}$ and signs, on the operator's behalf, the canonical payloads
+the operator actually issues (query set $Q$); the adversary, without the key,
+outputs $(h,h')$ and wins iff $\mathsf{Ev}(h,h')=1$ and at least one of the
+two canonical payloads is not in $Q$. (If both payloads are in $Q$, the key
+holder really did sign two equal-size heads with unequal roots --- the
+evidence is genuine, not a frame.)
+
+\begin{theorem}[Frame resistance]\label{thm:fork}
+For every $\mathcal{A}$ there is an explicit $\mathcal{B}_{\rm fr}$ with
+$\mathbf{Adv}^{\mathsf{FORK}}(\mathcal{A})\le
+\mathbf{Adv}^{\text{euf-cma}}(\mathcal{B}_{\rm fr})$.
+\end{theorem}
+\begin{proof}
+A winning pair contains a head whose canonical payload was never queried to
+the signing oracle; its valid signature is an existential forgery, which
+$\mathcal{B}_{\rm fr}$ outputs. (Payloads are injective on $(n,r)$ by the
+canonical serialization of \S4.2, so distinct claimed views cannot collapse
+to one queried message.)
+\end{proof}
+
+\begin{lemma}[Policy separation]\label{lem:policy}
+For every leaf $a$ and certificate $c$, the verdict computed by
+$\mathsf{Verdict}$ equals $[\Obs_a(c)=\Policy(c)]$; it reads no operator
+label, and acceptance consults the operator's status only as a veto. This is a
+deterministic property of the $\mathsf{Verdict}$ algorithm, by construction
+(\S\ref{sec:model}); it is not a hardness statement.
+\end{lemma}
+
+\begin{definition}[Accountable replay distribution, formal]\label{def:formal}
+A scheme is \emph{accountable} if explicit reductions
+$\mathcal{B}_{\rm pb},\mathcal{B}_{\rm hist}$ as above exist, fork evidence is
+complete with frame resistance bounded by EUF-CMA, and $\mathsf{Verdict}$
+satisfies policy separation. This formalizes clauses (i)--(iv) of
+Definition~2: $\mathsf{PB}$ gives position binding, $\mathsf{HIST}$ the local
+append-only history, $\mathsf{FORK}$ transferable same-size evidence, and
+Lemma~\ref{lem:policy} policy separation.
+\end{definition}
+
+\begin{theorem}[Accountability of the construction]\label{thm:main}
+The LTL construction --- the RFC~9162 tree, the canonical signed heads of
+\S4.2, the pin rule of \S4.3, and the policy verdict of \S\ref{sec:model} ---
+is an accountable replay-distribution scheme, with
+$\mathcal{B}_{\rm pb}$, $\mathcal{B}_{\rm hist}$, and $\mathcal{B}_{\rm fr}$
+the explicit algorithms of Theorems~\ref{thm:pb}--\ref{thm:fork}.
+\end{theorem}
+
+\begin{remark}[What is mechanized, what is not]\label{rem:gamescope}
+The games are stated for the scheme's specified verifiers --- the recursive
+model whose honest-reference specializations are kernel-checked in entry~13
+(the named extractors and per-step pin safety). The two-transcript comparisons
+of Theorems~\ref{thm:pb} and~\ref{thm:hist} and the prefix-transport lemma are
+paper-level proofs in the same discipline, not part of the mechanized corpus;
+Game~$\mathsf{HIST}$ supplies, at paper level, the multi-step closure that the
+corpus leaves external. Applying any of these statements to the deployed
+iterative verifier inherits the refinement boundary of the previous subsection
+unchanged.
+\end{remark}
+
 \section{Lean and Ed25519 instantiation}\label{sec:instantiation}
 
 \subsection{Proof corpus}
@@ -749,6 +927,7 @@ Consistency & recursive-model soundness and extractor & no general consistency-c
 Pinning & per-step monotonicity and prefix correctness & signature layer and multi-step closure external \\
 Deployment refinement & finite differential harness & no theorem for iterative verifier under authentic-pair invariant \\
 Policy separation & deterministic tooling logic and regression tests & not mechanized in the entry-13 corpus \\
+Scheme-level games (\S\ref{sec:games}) & paper-level explicit reductions & two-transcript comparisons and prefix transport not mechanized \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -821,7 +1000,10 @@ structure actually differs.
 Certificate Transparency introduced publicly auditable append-only logs for
 certificate issuance~\cite{ct1,ct2}; Crosby and Wallach developed efficient
 tamper-evident history trees~\cite{crosby}; Dowling et al. formalized security
-notions for secure logging and CT~\cite{dghs}. CONIKS applies transparency to
+notions for secure logging and CT~\cite{dghs} --- the games of
+\S\ref{sec:games} adapt that two-transcript style to replay attestation, with
+the operator as first-class adversary and policy separation as a deterministic
+functionality. CONIKS applies transparency to
 key directories~\cite{coniks}. LTL reuses the authenticated data structure but
 changes the payload and trust semantics: a leaf is an observation of a proof
 replay, not an issuance event or key binding.
@@ -1022,6 +1204,10 @@ C. Peters. Twisted Edwards curves. AFRICACRYPT, LNCS 5023, pp. 389--405,
 \bibitem{pnueli} A. Pnueli. The temporal logic of programs. IEEE FOCS, pp.
 46--57, 1977.
 
+
+\bibitem{rogaway} P. Rogaway. Formalizing Human Ignorance:
+Collision-Resistant Hashing without the Keys. VIETCRYPT, LNCS 4341, pp.
+211--228, 2006.
 
 \bibitem{klaus2026} N. Klaus, J. Conejero, P. Tolmach. A Rust-to-Lean
 Verification Pipeline with AI Provers: An Experience Report. arXiv:2605.30106,
