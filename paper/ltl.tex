@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \quad (v0.7)}
+\date{July 2026 \quad (v0.8)}
 
 \begin{document}
 \maketitle
@@ -72,18 +72,18 @@ are compared.
 We instantiate the model as the Lean Transparency Log (LTL), using Lean~4 replay
 attestations and an RFC~9162 Merkle tree. We give explicit
 collision-extracting arguments for inclusion and consistency, lift them to
-scheme-level accountability games with an explicit composition theorem,
-formalize the consumer pinning and policy boundaries, and evaluate a live
-deployment over four production Ed25519 codebases. The public log contains thirteen leaves; its thirteenth
-leaf attests a Lean mechanization of the accumulator's own security arguments
-(222 inventoried environment constants, 61 human-reviewed assumption cones,
-and a single uninterpreted SHA-256 axiom). The mechanization effort also exposed, via differential testing, a nontrivial
-implementation boundary: the deployed iterative consistency verifier is not
-extensionally equal to the recursive model on malformed size claims. The leaf records
-this limitation explicitly. The resulting contribution is a cryptographic
-distribution model for machine-checked correctness evidence, together with an
-end-to-end deployed instantiation that carries scoped proofs about its own
-accountability machinery.
+scheme-level accountability games with a composition theorem, and evaluate a
+live deployment over four production Ed25519 codebases. The public log
+contains thirteen leaves; the thirteenth attests a Lean mechanization of the
+accumulator's own security arguments (61 human-reviewed certificates over a
+single uninterpreted SHA-256 axiom). The mechanization effort also exposed,
+via differential testing, a nontrivial implementation boundary --- the
+deployed iterative consistency verifier is not extensionally equal to the
+recursive model on malformed size claims --- and the leaf records this
+limitation explicitly. The contribution is a cryptographic distribution
+model for machine-checked correctness evidence, with an end-to-end deployed
+instantiation that carries scoped proofs about its own accountability
+machinery.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -193,7 +193,7 @@ types. These are explicit boundaries, not hidden qualifications.
 Let a subject repository at commit $g$ contain theorem declarations
 $T_1,\dots,T_q$. A deterministic verifier execution produces an observation
 $O_g$ containing success/failure and the reported assumption cone of each
-$T_i$. There are three natural ways to consume this result.
+$T_i$ --- the set of axioms the checked proof of $T_i$ ultimately rests on. There are three natural ways to consume this result.
 
 \begin{description}[leftmargin=1.5em,itemsep=4pt]
 \item[Direct replay.] The consumer reconstructs the verifier environment and
@@ -468,6 +468,28 @@ Freshness is an external availability policy. A persisted pin detects rollback
 relative to local history; it does not prove that a client sees the globally
 latest signed head.
 
+\paragraph{Notation summary.}
+For reference across the security analysis:
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+$\Hh$;\ $\hleaf(d)$;\ $\hnode(x,y)$ & SHA-256; leaf hash $\Hh(\mathtt{0x00}\|d)$; node hash $\Hh(\mathtt{0x01}\|x\|y)$ \\
+$D$, $d$, $m$, $n$ & leaf list; leaf bytes; leaf index; tree size \\
+$\MTH(D)$;\ $k$ & Merkle root; split point (largest power of two below $n$) \\
+$\Path(m,D)$;\ $\Root(v,m,n,P)$ & inclusion path (leaf to root); path refold \\
+$\mathsf{Open}(d,m,n,P,r)$ & accepting opening: $m<n$ and $\Root(\hleaf(d),m,n,P)=r$ \\
+$\ConsRec$;\ $\mathsf{Ext}$ & recursive consistency verifier; pin-rule transition \\
+$\Obs_a(c)$;\ $\Policy(c)$ & axiom names recorded in leaf $a$; consumer's allowed set \\
+$\chi_{\rm enc}$;\ $\chi=(\chi_{\rm enc},pk)$ & payload-encoded head context; full context with the key \\
+$h=(n,r,t;\sigma)$;\ $\mathsf{Vf}_{pk}$ & signed head (size, root, timestamp); signature check \\
+$\mathsf{Ev}_\chi$ & same-context, equal-size, unequal-root evidence pair \\
+$\mathcal{B}_{\rm pb},\mathcal{B}_{\rm hist},\mathcal{B}_{\rm ha},\mathcal{B}_{\rm fr}$ & the named explicit reductions of \S\ref{sec:games} \\
+$Q$;\ $\mathbf{Adv}$ & signing-oracle query set; winning probability (keyed games) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \section{Security analysis}\label{sec:security}
 
 This section states the consumer-facing arguments in the form used by the Lean
@@ -586,7 +608,7 @@ A deployment may conservatively treat an operator failure label as a veto, but
 a veto cannot grant acceptance.
 \end{proof}
 
-\subsection{Scope of the deployed consistency claim}
+\subsection{Scope of the deployed consistency claim}\label{sec:seamscope}
 
 The Lean theorem covers the recursive predicate above. The deployed iterative
 verifier follows the familiar RFC bit-navigation algorithm. Differential
@@ -610,42 +632,55 @@ unmechanized authentic-size/root invariant.
 \subsection{Scheme-level games and a composition theorem}\label{sec:games}
 
 The theorems above bind single artifacts to a reference leaf list. This
-subsection lifts them to the scheme. Fix once, for the entire subsection, an
-\emph{encoded context}
+subsection lifts them to the scheme. Readers content with the component
+theorems can skim the statements --- the four games,
+Definition~\ref{def:formal}, Theorem~\ref{thm:main} --- and the closing
+mapping paragraph; the proofs add explicit reductions but no new assumptions.
+
+Fix once, for the entire subsection, an \emph{encoded context}
 \[\chi_{\rm enc}=(\text{log identifier},\ \text{schema and type tags},\
 \text{hash-algorithm identifier});\]
 every head below is required to encode $\chi_{\rm enc}$ in its canonical
 payload, matching the deployed head format of \S4.2. The verification key is
-deliberately \emph{not} part of the payload: it is an external verification
+deliberately \emph{not} part of the payload: it is the external verification
 parameter, and we write $\chi=(\chi_{\rm enc},pk)$ for the full context once
-a key exists --- the keyed games below fix $\chi_{\rm enc}$, run
+a key exists --- the keyed games fix $\chi_{\rm enc}$, run
 $\mathsf{KeyGen}$, and then set $\chi$.
-The results come in two deliberately separated levels. First,
-\emph{collision-extractable accountability}: unconditional theorems whose
-proofs are explicit algorithms turning any winning transcript into a concrete
-SHA-256 collision, and reductions whose signature losses are exactly one
-EUF-CMA forgery. Second, a \emph{security corollary}: SHA-256 is a fixed,
-unkeyed function, so collision resistance cannot be a probability statement
-over a key space; following the human-ignorance treatment~\cite{rogaway}, the hardness
-premise --- that no feasible SHA-256 collision finder is known --- is an
-epistemic engineering judgment, and the corollary states only the
-constructive consequence: an explicit winner yields an explicit collision
-finder. (A
-keyed-family restatement is routine and omitted.) Extractability does not by
-itself assert hardness; the corollary's explicitly labeled interpretation
-sentence is where the judgment enters, and only there.
 
-The position-binding and history games are non-interactive, and the right
-reason is not merely that the operator-adversary holds the signing key: the
-properties are universal statements over \emph{accepted transcripts},
-independent of how a transcript was obtained, so adaptive interaction with
-any proof-issuing service can be collapsed into the adversary's final output.
-Signatures constrain two different parties: an outsider forging an ordinary
-head ($\mathsf{HEAD}$), and a third party fabricating equivocation evidence
-($\mathsf{FORK}$); those two games have a secret and are stated with a
-signing oracle and an advantage, defined as the probability, over the
-challenger's key generation and the adversary's coins, that the adversary
-wins.
+The results come in two levels. The theorems are unconditional: explicit
+algorithms turn any winning transcript into a concrete SHA-256 collision,
+and the signature reductions lose exactly one EUF-CMA forgery. Hardness
+enters only at the end: SHA-256 is a fixed, unkeyed function, so following
+the human-ignorance treatment~\cite{rogaway}, Corollary~\ref{cor:security}
+states the constructive consequence --- an explicit winner yields an explicit
+collision finder --- and labels the security reading as the engineering
+judgment it is. (A keyed-family restatement is routine and omitted.)
+
+The position-binding and history games are non-interactive: they are
+universal statements over accepted transcripts, independent of how a
+transcript was obtained, so adaptive interaction with a proof-issuing
+service collapses into the adversary's final output. Signatures constrain
+two other parties --- an outsider forging an ordinary head
+($\mathsf{HEAD}$), and a third party fabricating equivocation evidence
+($\mathsf{FORK}$); those games have a secret and a signing oracle, and their
+advantage is the probability, over key generation and the adversary's coins,
+of winning.
+
+\paragraph{The games at a glance.}
+\begin{center}\footnotesize
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Game & Adversary & Secrets & Wins by exhibiting & Consequence \\
+\midrule
+$\mathsf{PB}$ & operator (holds key) & none & two openings, one position, $d\neq d'$ & collision (Thm.~\ref{thm:pb}) \\
+$\mathsf{HIST}$ & operator & none & accepted chain, changed opened value & collision (Thm.~\ref{thm:hist}) \\
+$\mathsf{HEAD}$ & outsider & signing oracle & valid head never issued & forgery (Thm.~\ref{thm:head}) \\
+$\mathsf{FORK}$ & third party & signing oracle & evidence pair not fully issued & forgery (Thm.~\ref{thm:fork}) \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent Policy separation is deliberately not a game: it is a deterministic
+property of the verdict algorithm (Lemma~\ref{lem:policy}).
 
 \paragraph{Accepted-artifact syntax.}
 A head is $h=(n,r,t;\sigma)$, with $t$ a timestamp; its canonical payload is
@@ -710,7 +745,8 @@ collision of distinct strings.
 \paragraph{The transport algorithm.}
 For the history theorem we need to move an opening backward through an
 accepted extension. Recall the recursive verifiers (\S4.1, the mechanized
-form; malformed shapes reject). With $k$ the largest power of two below $n$:
+form; malformed shapes reject); Figure~\ref{fig:transport} shows the assembly in a
+small instance. With $k$ the largest power of two below $n$:
 \[
 \Root(v,m,n,P)=
 \begin{cases}
@@ -734,6 +770,50 @@ $(x,y)=\ConsRec(n_0{-}k,n{-}k,C,\bot,r)$. Both recursions' shapes are
 determined by their integer arguments, not by the adversary, so two
 computations at the same arguments traverse the same nodes and there are no
 mismatched stopping points.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize},
+  lf/.style={draw,minimum width=6.5mm,minimum height=5mm,inner sep=1pt},
+  nd/.style={draw,rounded corners=1pt,minimum width=7.5mm,minimum height=4.5mm,inner sep=1pt,fill=white},
+  fr/.style={nd,draw=blue!60!black,thick,fill=blue!8},
+  pn/.style={nd,draw=black!55,dashed,fill=black!4},
+  sb/.style={draw=orange!85!black,thick},
+  op/.style={draw=red!70!black,very thick}
+]
+\foreach \i in {0,...,7} \node[lf] (d\i) at (0.95*\i,0) {$\i$};
+\node[nd,sb] (p01) at (0.475,0.95) {};
+\node[nd,sb] (p23) at (2.375,0.95) {};
+\node[fr] (p45) at (4.275,0.95) {$B$};
+\node[pn] (p67) at (6.175,0.95) {};
+\node[fr] (q03) at (1.425,1.9) {$A$};
+\node[pn] (q47) at (5.225,1.9) {$s$};
+\node[nd] (rt) at (3.325,2.85) {$r_1$};
+\foreach \a/\b in {d0/p01,d1/p01,d2/p23,d3/p23,d4/p45,d5/p45,d6/p67,d7/p67,p01/q03,p23/q03,p45/q47,p67/q47,q03/rt,q47/rt}
+  \draw (\a) -- (\b);
+\draw[op] (d1.north) -- (p01); \draw[op] (p01) -- (q03); \draw[op] (q03) -- (rt);
+\draw[decorate,decoration={brace,mirror,raise=3pt},blue!60!black]
+  ([xshift=-1pt]d0.south west) -- ([xshift=1pt]d3.south east)
+  node[midway,below=5pt]{$T^*$ (contains $m{=}1$)};
+\draw[decorate,decoration={brace,mirror,raise=3pt},black!60]
+  ([xshift=-1pt]d4.south west) -- ([xshift=1pt]d5.south east)
+  node[midway,below=5pt]{$[4,6)$};
+\node[nd,draw=blue!60!black,thick] (r0) at (7.8,2.6) {$r_0$};
+\node[align=left,anchor=north west] at (6.95,2.25)
+  {$r_0=\hnode(A,B)$\\[1pt]$P_0=(\,\text{siblings in }T^*\,)\,\|\,[B]$};
+\end{tikzpicture}
+\caption{Prefix transport in the $6\to8$ instance, opening at index $m=1$.
+The accepted consistency transcript pins the frontier values $A,B$ covering
+$[0,6)$ (solid blue) and consumes the proof value $s$ covering $[6,8)$
+(dashed). Comparing the opening's fold (red path) with the transcript fixes
+the opening's value at the frontier subtree $T^*$ containing $m$. Below
+$T^*$ the opening keeps its own siblings (orange); above it, the old-root
+fold $r_0=\hnode(A,B)$ supplies the one remaining sibling $B$. The assembled
+$P_0$ is the opening's inner path with the new tree's top sibling replaced
+by $B$.}
+\label{fig:transport}
+\end{figure}
 
 \begin{lemma}[Prefix transport]\label{lem:transport}
 Suppose $m<n_0\le n_1$ and
@@ -797,16 +877,20 @@ every assembled path entry is either an entry of $P$, an entry of $C$, or a
 sub-call output value, all present in the replayed transcripts.
 \end{proof}
 
+In the smallest growth case $2\to3$ --- the log's own transition in
+\S\ref{sec:seamscope} --- $n_0$ is a power of two: the frontier is the whole
+old tree and $P_0$ is simply the opening's within-prefix tail.
+
 \paragraph{Game $\mathsf{HIST}$ (local history binding).}
-$\mathcal{A}$ outputs a chain of head values $h_0,\dots,h_k$ (the
-Merkle-level content; authentication is $\mathsf{HEAD}$'s job) and
-transition proofs $C_1,\dots,C_k$ with $\mathsf{Ext}(n_{i-1},r_{i-1},n_i,r_i,C_i)=1$ for every
-$1\le i\le k$ --- the Merkle-level state sequence a consumer's pin traverses after head
-authentication; the binding properties quantify over accepted transcripts
-regardless of provenance --- together with indices $0\le a<b\le k$, an index
-$m<n_a$, and openings with
+$\mathcal{A}$ outputs a chain of head values $h_0,\dots,h_k$, transition
+proofs $C_1,\dots,C_k$ with $\mathsf{Ext}(n_{i-1},r_{i-1},n_i,r_i,C_i)=1$
+for every $1\le i\le k$, indices $0\le a<b\le k$, an index $m<n_a$, and
+openings with
 $\mathsf{Open}(d,m,n_a,P,r_a)=\mathsf{Open}(d',m,n_b,P',r_b)=1$ and
-$d\neq d'$. $\mathcal{A}$ wins iff everything verifies.
+$d\neq d'$. $\mathcal{A}$ wins iff everything verifies. (The chain is the
+Merkle-level state sequence a consumer's pin traverses; authentication is
+$\mathsf{HEAD}$'s job, and the binding properties quantify over accepted
+transcripts regardless of provenance.)
 
 \begin{theorem}[History binding]\label{thm:hist}
 There is an explicit algorithm $\mathcal{B}_{\rm hist}$ that, whenever
@@ -1002,8 +1086,8 @@ replay diagnostics, and resource controls. Missing cones are
 
 The service reports that tree heads are generated using a binary built from the
 same Ed25519 source family whose verification-path certificates appear in the
-log. Before signing, the operator recomputes inclusion of the newest signing-
-library leaf in the tree. This is useful operational coherence, but not proof
+log. Before signing, the operator recomputes inclusion of the newest
+signing-library leaf in the tree. This is useful operational coherence, but not proof
 of execution provenance. The signature authenticates the tree-head payload; it
 does not reveal the program that produced it. Reproducible builds or execution
 attestation would be required to establish that stronger claim.
@@ -1034,10 +1118,12 @@ than replacing the old leaves. A leaf whose pinned commit ceases to be
 distributed decays from a replayable claim to a historical record; consumers
 act only on attestations whose subjects they can retrieve.
 
+\begin{samepage}
 Leaf 12 (the thirteenth entry) attests the accumulator corpus at commit
 \begin{center}\small\ttfamily
 172a1d0653f489d5b7cb73ac7942a57cbb496532
 \end{center}
+\end{samepage}
 It records 61/61 reviewed
 certificates as proven with exact expected/observed cones. The corpus audit
 also inventories 222 compiled environment constants and permits exactly one
@@ -1056,7 +1142,7 @@ boundary axiom, \code{LTLAcc.sha256}.
 \foreach \i in {0,...,3} {\node[fail] (l\i) at (1.08*\i,0) {\i\\failed};}
 \foreach \i in {4,...,7} {\node[ok] (l\i) at (1.08*\i,0) {\i\\clean};}
 \foreach \i in {8,...,11} {\node[ok] (l\i) at (1.08*\i,0) {\i\\clean};}
-\node[acc,minimum width=1.3cm] (l12) at (1.08*12,0) {12\\accumulator};
+\node[acc] (l12) at (1.08*12,0) {12\\accum.};
 \draw[decorate,decoration={brace,mirror,raise=5pt},black!45]
   ($(l0.south west)+(-.05,0)$)--($(l3.south east)+(.05,0)$)
   node[midway,below=11pt,font=\scriptsize]{run 1};
