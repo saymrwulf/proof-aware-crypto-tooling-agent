@@ -443,7 +443,10 @@ latest signed head.
 This section states the consumer-facing arguments in the form used by the Lean
 mechanization. The proofs are elementary but explicit: successful false
 openings yield concrete SHA-256 collisions rather than appealing to an informal
-``Merkle trees are secure'' statement.
+``Merkle trees are secure'' statement. The explicitness is load-bearing: over a
+fixed-width hash a bare ``some collision exists'' is vacuously true by
+counting, so each soundness statement is about a named extractor function, and
+the corpus pins a machine-checked non-vacuity guard for every extractor.
 
 \subsection{Inclusion}
 
@@ -566,7 +569,8 @@ unmechanized authentic-size/root invariant.
 \subsection{Proof corpus}
 
 The initial subjects are upstream \code{curve25519-dalek}/\code{ed25519-dalek}
-and three deployed forks: Solana/Anza, RISC~Zero, and Betrusted --- all
+(one implementation: the curve crate and the signature crate atop it) and
+three deployed forks: Solana/Anza, RISC~Zero, and Betrusted --- all
 implementations of Ed25519~\cite{eddsa,rfc8032}. Aeneas
 provides a functional translation route from Rust to theorem-prover models;
 its design uses Rust ownership information to avoid explicit memory reasoning
@@ -648,7 +652,9 @@ repository's standalone verifier.
 The first twelve leaves are three four-fork replay generations. Leaves 0--3
 record a failed audit run and remain permanently visible. Leaves 4--7 record a
 clean replay. Leaves 8--11 re-attest rewritten repository histories rather
-than replacing the old leaves.
+than replacing the old leaves. A leaf whose pinned commit ceases to be
+distributed decays from a replayable claim to a historical record; consumers
+act only on attestations whose subjects they can retrieve.
 
 Leaf 12 (the thirteenth entry) attests the accumulator corpus at commit
 \begin{center}\small\ttfamily
@@ -721,7 +727,8 @@ Deployment refinement & finite differential harness & no theorem for iterative v
 \subsection{Cost and reproducibility}
 
 A replay of one Ed25519 fork requires approximately 30 minutes of Lean kernel
-time under the pinned environment. Receipt verification requires one Ed25519
+time under the pinned environment, a figure corroborated by the inter-leaf
+issuance spacing visible in the published log. Receipt verification requires one Ed25519
 signature and a logarithmic number of SHA-256 node computations. The
 accumulator corpus is independently reviewable with a pinned public Lean
 release; an environment-derived inventory fails closed on added, removed, or
@@ -833,7 +840,9 @@ proofs make the lie attributable and persistent; they do not make it true.
 Targeted independent replay is the corrective mechanism.
 
 \paragraph{Theorem identity.}
-Names and repository commits are not canonical semantic identifiers. A future
+Names and repository commits are not canonical semantic identifiers, and
+commit identifiers are SHA-1-based --- a weaker binding than the log's own
+SHA-256 tree. A future
 schema should commit to elaborated theorem-type digests, axiom declaration-type
 digests, and an environment or replay-manifest digest.
 
