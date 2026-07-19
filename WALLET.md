@@ -143,6 +143,17 @@ pacta wallet mcp --wallet ./my-warden             # stdio JSON-RPC MCP server
 
 ---
 
+## The custody cockpit (human surface, read-only)
+
+`pacta wallet cockpit --wallet <dir>` serves a local web UI for the
+operator: posture (latch, ledger chain re-verified, pinned quorum),
+the airgap signature queue (observed, never operated), the incident and
+refusal browser, and a receipt inspector driven by the deployed
+verifier. Design law: it renders recomputed evidence with provenance
+lines, never cached status; it cannot approve, sign, unlatch, or modify
+custody state (byte-level read-only guarantee in
+`tests/test_walletui.py`). Details: [docs/cockpit.md](docs/cockpit.md).
+
 ## Agent-native surface (MCP)
 
 `pacta wallet mcp` speaks MCP over stdio JSON-RPC. Eight outcome-first

@@ -13,7 +13,7 @@
 - [ESTATE.md](ESTATE.md): the map of the whole endeavour — every repo, service, mirror, operator-held entity, and the two self-referential loops.
 
 - [README.md](README.md): what pacta is, the R0–R5 risk model, the dogfood loop.
-- [WALLET.md](WALLET.md): warden, the verified-custody wallet — the quorum boundary, the signing firewall, the R4 gate, the MCP surface.
+- [WALLET.md](WALLET.md): warden, the verified-custody wallet — the quorum boundary, the signing firewall, the R4 gate, the MCP surface, and the local read-only custody cockpit for the human operator (docs/cockpit.md).
 - [docs/agent-native.md](docs/agent-native.md): why the wallet is agent-native first (AX, MCP, A2A, AP2, x402, ERC-8004) and what each idea became.
 - [docs/products.md](docs/products.md): the four warden deployment profiles.
 

@@ -235,6 +235,12 @@ def build_parser() -> argparse.ArgumentParser:
     w_mcp.add_argument("--log-url", default="https://ltl.zkdefi.org")
     w_mcp.set_defaults(func=cmd_wallet_mcp)
 
+    w_cockpit = wsub.add_parser("cockpit", help="Serve the read-only custody cockpit (local web UI) for the human operator.")
+    w_cockpit.add_argument("--wallet", required=True)
+    w_cockpit.add_argument("--host", default="127.0.0.1", help="Bind address (default localhost; the cockpit is not meant to be exposed).")
+    w_cockpit.add_argument("--port", type=int, default=8471)
+    w_cockpit.set_defaults(func=cmd_wallet_cockpit)
+
     w_ledger = wsub.add_parser("verify-ledger", help="Re-check the wallet's hash-chained ledger integrity.")
     w_ledger.add_argument("--wallet", required=True)
     w_ledger.set_defaults(func=cmd_wallet_verify_ledger)
@@ -670,6 +676,18 @@ def cmd_wallet_card(args: argparse.Namespace) -> int:
         print(f"custody card: {path}")
     else:
         print(json.dumps(build_custody_card(wallet, args.log_url), indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_wallet_cockpit(args: argparse.Namespace) -> int:
+    from .walletui import serve
+    server = serve(args.wallet, host=args.host, port=args.port)
+    host, port = server.server_address[0], server.server_address[1]
+    print(f"warden cockpit (READ-ONLY) on http://{host}:{port}  -  Ctrl-C to stop")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.shutdown()
     return 0
 
 
