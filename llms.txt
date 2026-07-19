@@ -17,8 +17,8 @@
 
 ## Live evidence
 
-- Transparency log (RFC 9162): https://ltl.zkdefi.org — signed replay attestations of the Lean proofs, one leaf per fork.
-- The paper: https://ltl.zkdefi.org/paper — "The Lean Transparency Log: Distributing Kernel-Checked Correctness Evidence for Deployed Ed25519 Implementations" (revised, with security proofs, 19 pages; prior version at /paper/v0.1).
+- Transparency log (RFC 9162): https://ltl.zkdefi.org — signed replay attestations of the Lean proofs. Thirteen leaves: three replay generations over four Ed25519 forks, plus entry 13 attesting the Lean mechanization of the log's own accumulator model. The mirror ships a fail-closed offline verifier (verify.py --all covers every leaf, signed head, and receipt) with an adversarial self-test.
+- The paper: https://ltl.zkdefi.org/paper — "Accountable Distribution of Machine-Checked Correctness Evidence: A Transparency Model and the Lean Transparency Log" (23 pages: trust decomposition, scheme-level accountability games with explicit reductions, live deployment, and the measured model/deployment divergence reported as a result). Earlier versions archived at /paper/v0.2 (19 pages) and /paper/v0.1 (4 pages).
 
 ## For agents
 

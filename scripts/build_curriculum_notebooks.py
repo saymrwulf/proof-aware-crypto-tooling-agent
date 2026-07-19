@@ -1560,8 +1560,8 @@ COURSE = {
                 After these cells pass, the agent knows: *the provider whose key I
                 pinned states that the Lean proofs of repository X at commit Y check
                 out with exactly the documented assumptions, and that statement is
-                irrevocably part of the log every other agent sees.* The agent then
-                clones commit Y (the git hash IS the content hash) and builds it -
+                committed to the log's signed view, which any agent can compare.* The agent then
+                clones commit Y (the commit pins the exact source tree) and builds it -
                 compiler and build remain declared trusted base until R5. Where a
                 claim lives (this notebook) and why it is true (the provider's Lean
                 replay, lecture 6a) never blur.

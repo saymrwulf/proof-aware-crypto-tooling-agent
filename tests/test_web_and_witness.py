@@ -132,6 +132,7 @@ def test_publish_and_witness_audit_catches_tampering(tmp_path):
     report = log.publish(published, public_key_path=tmp_path / "k.pub")
     assert report["entries"] == 3
     assert (published / "verify.py").exists() and (published / "README.md").exists()
+    assert (published / "verify_selftest.py").exists()
 
     clean = audit_published_log(published, tmp_path / "k.pub")
     assert clean.ok and clean.heads_checked == 3
@@ -156,4 +157,5 @@ def test_standalone_verify_py_runs(tmp_path):
     log.publish(published, public_key_path=tmp_path / "k.pub")
     result = subprocess.run([sys.executable, "verify.py", "--all"], cwd=published, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "OK - the log is internally consistent" in result.stdout
+    # hardened verifier: full mode (signatures verified) must report exactly this
+    assert "RESULT: OK [full]" in result.stdout

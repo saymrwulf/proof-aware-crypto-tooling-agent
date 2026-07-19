@@ -295,9 +295,10 @@ class TransparencyLog:
             (out / "entries" / f"{component}.attestation.json").write_text(
                 json.dumps(entry.leaf.get("attestation"), indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-        from .published_assets import README_MD, VERIFY_PY
+        from .published_assets import README_MD, VERIFY_PY, VERIFY_SELFTEST_PY
 
         (out / "verify.py").write_text(VERIFY_PY, encoding="utf-8")
+        (out / "verify_selftest.py").write_text(VERIFY_SELFTEST_PY, encoding="utf-8")
         (out / "README.md").write_text(README_MD, encoding="utf-8")
         if public_key_path is not None:
             (out / "provider.ed25519.pub").write_bytes(Path(public_key_path).read_bytes())

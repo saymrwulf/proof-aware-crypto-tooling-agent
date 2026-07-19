@@ -1,11 +1,12 @@
-"""The paper (ltl.tex, §5.3, App. B) claims the *recursive* inclusion and
-consistency verifiers it defines and proves about are equivalent to the
-deployed iterative RFC 9162 verifiers, and cites exhaustive
-differential-testing counts. This test IS that verification, so the paper's
-numbers cannot silently rot: it reproduces the exact recursive forms
-written in the paper and asserts full agreement with the deployed code over
-all sizes up to 256, honest inputs plus adversarial mutations, and pins the
-cited case counts (164,479 inclusion; 164,224 consistency).
+"""Historical regression pin from the archived v0.2 system report
+(hosted at /paper/v0.2), which cited these exact differential-testing
+counts (164,479 inclusion; 164,224 consistency) for its recursive forms
+against the deployed iterative RFC 9162 verifiers over these families.
+The CURRENT paper makes no extensional-equality claim: it cites the
+accumulator corpus's fidelity harness instead (230,271 / 230,016 honest
+families, 73,573 lied-size cases with 3,867 divergences, every one
+accepted only by the deployed verifier). This test remains as a pinned
+regression boundary for the pacta-internal recursive forms.
 """
 
 import hashlib
