@@ -1,5 +1,8 @@
 # proof-aware-crypto-tooling-agent
 
+> **Lost in the estate?** [ESTATE.md](ESTATE.md) is the one-page map of
+> every repo, service, mirror, and loop, with the edge semantics.
+
 `pacta` is a local CLI prototype for interpreting formal-verification evidence in cryptographic tooling. It is not a trading bot, does not move funds, and does not make financial decisions.
 
 The immediate corpus is the `saymrwulf/*-verified` family of repositories. The shipped Lean files are treated as the verification artifact. This project intentionally does not run Charon, Aeneas, extraction, or Rust-to-Lean regeneration.
