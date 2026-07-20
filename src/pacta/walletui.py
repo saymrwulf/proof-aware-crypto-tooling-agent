@@ -188,7 +188,8 @@ def inspect_receipt(attestation_text: str, receipt_text: str,
 # ---------------------------------------------------------------------------
 
 _VIEWS = [("/", "Posture"), ("/queue", "Signature queue"),
-          ("/incidents", "Incidents & refusals"), ("/inspect", "Receipt inspector")]
+          ("/incidents", "Incidents & refusals"), ("/inspect", "Receipt inspector"),
+          ("/estate", "Estate map")]
 
 
 def _page(title: str, active: str, body: str, wallet_dir: str) -> str:
@@ -370,6 +371,9 @@ def make_handler(wallet_dir: Path):
                 self._send(_page("incidents", "/incidents", body, wd))
             elif route == "/inspect":
                 self._send(_page("receipt inspector", "/inspect", render_inspect(None), wd))
+            elif route == "/estate":
+                from .estateview import ESTATE_HTML
+                self._send(ESTATE_HTML)
             else:
                 self._send(_page("not found", "", "<div class='panel bad'>No such view.</div>", wd), 404)
 

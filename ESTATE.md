@@ -9,7 +9,7 @@ machinery hub and the only repo that changes freely.
 
 State snapshot (2026-07-19): log **13 leaves**, root `3488a2d0…`, key
 fingerprint `874c8a00…`, paper **v0.9 camera-ready (23 pp)**, five
-attested components, pacta suite 118 green.
+attested components, pacta suite 130 green.
 
 ```mermaid
 flowchart LR
@@ -132,6 +132,24 @@ deployed verifier; see the corpus KNOWN-GAPS ledger).
 | **Signing key** | offline, operator-only; fingerprint `874c8a00…`; never on the server; public half published in two independent locations. |
 | **Operational log state** | `provider/state/transparency-log-main` — the true accumulator. Appends happen here; the mirror is its projection. |
 | **Evidence archive (offline)** | review kits and stamped artifacts (`_timestamp_hash8` convention); never in git. |
+
+## What is running (operations, verified 2026-07-20)
+
+| Entity | Runtime | Where | Starts / stops |
+|---|---|---|---|
+| caddy (TLS, static blog) | **always on** | droplet container | `docker compose`, restart-unless-stopped |
+| LTL web service (ltl.zkdefi.org) | **always on** | droplet container | `pacta_provider serve` with read-only mounts and `read_only: true` — it *cannot* write, sign, or append |
+| Forgejo mirror | **always on** | droplet container | plus exactly one cron: 03:00 daily mirror reconcile |
+| provider write side (check / append / publish / sign) | **on demand** | operator machine | runs only during an append ceremony, minutes at a time; the signing key is offline otherwise |
+| warden (the financial agent) | **not running** | nowhere | implemented prototype: a wallet directory plus CLI/MCP/cockpit processes that exist only while explicitly started; no deployed instance, no funds watched |
+| custody cockpit | **on demand** | operator machine, localhost | `pacta wallet cockpit`, stops with Ctrl-C; read-only |
+| everything else (repos, paper, book, mirror, SD) | **no process** | — | static files; consumers and reviewers are external and episodic |
+
+The human-facing interactive rendering of this whole map, runtime
+dimension included, is the cockpit's **Estate map** view
+(`pacta wallet cockpit` → `/estate`); this file remains the canonical
+committed version, and `tests/test_walletui.py` guards name-level drift
+between the two.
 
 ## Edge glossary
 

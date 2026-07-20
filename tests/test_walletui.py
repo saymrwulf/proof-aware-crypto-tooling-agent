@@ -195,3 +195,38 @@ def test_server_routes_and_read_only_guarantee(tmp_path):
 def test_serve_refuses_non_wallet(tmp_path):
     with pytest.raises(Exception):
         serve(tmp_path / "empty")
+
+
+def test_estate_view_served_with_runtime_dimension(tmp_path):
+    wallet = _seal_wallet(tmp_path)
+    server = serve(wallet.dir, host="127.0.0.1", port=0)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/estate") as resp:
+            body = resp.read().decode()
+        assert resp.status == 200
+        assert "ALWAYS ON" in body and "ON-DEMAND" in body and "NOT RUNNING" in body
+        assert "Runtime:" in body  # dossier panel wiring
+        assert "lean-transparency-log" in body and "ltl-accumulator-verified" in body
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_estate_view_and_estate_md_do_not_drift():
+    """Name-level sync guard between the cockpit estate page and ESTATE.md
+    (the published_assets lesson: two renderings of one model need a
+    tripwire)."""
+    from pacta.estateview import ESTATE_HTML
+    estate_md = Path("ESTATE.md").read_text(encoding="utf-8")
+    for name in ("lean-transparency-log", "ltl-accumulator-verified",
+                 "proof-aware-crypto-tooling-agent", "verifying-crypto-with-lean",
+                 "dalek-ed25519-verified", "pasta-pallas-verified",
+                 "ltl.zkdefi.org", "Forgejo"):
+        assert name in ESTATE_HTML, f"estate view lost: {name}"
+        assert name in estate_md, f"ESTATE.md lost: {name}"
+    # the runtime dimension must exist in BOTH renderings
+    assert "What is running" in estate_md
+    assert "ALWAYS ON" in ESTATE_HTML

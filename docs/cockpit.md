@@ -34,6 +34,7 @@ separate, explicitly reviewed milestone.
 | **Posture** (`/`) | custody latch state, ledger head with full hash-chain re-verification, the pinned quorum members (backend, component, tier, source commit, binary hash), spending policy verbatim, incident/refusal counts | `Wallet.posture()` / `Wallet.verify_ledger()` |
 | **Signature queue** (`/queue`) | parked airgap signing requests (outbox) and whether the device has answered (inbox) — observed, never operated | airgap outbox/inbox listing |
 | **Incidents & refusals** (`/incidents`) | incident records and signed refusal receipts, verbatim, newest first | `incidents/*.json`, `receipts/*.json` |
+| **Estate map** (`/estate`) | the whole endeavour — every repo, service, mirror, loop — with RUNTIME on every entity (always-on / on-demand / not-running / static) | rendering of ESTATE.md's model (drift-guarded by test) |
 | **Receipt inspector** (`/inspect`) | paste an attestation + transparency receipt + log public key; the verdict, per-signature results, and diagnostics come verbatim from the deployed verifier | `pacta.transparency.verify_receipt` |
 
 Every panel also states what it does **not** prove (e.g. the quorum
