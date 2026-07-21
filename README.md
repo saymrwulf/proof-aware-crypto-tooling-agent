@@ -97,8 +97,10 @@ PyYAML is optional. Without it, `pacta` can still read the included simple YAML 
 
 ```bash
 python -m pacta --help
-pacta wallet cockpit --demo        # the human surface: bridge, deck, lab manual
-pacta wallet status --wallet DIR   # custody posture from the CLI
+pacta wallet cockpit --demo                      # human surface from zero: bridge /deck /manual /guide
+pacta wallet cockpit --wallet DIR                # same cockpit over a real wallet (default port 8471)
+pacta wallet cockpit --wallet DIR --port 9000    # --host/--port to taste; localhost-only by design
+pacta wallet status --wallet DIR                 # custody posture from the CLI
 pacta scan --config examples/repos.yaml
 pacta doctor --config examples/repos.yaml --repo-name dalek-ed25519-verified
 pacta claims --config examples/repos.yaml --repo-name dalek-ed25519-verified --offline-fixture --out claims.yaml
@@ -129,8 +131,18 @@ The `notebooks/` directory contains a zero-to-hero teaching sequence for undergr
 - `08_capstone_research_program.ipynb`: audit the shipped R4 evidence; design the R5 discharge plan.
 - `09_dogfood_verified_crypto.ipynb`: the proven-path verifier in the agent's own loop; hybrid-PQC posture.
 - `10_verified_custody_wallet.ipynb`: warden - the quorum custody boundary and signing firewall, ratchet-rule (toy 3-of-3, then the real four proven forks), plus the counterparty recomputing a custody card's inclusion proof.
+- `11_the_customers_eye_view.ipynb`: the counterparty's seat - what a customer can and cannot recompute about someone else's wallet from its custody card and the public log.
 
 The course states and keeps a "ratchet rule": every load-bearing idea runs twice - napkin scale, then real scale - and every pair is executable in the notebook.
+
+The notebooks are the **code-level track** of a three-part teaching stack;
+the **role-level track** is the [lab manual](docs/warden-lab-manual.md)
+(served at `/manual` in the cockpit: sessions, drills, self-tests, a
+capstone incident across all six roles), and the in-cockpit **Guide**
+(`/guide`) is the plain-language reference both lean on. All fourteen
+notebooks execute offline, top to bottom, with pure-Python cells (no
+shell magics), degrading gracefully where Lean or built binaries are
+absent.
 
 The notebooks are committed without execution output. They can be opened in Jupyter, VS Code, or any notebook reader. They import `pacta` directly from this repository and avoid external notebook-only dependencies.
 
