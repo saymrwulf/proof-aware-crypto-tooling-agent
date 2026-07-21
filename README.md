@@ -24,9 +24,37 @@ agent-native first (an MCP server; a self-proving custody card); see
 [docs/products.md](docs/products.md), and the design research in
 [docs/agent-native.md](docs/agent-native.md).
 
+For humans, warden ships the **custody cockpit** — a local, read-only web
+UI organized as a bridge of six role stations (proposer, quorum bench,
+operator, cryptographer, architect, newcomer) over shared evidence
+instruments, with a tmux-style deck showing every station live in
+parallel and a color-guided wizard. It explains itself; no prior warden
+knowledge is assumed. One command, no wallet needed:
+
+```bash
+pacta wallet cockpit --demo     # → http://127.0.0.1:8471/deck
+```
+
+The full course lives beside it: [docs/warden-lab-manual.md](docs/warden-lab-manual.md)
+(served at `/manual`) — a study-club lab that teaches every role hands-on.
+Docs: [docs/cockpit.md](docs/cockpit.md).
+
 ## macOS / Apple Silicon
 
 The prototype is written for Python 3.11+ and macOS on Apple Silicon. It does not assume GNU coreutils, Linux `free`, Linux `taskset`, GNU `timeout`, Docker, Nix, or x86_64.
+
+One system prerequisite for the wallet features (key generation and
+signing, including `cockpit --demo`): an `openssl` on PATH that supports
+Ed25519. Stock macOS ships LibreSSL as `/usr/bin/openssl`, and older
+LibreSSL versions lack the Ed25519 key commands — self-check with:
+
+```bash
+openssl genpkey -algorithm ed25519 | head -1   # must print a PEM header, not an error
+```
+
+If it errors, `brew install openssl@3` and put it first on PATH (e.g.
+`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`). `git` on PATH is
+needed only for the cockpit's liveness board repo probes.
 
 Lean tooling is detected with `shutil.which("lean")` and `shutil.which("lake")`. If neither is available, `pacta` reports clear diagnostics and still supports offline claim-card generation and static hygiene scans.
 
@@ -39,11 +67,29 @@ python3 scripts/mini_pytest.py   # dependency-free fallback runner (same suite)
 
 ## Install
 
+Runtime dependencies: **none** — the tool is Python 3.11+ standard
+library. The supported install is an **editable install from a clone**:
+the repo's own files (estate map, lab manual, sample evidence) are part
+of the product and are resolved relative to the checkout.
+
 ```bash
+git clone <this repo> && cd proof-aware-crypto-tooling-agent
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
+pacta wallet cockpit --demo        # smoke-test the human surface
 ```
+
+Zero-install alternative (no venv, no pip, straight from the clone):
+
+```bash
+python3 scripts/mini_pytest.py                        # dependency-free suite
+PYTHONPATH=src python3 -m pacta wallet cockpit --demo
+```
+
+On a fresh machine with no Lean toolchain and no locally built dogfood
+binary, the suite passes with a handful of clearly labeled skips —
+capability gaps skip, they never fail silently.
 
 PyYAML is optional. Without it, `pacta` can still read the included simple YAML examples and JSON-compatible `.yaml` files.
 
@@ -51,6 +97,8 @@ PyYAML is optional. Without it, `pacta` can still read the included simple YAML 
 
 ```bash
 python -m pacta --help
+pacta wallet cockpit --demo        # the human surface: bridge, deck, lab manual
+pacta wallet status --wallet DIR   # custody posture from the CLI
 pacta scan --config examples/repos.yaml
 pacta doctor --config examples/repos.yaml --repo-name dalek-ed25519-verified
 pacta claims --config examples/repos.yaml --repo-name dalek-ed25519-verified --offline-fixture --out claims.yaml

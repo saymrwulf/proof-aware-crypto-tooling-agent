@@ -33,6 +33,27 @@ lying (firewall); an attacker who fully owns the host owns the wallet.**
 - **Deliberately absent**: reproducible builds, side-channel hardening
   (R5 frontier); ML-DSA (fail-closed — no proven implementation exists).
 
+## The cockpit surface (attack surface note)
+
+The custody cockpit (`pacta wallet cockpit`) adds a localhost-bound,
+read-only HTTP surface. Its threat posture, stated plainly:
+
+- **No mutating routes exist.** It cannot approve, sign, unlatch, or edit
+  custody state; the test suite asserts byte-level wallet-directory
+  identity across a full request sweep including POST. Custody-mutating
+  acts are only ever printed as CLI commands for the human.
+- **No authentication because there is nothing to operate** — but it binds
+  `127.0.0.1` by default and must not be exposed: it *reads* wallet state,
+  so exposure is an information-disclosure risk (posture, incidents,
+  member fingerprints), not a custody-control risk.
+- **It phones home never by default.** Outbound traffic happens only when
+  the operator explicitly presses «Probe now» (liveness GETs) — page loads
+  perform no network I/O.
+- An attacker who can serve the operator a *fake* cockpit (host compromise,
+  attacker #7) can lie to the human — which is the standing host-compromise
+  boundary above, not a new one; the CLI (`pacta wallet status`,
+  `verify-ledger`) remains the independent second surface.
+
 ## Design invariants the controls enforce
 
 1. **Unanimity or nothing**: no majority voting; any divergence fails

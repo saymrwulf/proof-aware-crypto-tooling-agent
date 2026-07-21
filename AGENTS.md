@@ -6,6 +6,8 @@ Guidance for future Codex runs in this repository:
 - Do not regenerate Lean from Rust. Treat shipped Lean files in verified repos as the artifact.
 - Do not claim end-to-end verification unless theorem coverage actually exists.
 - Keep macOS and Apple Silicon portability. Do not rely on GNU `timeout`, `free`, `taskset`, Docker, Nix, or x86_64 assumptions.
+- The same portability law applies to DOCUMENTATION: commands printed in docs, the cockpit, and the lab manual must run on macOS (BSD userland: `shasum -a 256` not `sha256sum`; no GNU `sed -i` form; prefer portable `python3 -c` one-liners), and every printed command must be executed once before it ships.
+- The cockpit's three laws are load-bearing: renders-evidence-never-asserts (provenance lines, loud FAILED TO VERIFY), never-leave-a-human-in-the-dark (verdict in words, explainers, glossary links), and distinct-roles-with-handoffs (stations never melt). All three are test-enforced; keep them so.
 - Prefer explicit theorem-boundary language over marketing language.
 - Update tests with every behavior change.
 - Do not silently lower risk ratings. A lower score must explain the failed or missing evidence.

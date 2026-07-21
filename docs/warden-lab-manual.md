@@ -27,9 +27,13 @@ exercises, open a *second* terminal in the same repo directory and set up two
 things once (the server keeps running in the first terminal):
 
 ```
-alias pacta='PYTHONPATH=src:provider/src python3 -m pacta'
+alias pacta='PYTHONPATH=src python3 -m pacta'
 export W=/tmp/warden-DEMO-xxxxxxxx/wallet    # <- your printed demo path
 ```
+
+(If you installed per the README — venv plus `pip install -e .` — skip the
+alias: plain `pacta` already works. The alias is the zero-install path
+straight from a clone; both are equivalent for this course.)
 
 **Time.** The course is eight sessions plus a capstone: roughly four to six
 hours total. Every session is self-contained — stopping after any session and
@@ -267,7 +271,7 @@ chair with hard walls — and in exchange, the Proposer gets something rare:
 
 ```
 printf 'pay 5 to bob' > /tmp/payload.demo
-sha256sum /tmp/payload.demo
+shasum -a 256 /tmp/payload.demo      # GNU/Linux equivalent: sha256sum
 ```
 
    Change one character (`5` → `6`) and hash again. ✎ How much of the
@@ -487,7 +491,8 @@ pacta wallet verify-ledger --wallet "$W"
 
 ```
 cp -r "$W" /tmp/tamper-lab-wallet
-sed -i 's/genesis/gene-sis/' /tmp/tamper-lab-wallet/ledger.jsonl
+python3 -c "p='/tmp/tamper-lab-wallet/ledger.jsonl'; s=open(p).read(); \
+open(p,'w').write(s.replace('genesis','gene-sis'))"
 pacta wallet verify-ledger --wallet /tmp/tamper-lab-wallet
 ```
 
@@ -889,7 +894,7 @@ wallet state — real operations, operator's deliberate acts).*
 | any | `pacta wallet cockpit --demo` | seal + serve a throwaway demo wallet |
 | any | `pacta wallet cockpit --wallet DIR` | serve the cockpit over a wallet |
 | any | `pacta wallet status --wallet DIR` | custody posture (capsule, latch, ledger) |
-| Proposer | `sha256sum payload.bin` | the payload fingerprint, born |
+| Proposer | `shasum -a 256 payload.bin` | the payload fingerprint, born |
 | Proposer | `pacta wallet mcp --wallet DIR` | the front door (then `request_signature`) |
 | Proposer | `pacta wallet treasury-verify --wallet DIR --tx-file f` | quorum-verify a transaction's signatures |
 | Quorum | `pacta wallet build-quorum --sources-root DIR` | rebuild members from pinned proven sources |

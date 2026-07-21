@@ -79,6 +79,10 @@ def _payload_intent(payload: bytes) -> dict:
 
 
 def test_ledger_is_hash_chained(tmp_path):
+    from pacta.dogfood import locate_verifier
+
+    if locate_verifier() is None:
+        pytest.skip("dogfood signer not built")
     wallet = _seal_wallet(tmp_path, {"a": "accept", "b": "accept"}, tmp_path / "state")
     payload = b"hello"
     wallet.request_signature(_payload_intent(payload), payload, state_dir=wallet._test_state_dir)

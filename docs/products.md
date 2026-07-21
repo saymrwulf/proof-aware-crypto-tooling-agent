@@ -6,6 +6,11 @@ are **production-ready product definitions**, not four separate codebases:
 each is the same `pacta wallet` core with a different signer, policy, and
 surface. Presented here as products so the shape of each is unambiguous.
 
+Every profile also ships the same human surface: the **custody cockpit**
+(`pacta wallet cockpit`) — local, read-only, six role stations over live
+evidence instruments, with the deck, the guide, and the lab manual. See
+[docs/cockpit.md](cockpit.md).
+
 The trust posture in [WALLET.md](../WALLET.md#trust-posture) applies to all
 four without exception. What differs is *where the boundary sits* and *what
 the wallet is wired into*.
