@@ -178,7 +178,11 @@ def test_server_routes_and_read_only_guarantee(tmp_path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        for route in ("/", "/queue", "/incidents", "/inspect", "/guide"):
+        routes = ("/", "/posture", "/queue", "/incidents", "/inspect", "/guide",
+                  "/station/proposer", "/station/quorum", "/station/operator",
+                  "/station/operator?probe=1", "/station/cryptographer",
+                  "/station/architect", "/station/newcomer")
+        for route in routes:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}{route}") as resp:
                 body = resp.read().decode()
                 assert resp.status == 200
@@ -293,7 +297,7 @@ def test_every_view_carries_lead_nav_and_explainers(tmp_path):
     wallet = _seal_wallet(tmp_path)
     server, thread, port = _serve(wallet.dir)
     try:
-        for route in ("/", "/queue", "/incidents", "/inspect"):
+        for route in ("/", "/posture", "/queue", "/incidents", "/inspect"):
             status, body = _get(port, route)
             assert status == 200
             assert 'href="/guide"' in body, f"{route}: no path to the guide"
@@ -323,6 +327,100 @@ def test_estate_page_links_back_to_cockpit(tmp_path):
         status, body = _get(port, "/estate")
         assert status == 200
         assert "Back to cockpit" in body
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+# ---------------------------------------------------------------------------
+# Crew law: the bridge presents six DISTINCT role stations that cooperate
+# through explicit handoffs — everything a human crew would need with no AI
+# around, as runnable commands. Roles never melt into each other.
+# ---------------------------------------------------------------------------
+
+STATION_IDS = ("proposer", "quorum", "operator", "cryptographer",
+               "architect", "newcomer")
+
+
+def test_bridge_shows_crew_and_dispatch(tmp_path):
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/")
+        assert status == 200
+        assert "CUSTODY HEALTHY" in body  # whole-system verdict, in words, on top
+        for name in ("Proposer", "Quorum bench", "Operator", "Cryptographer",
+                     "Architect", "Newcomer"):
+            assert name in body, f"bridge is missing the {name} card"
+        assert "Take this station" in body
+        assert "If this happens, who acts" in body  # the dispatch (andon) board
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_every_station_defines_role_contract(tmp_path):
+    """Each station page must state: mission, duties as runnable commands,
+    the never-list (separation of duties), and explicit handoffs."""
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        for sid in STATION_IDS:
+            status, body = _get(port, f"/station/{sid}")
+            assert status == 200, f"{sid}: not served"
+            assert "Mission" in body, f"{sid}: no mission"
+            assert "Duties" in body, f"{sid}: no duties"
+            assert 'class="cmd"' in body, f"{sid}: no runnable command (the no-AI drill)"
+            assert "This station never" in body, f"{sid}: no separation-of-duties list"
+            assert "Handoffs" in body, f"{sid}: no handoffs"
+            assert "RECEIVES" in body and "DELIVERS" in body, f"{sid}: handoffs empty"
+            assert 'class="lead"' in body, f"{sid}: no lead"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_stations_are_distinct_roles(tmp_path):
+    """No melting: each role's signature phrase appears on its own station
+    and on no other station."""
+    markers = {
+        "proposer": "front door",
+        "quorum": "unanimity or latch",
+        "operator": "Probe now",
+        "cryptographer": "Replay the whole log offline",
+        "architect": "Drift tripwire",
+        "newcomer": "Your first hour",
+    }
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        bodies = {sid: _get(port, f"/station/{sid}")[1] for sid in STATION_IDS}
+        for sid, marker in markers.items():
+            assert marker in bodies[sid], f"{sid}: lost its signature duty ({marker})"
+            for other, body in bodies.items():
+                if other != sid:
+                    assert marker not in body, (
+                        f"{other} bleeds into {sid}'s role ({marker})")
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_operator_probe_is_explicit_and_live(tmp_path):
+    """The liveness board never phones home on an ordinary page load; probes
+    run only on the operator's explicit demand, then show per-target rows."""
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/station/operator")
+        assert status == 200
+        assert "has not probed" in body and "Probe now" in body
+        assert "Public services" not in body  # no results without demand
+        status, body = _get(port, "/station/operator?probe=1")
+        assert status == 200
+        assert "Public services" in body and "Local working copies" in body
+        for target in ("log head", "paper", "blog", "lean-transparency-log"):
+            assert target in body, f"probe results missing target: {target}"
     finally:
         server.shutdown()
         thread.join(timeout=5)

@@ -1,9 +1,14 @@
-# The custody cockpit — a read-only surface for the human operator
+# The custody cockpit — a bridge for the human crew
 
 `pacta wallet cockpit --wallet <dir>` serves a local web UI
 (default `http://127.0.0.1:8471`) over an existing warden wallet.
 warden has always been agent-native (MCP) and CLI-native; the cockpit is
-the third surface — for the human who ultimately answers for the money.
+the third surface — for the humans who ultimately answer for the money.
+
+It is organized as a **bridge with six role stations** over shared
+evidence instruments, in the control-room tradition (overview → station
+→ instrument → raw files/CLI): the cockpit provides everything a human
+crew would need to run this estate **if no AI were around**.
 
 ## The design law
 
@@ -36,15 +41,55 @@ page is built from the same anatomy, top to bottom:
 5. **The provenance line** — the dashed footer naming the exact function
    and timestamp that recomputed the panel.
 
-The `/guide` view is the manual: what warden is, how to read any page,
-the color code, a five-minute tour, a glossary of every term (capsule,
-member, pinning, evidence grades R0–R5, ledger, latch, incident, refusal
-receipt, air-gap, attestation/receipt, provenance, DEMO), and an honest
-"what this cockpit cannot tell you" section. Navigation tabs state the
-question each view answers. This contract is enforced by tests
-(`test_guide_view_explains_every_term`,
+The `/guide` view is the manual: what warden is, the crew model, how to
+read any page, the color code, a five-minute tour, a glossary of every
+term (capsule, member, pinning, evidence grades R0–R5, ledger, latch,
+incident, refusal receipt, air-gap, attestation/receipt, provenance,
+station, DEMO), and an honest "what this cockpit cannot tell you"
+section. Navigation tabs state the question each view answers. This
+contract is enforced by tests (`test_guide_view_explains_every_term`,
 `test_every_view_carries_lead_nav_and_explainers`,
 `test_empty_states_are_explained`).
+
+## The crew law (roles, not a blur)
+
+**The crew is a team of distinct roles.** Running the estate takes six
+roles; in production one financial agent can play every one of them —
+but the roles stay separate, cooperate through explicit handoffs, and
+never melt into each other. Separation of duties is a custody control:
+the one who proposes never approves, the one who verifies never
+proposes, the one who watches never overrides the bench.
+
+The **Bridge** (`/`) is the Level-1 overview: the whole-system verdict
+strip (custody verdict in words + quorum/ledger/incident/queue chips),
+the six crew cards with live data, and the dispatch (andon) board — "if
+this happens, who acts". Each **station** (`/station/<id>`) is one
+role's console with a fixed anatomy: *Mission* → *Duties* (every duty a
+runnable command — the no-AI drill) → live embedded instruments →
+*"This station never…"* (the separation-of-duties list) → *Handoffs*
+(receives ← / delivers →).
+
+| station | question | live instruments on the console |
+|---|---|---|
+| **Proposer** (`/station/proposer`) | I need something signed — how do I ask, and what do I do with the answer? | the Queue |
+| **Quorum bench** (`/station/quorum`) | Would I stake custody on this evidence? Four seats, one answer each. | the live bench roster (capsule members) |
+| **Operator** (`/station/operator`) | Is everything that should be running, running — and is custody unfrozen? | the **liveness board** (on-demand probes of every public service + every local repo), latch, recorded history |
+| **Cryptographer** (`/station/cryptographer`) | Does the evidence really prove what it claims — no more, no less? | the Inspect verifier |
+| **Architect** (`/station/architect`) | Does the map still match the territory? | the live **drift tripwire** (ESTATE.md vs estate view) |
+| **Newcomer** (`/station/newcomer`) | What is all this? Where do I start? | the first-hour checklist |
+
+The liveness board probes **only when the operator presses «Probe
+now»** — the cockpit never phones home on an ordinary page load. Probes
+are read-only observations (HTTP GET on the public services, `git
+rev-parse`/`status` on local checkouts) and report observed facts with
+latency; liveness is pulses, not honesty — honesty is the
+Cryptographer's replay.
+
+The crew law is test-enforced: `test_bridge_shows_crew_and_dispatch`,
+`test_every_station_defines_role_contract` (mission/duties/commands/
+never-list/handoffs on all six), `test_stations_are_distinct_roles`
+(each role's signature phrase appears on its own station and on no
+other — no melting), `test_operator_probe_is_explicit_and_live`.
 
 ## The read-only guarantee
 
@@ -57,11 +102,11 @@ wallet directory hash-identical. Human approve/deny is deliberately NOT
 here — that would be a custody-semantics change, which belongs to a
 separate, explicitly reviewed milestone.
 
-## The six views
+## The instruments (shared evidence views)
 
 | view | answers | recomputed by |
 |---|---|---|
-| **Posture** (`/`) | *Is custody healthy right now?* Verdict banner, then: custody latch, ledger with full hash-chain re-verification, the pinned quorum members (backend, component, evidence grade, source commit, binary fingerprint), signing rules verbatim, incident/refusal counts | `Wallet.posture()` / `Wallet.verify_ledger()` |
+| **Posture** (`/posture`) | *Is custody healthy right now?* Verdict banner, then: custody latch, ledger with full hash-chain re-verification, the pinned quorum members (backend, component, evidence grade, source commit, binary fingerprint), signing rules verbatim, incident/refusal counts | `Wallet.posture()` / `Wallet.verify_ledger()` |
 | **Queue** (`/queue`) | *What awaits the offline signer?* Parked air-gap signing requests (outbox) and whether the device has answered (inbox) — observed, never operated | airgap outbox/inbox listing |
 | **Incidents** (`/incidents`) | *What has ever gone wrong?* Incident records and signed refusal receipts, verbatim, newest first — with the page explaining why empty is the good state | `incidents/*.json`, `receipts/*.json` |
 | **Inspect** (`/inspect`) | *Can I check a receipt myself?* Paste an attestation + transparency receipt + log public key; the verdict, per-signature results, and diagnostics come verbatim from the deployed verifier | `pacta.transparency.verify_receipt` |

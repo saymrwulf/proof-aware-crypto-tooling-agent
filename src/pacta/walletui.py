@@ -1,152 +1,67 @@
-"""walletui - the warden custody cockpit (local, read-only).
+"""walletui - the warden custody cockpit (local, read-only): a bridge
+with six role stations over shared evidence instruments.
 
-A localhost web surface over an existing wallet directory, for the human
-operator who ultimately answers for the money. Six views: posture, the
-pending-signature queue (airgap outbox), the incident & refusal browser,
-a receipt inspector, the estate map, and a plain-language guide.
+Information architecture (control-room style, four levels):
+  1. BRIDGE (/)            - whole-system verdict + the crew of six roles
+  2. STATIONS (/station/*) - one console per role: mission, duties as
+                             runnable commands, live instruments, the
+                             never-list, explicit handoffs
+  3. INSTRUMENTS           - shared evidence views: posture, queue,
+                             incidents, inspect, estate, guide
+  4. RAW                   - the wallet files and the CLI themselves
 
-Design law: THE COCKPIT RENDERS EVIDENCE, IT NEVER ASSERTS IT. Every
+Three laws, each enforced by tests:
+
+DESIGN LAW - THE COCKPIT RENDERS EVIDENCE, IT NEVER ASSERTS IT. Every
 panel is recomputed from wallet state or submitted artifacts at request
 time by the same functions the wallet itself uses, and every panel names
 the function and timestamp that produced it. Anything that cannot be
-recomputed renders as a loud FAILED-TO-VERIFY panel - there is no cached
-green and no neutral gray.
+recomputed renders as a loud FAILED-TO-VERIFY panel - no cached green,
+no neutral gray.
 
-UX law (the design law's twin): THE COCKPIT NEVER LEAVES A HUMAN IN THE
-DARK. Every page opens with a plain-language statement of what it shows;
-every verdict is stated in words, not just color; every panel carries a
-"how to read this" explainer; every piece of jargon links to the /guide
-glossary. A person who has never heard of warden must be able to read
-every screen.
+UX LAW - THE COCKPIT NEVER LEAVES A HUMAN IN THE DARK. Every page opens
+with a plain-language lead; every verdict is stated in words; every
+panel carries a "how to read this" explainer; every jargon term links to
+the /guide glossary.
+
+CREW LAW - ROLES ARE DISTINCT AND COOPERATE THROUGH HANDOFFS. The bridge
+presents everything a human crew would need if no AI were around: six
+stations (proposer, quorum bench, operator, cryptographer, architect,
+newcomer), each with runnable duties and a "this station never" list.
+Separation of duties is a custody control; the stations do not melt into
+each other. (Role content lives in stations.py; liveness probes in
+liveness.py; shared primitives in uikit.py.)
 
 Read-only guarantee: this module calls only read paths (``Wallet.posture``,
-``verify_ledger``, directory listings) and ``transparency.verify_receipt``
-on submitted artifacts (parsed in memory / temp files outside the wallet).
-It cannot approve, sign, unlatch, or modify custody state; the HTTP surface
-exposes no mutating route. Human approve/deny is deliberately NOT here -
-that would be a custody-semantics change, which belongs to a separate,
-explicitly reviewed milestone.
+``verify_ledger``, directory listings), ``transparency.verify_receipt`` on
+submitted artifacts (parsed in memory / temp files outside the wallet),
+and - only when the operator explicitly presses "Probe now" - outbound
+liveness observations (HTTP GET, git queries). It cannot approve, sign,
+unlatch, or modify custody state; the HTTP surface exposes no mutating
+route. Human approve/deny is deliberately NOT here - that would be a
+custody-semantics change, which belongs to a separate, explicitly
+reviewed milestone. The mutating acts a human crew needs are provided as
+exact CLI commands on the stations instead.
 
 The server binds 127.0.0.1 by default and is not meant to be exposed.
 """
 from __future__ import annotations
 
-import html
 import json
 import tempfile
 import urllib.parse
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 
 from .attestation import load_attestation
+from .liveness import collect_liveness, render_liveness
+from .stations import STATION_BY_ID, STATIONS, render_bridge, render_station
 from .transparency import load_receipt, verify_receipt
+from .uikit import (STYLE, esc as _esc, explain as _explain,
+                    failed_panel as _failed_panel, help_link as _help,
+                    now_utc as _now, provenance as _provenance)
 from .wallet import Wallet
-
-_STYLE = """
- :root{--ink:#1c2430;--ink2:#5a6675;--line:#dde2e9;--ok:#1e7f4f;--okbg:#e2f2e9;
-       --bad:#a3242c;--badbg:#fbe4e6;--warn:#a86a10;--warnbg:#fdf0da;
-       --accent:#3b4d8f;--accentbg:#eef0f7;--bg:#f8f9fa}
- *{box-sizing:border-box}
- body{font-family:system-ui,sans-serif;max-width:62rem;margin:0 auto;
-      padding:1.4rem 1.2rem 4rem;color:var(--ink);line-height:1.55;background:var(--bg)}
- h1{font-size:1.35rem;margin:.2rem 0 0}
- h2{font-size:1.05rem;margin:1.6rem 0 .5rem}
- code{font-family:ui-monospace,Menlo,Consolas,monospace;background:#eef0f3;
-      border-radius:4px;padding:.08rem .3rem;font-size:.88em}
- .sub{color:var(--ink2);font-size:.85rem;margin:.3rem 0 .6rem}
- nav{margin:.7rem 0 1rem;display:flex;gap:.5rem;flex-wrap:wrap}
- nav a{color:var(--accent);text-decoration:none;border:1px solid var(--line);
-      background:#fff;border-radius:6px;padding:.3rem .7rem;font-size:.85rem;
-      display:flex;flex-direction:column;line-height:1.25;min-width:7.5rem}
- nav a.here{border-color:var(--accent);font-weight:600;background:var(--accentbg)}
- nav a .navsub{font-size:.67rem;color:var(--ink2);font-weight:400}
- .banner{background:var(--warnbg);border:1px solid var(--warn);color:var(--warn);
-      border-radius:6px;padding:.45rem .8rem;font-size:.82rem;font-weight:600}
- .banner a{color:var(--warn)}
- .lead{font-size:.92rem;margin:.9rem 0 .2rem}
- .verdict{border-radius:8px;padding:.8rem 1.1rem;margin:.8rem 0;border:1px solid}
- .verdict strong{font-size:1.05rem;letter-spacing:.02em}
- .verdict p{margin:.3rem 0 0;font-size:.88rem;font-weight:400}
- .verdict.ok{background:var(--okbg);border-color:var(--ok);color:var(--ok)}
- .verdict.warn{background:var(--warnbg);border-color:var(--warn);color:var(--warn)}
- .verdict.bad{background:var(--badbg);border-color:var(--bad);color:var(--bad)}
- .panel{background:#fff;border:1px solid var(--line);border-radius:8px;
-      padding:.9rem 1.1rem;margin:.7rem 0}
- .panel.bad{border-color:var(--bad);background:var(--badbg)}
- .prov{color:var(--ink2);font-size:.72rem;margin-top:.6rem;border-top:1px dashed var(--line);
-      padding-top:.35rem}
- .pill{display:inline-block;border-radius:9px;padding:.06rem .55rem;font-size:.76rem;
-      font-weight:700}
- .pill.ok{background:var(--okbg);color:var(--ok)}
- .pill.bad{background:var(--badbg);color:var(--bad)}
- .pill.warn{background:var(--warnbg);color:var(--warn)}
- a.help{display:inline-block;width:1.05rem;height:1.05rem;line-height:1.05rem;text-align:center;
-      border-radius:50%;background:var(--accentbg);color:var(--accent);font-size:.72rem;
-      font-weight:700;text-decoration:none;vertical-align:.15em}
- details.explain{margin-top:.55rem;font-size:.82rem}
- details.explain summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:.78rem}
- details.explain .expl{color:var(--ink2);margin:.4rem 0 0;padding:.5rem .7rem;
-      background:var(--accentbg);border-radius:6px}
- details.explain .expl ul{margin:.3rem 0;padding-left:1.1rem}
- details.explain .expl li{margin:.15rem 0}
- .plain{font-size:.88rem;margin:.3rem 0 .6rem}
- .empty{color:var(--ink2);font-size:.88rem;background:var(--accentbg);border-radius:6px;
-      padding:.5rem .8rem}
- pre{overflow-x:auto}
- .tablewrap{overflow-x:auto}
- table{border-collapse:collapse;width:100%;font-size:.88rem;background:#fff}
- td,th{border:1px solid var(--line);padding:.4rem .6rem;text-align:left;vertical-align:top}
- th{background:var(--accentbg)}
- ul.diag{margin:.4rem 0 0;padding-left:1.2rem}
- ul.diag li{font-size:.85rem;margin:.2rem 0}
- dl.gloss dt{font-weight:700;margin-top:.8rem}
- dl.gloss dd{margin:.15rem 0 0 0;font-size:.88rem;color:var(--ink)}
- textarea{width:100%;min-height:7.5rem;font-family:ui-monospace,monospace;font-size:.8rem;
-      border:1px solid var(--line);border-radius:6px;padding:.5rem}
- button{background:var(--accent);color:#fff;border:0;border-radius:6px;
-      padding:.5rem 1.1rem;font-size:.9rem;cursor:pointer}
- .muted{color:var(--ink2);font-size:.85rem}
- .mono{font-family:ui-monospace,monospace}
-"""
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _esc(value: Any) -> str:
-    return html.escape(str(value))
-
-
-def _help(anchor: str) -> str:
-    """A small ? that jumps to the glossary entry for a term."""
-    return (f'<a class="help" href="/guide#{anchor}" '
-            f'title="what does this mean? — explained in the guide">?</a>')
-
-
-def _explain(body: str) -> str:
-    """The per-panel interpretation aid: always present, opt-in detail."""
-    return (f'<details class="explain"><summary>How to read this panel</summary>'
-            f'<div class="expl">{body}</div></details>')
-
-
-def _provenance(via: str) -> str:
-    return f'<div class="prov">recomputed {_esc(_now())} via <code>{_esc(via)}</code> — nothing on this panel is cached or asserted.</div>'
-
-
-def _failed_panel(what: str, via: str, error: Exception) -> str:
-    return (
-        f'<div class="panel bad"><span class="pill bad">FAILED TO VERIFY</span> '
-        f"<strong>{_esc(what)}</strong> could not be recomputed: "
-        f"<code>{_esc(f'{type(error).__name__}: {error}')}</code>. "
-        f"A cockpit that cannot verify shows red, never a stale green. "
-        f"<span class='muted'>What to do: check that the wallet directory still exists and is "
-        f"readable, then reload. If this persists, inspect from the command line with "
-        f"<code>pacta wallet posture</code>.</span>"
-        f"{_provenance(via)}</div>"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -232,25 +147,55 @@ def inspect_receipt(attestation_text: str, receipt_text: str,
                 "error": f"{type(error).__name__}: {error}"}
 
 
+def _collect_drift() -> dict[str, Any]:
+    """The Architect's live tripwire: do the two estate renderings agree?"""
+    def read() -> dict[str, Any]:
+        from .estateview import ESTATE_HTML
+        estate_md = (Path(__file__).resolve().parents[2] / "ESTATE.md").read_text(
+            encoding="utf-8")
+        sentinels = ["lean-transparency-log", "ltl-accumulator-verified",
+                     "proof-aware-crypto-tooling-agent", "verifying-crypto-with-lean",
+                     "dalek-ed25519-verified", "pasta-pallas-verified",
+                     "ltl.zkdefi.org", "Forgejo"]
+        missing = ([f"{n} (estate view)" for n in sentinels if n not in ESTATE_HTML]
+                   + [f"{n} (ESTATE.md)" for n in sentinels if n not in estate_md])
+        return {"sentinels": len(sentinels), "missing": missing,
+                "runtime_in_both": ("What is running" in estate_md
+                                    and "ALWAYS ON" in ESTATE_HTML)}
+    return collect("name-level comparison of estateview.ESTATE_HTML vs ESTATE.md", read)
+
+
 # ---------------------------------------------------------------------------
-# page shell - one navigation, one lead paragraph, on every view
+# page shell - two-row navigation (stations / instruments), lead on every view
 # ---------------------------------------------------------------------------
 
-_VIEWS = [
-    ("/", "Posture", "is custody healthy right now?"),
+_STATION_TABS = [("/", "Bridge", "the whole system at a glance")] + [
+    (f"/station/{s['id']}", s["name"], sub) for s, sub in zip(STATIONS, [
+        "ask for signatures", "four seats, one answer each",
+        "liveness + latch recovery", "recompute everything",
+        "map = territory", "start here"])]
+
+_INSTRUMENT_TABS = [
+    ("/posture", "Posture", "is custody healthy right now?"),
     ("/queue", "Queue", "what awaits the offline signer?"),
     ("/incidents", "Incidents", "what has ever gone wrong?"),
     ("/inspect", "Inspect", "check a receipt yourself"),
-    ("/estate", "Estate map", "the whole system, drawn"),
+    ("/estate", "Estate map", "the territory, drawn"),
     ("/guide", "Guide", "every term, explained"),
 ]
 
-_LEADS = {
-    "/": ('This page answers one question: <strong>is custody healthy right now?</strong> '
-          'The verdict comes first, the evidence behind it below. Every panel ends with a '
-          'dashed provenance line naming the exact function that just recomputed it — '
-          'and every small <a class="help" href="/guide#glossary">?</a> jumps to a '
-          'plain-language explanation.'),
+_LEADS: dict[str, str] = {
+    "/": ('This is the <strong>bridge</strong>: the whole estate at one glance, then '
+          'the crew. The verdict strip is recomputed on load; each crew card opens a '
+          '<strong>station</strong> — one human role with its duties, commands, and '
+          'handoffs. If no AI were around, these six stations are how people would '
+          'run this system.'),
+    "/posture": ('This page answers one question: <strong>is custody healthy right '
+                 'now?</strong> The verdict comes first, the evidence behind it below. '
+                 'Every panel ends with a dashed provenance line naming the exact '
+                 'function that just recomputed it — and every small '
+                 '<a class="help" href="/guide#glossary">?</a> jumps to a '
+                 'plain-language explanation.'),
     "/queue": ('The wallet’s signing key can live on an <em>air-gapped</em> device — a '
                'computer with no network connection. To get something signed, the wallet '
                'parks a request file in an outbox; a human carries it to the device; the '
@@ -265,16 +210,25 @@ _LEADS = {
                  'own verifier on them, on your machine, without writing anything to the '
                  'wallet. Use it to check evidence somebody handed you before trusting it.'),
     "/guide": ('Plain-language explanations for everything this cockpit shows. Nothing on '
-               'this page is live data — this is the manual. The other five tabs are the '
-               'instruments.'),
+               'this page is live data — this is the manual. The Bridge and the stations '
+               'are the working surfaces; the instruments are the shared evidence.'),
 }
+for _s in STATIONS:
+    _LEADS[f"/station/{_s['id']}"] = _s["lead"]
+
+
+def _tabs(items: list[tuple[str, str, str]], active: str) -> str:
+    return "".join(
+        f'<a href="{href}"{" class=here" if href == active else ""}>{label}'
+        f'<span class="navsub">{sub}</span></a>'
+        for href, label, sub in items)
 
 
 def _page(title: str, active: str, body: str, wallet_dir: str) -> str:
-    nav = "".join(
-        f'<a href="{href}"{" class=here" if href == active else ""}>{label}'
-        f'<span class="navsub">{sub}</span></a>'
-        for href, label, sub in _VIEWS)
+    nav = (f'<div class="navrow"><span class="navtag">STATIONS</span>'
+           f'{_tabs(_STATION_TABS, active)}</div>'
+           f'<div class="navrow"><span class="navtag">INSTRUMENTS</span>'
+           f'{_tabs(_INSTRUMENT_TABS, active)}</div>')
     demo_badge = ('<span class="pill warn" title="sealed by --demo; fake members; can sign '
                   'nothing real">DEMO WALLET — custody-inert</span> '
                   if "DEMO" in wallet_dir else "")
@@ -284,20 +238,22 @@ def _page(title: str, active: str, body: str, wallet_dir: str) -> str:
         "<!doctype html><html><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>warden cockpit — {_esc(title)}</title>"
-        f"<style>{_STYLE}</style></head><body>"
+        f"<style>{STYLE}</style></head><body>"
         f"<h1>warden custody cockpit {demo_badge}</h1>"
         f"<p class='sub'>Watching wallet <code>{_esc(wallet_dir)}</code> — everything below is "
         "recomputed live from that directory each time a page loads; nothing is cached, "
         "nothing is taken on trust.</p>"
         "<div class='banner'>READ-ONLY. This cockpit observes and recomputes; it cannot "
-        "approve, sign, unlatch, or modify custody state. First time here? Start with the "
-        "<a href='/guide'>Guide</a> — every term on these pages is explained there.</div>"
-        f"<nav>{nav}</nav>{lead_html}{body}</body></html>"
+        "approve, sign, unlatch, or modify custody state — the stations give you the "
+        "exact commands for every act instead. First time here? Start with the "
+        "<a href='/guide'>Guide</a> or the <a href='/station/newcomer'>Newcomer "
+        "station</a>.</div>"
+        f"{nav}{lead_html}{body}</body></html>"
     )
 
 
 # ---------------------------------------------------------------------------
-# renderers - pure string builders over collector output
+# posture instrument - verdict banner + five evidence panels
 # ---------------------------------------------------------------------------
 
 def _posture_verdict(p: dict[str, Any]) -> str:
@@ -321,25 +277,10 @@ def _posture_verdict(p: dict[str, Any]) -> str:
             "is re-checked — not remembered — in the panels below.</p></div>")
 
 
-def render_posture(posture: dict[str, Any]) -> str:
-    if not posture["ok"]:
-        return _failed_panel("Custody posture", posture["via"], posture["error"])
-    p = posture["data"]
+def _panel_latch(p: dict[str, Any]) -> str:
     latch = p["latch"]
-    ledger = p["ledger"]
     latch_pill = ('<span class="pill bad">LATCHED — outbound custody frozen</span>'
                   if latch.get("latched") else '<span class="pill ok">unlatched</span>')
-    chain_pill = ('<span class="pill ok">chain verified</span>' if ledger["chain_ok"]
-                  else '<span class="pill bad">CHAIN BROKEN</span>')
-    members = "".join(
-        f"<tr><td><code>{_esc(m['backend'])}</code></td>"
-        f"<td class='mono'>{_esc(m['component'])}</td>"
-        f"<td>{_esc(m['risk_tier'])}</td>"
-        f"<td class='mono'>{_esc(m['source_commit'][:12])}…</td>"
-        f"<td class='mono'>{_esc(m['binary_sha256'][:16])}…</td></tr>"
-        for m in p["members"])
-    problems = "".join(f"<li>{_esc(x)}</li>" for x in ledger["problems"]) or (
-        "<li>none — every link in the chain held</li>")
     latch_detail = ""
     if latch.get("latched"):
         latch_detail = (f"<p class='plain'>Trigger: <code>{_esc(latch.get('reason'))}</code> · "
@@ -347,19 +288,8 @@ def render_posture(posture: dict[str, Any]) -> str:
                         f"frozen since {_esc(latch.get('at'))}. Read the incident in the "
                         f"<a href='/incidents'>incident browser</a>, then follow "
                         f"<code>docs/runbook-latch.md</code> to recover.</p>")
-    spending = p.get("spending_policy") or {}
-    no_rules = (not spending) or ("note" in spending and len(spending) == 1)
-    spending_note = (
-        "<p class='empty'>No spending rules are configured for this wallet: beyond the "
-        "quorum gate and the latch, outbound signing is unrestricted — the wallet's own "
-        "words below say so. A real deployment would define limits and allowlists in "
-        "<code>policy.json</code>.</p>" if no_rules else
-        "<p class='plain'>These rules are enforced by the signing firewall before anything "
-        "is signed. Shown verbatim from <code>policy.json</code>.</p>")
     return (
-        _posture_verdict(p)
-        # --- latch ---------------------------------------------------------
-        + f"<div class='panel'><h2 style='margin-top:0'>Custody latch {_help('latch')} {latch_pill}</h2>"
+        f"<div class='panel'><h2 style='margin-top:0'>Custody latch {_help('latch')} {latch_pill}</h2>"
         "<p class='plain'>The latch is the wallet's emergency brake. It trips when the "
         "quorum disagrees or tampering is suspected, and freezes all outbound signing "
         "until an operator clears it through the wallet's own channels — never from "
@@ -371,8 +301,16 @@ def render_posture(posture: dict[str, Any]) -> str:
             "<li><span class='pill bad'>LATCHED</span> — the brake is on; every signing "
             "request is refused with a receipt until a human resolves the trigger. "
             "Recovery steps live in <code>docs/runbook-latch.md</code>.</li></ul>")
-        + f"{_provenance('Wallet.latch_state()')}</div>"
-        # --- ledger --------------------------------------------------------
+        + f"{_provenance('Wallet.latch_state()')}</div>")
+
+
+def _panel_ledger(p: dict[str, Any]) -> str:
+    ledger = p["ledger"]
+    chain_pill = ('<span class="pill ok">chain verified</span>' if ledger["chain_ok"]
+                  else '<span class="pill bad">CHAIN BROKEN</span>')
+    problems = "".join(f"<li>{_esc(x)}</li>" for x in ledger["problems"]) or (
+        "<li>none — every link in the chain held</li>")
+    return (
         f"<div class='panel'><h2 style='margin-top:0'>Ledger — has history been tampered with? {_help('ledger')} {chain_pill}</h2>"
         "<p class='plain'>The ledger is the wallet's append-only journal: every custody "
         "event, in order, each entry carrying the hash of the one before it. Editing, "
@@ -387,8 +325,18 @@ def render_posture(posture: dict[str, Any]) -> str:
             "<li><span class='pill bad'>CHAIN BROKEN</span> — at least one link failed: "
             "history was altered, truncated, or corrupted. The list above names the first "
             "entry that failed.</li></ul>")
-        + f"{_provenance('Wallet.verify_ledger() — full hash-chain recomputation')}</div>"
-        # --- quorum --------------------------------------------------------
+        + f"{_provenance('Wallet.verify_ledger() — full hash-chain recomputation')}</div>")
+
+
+def _panel_quorum(p: dict[str, Any]) -> str:
+    members = "".join(
+        f"<tr><td><code>{_esc(m['backend'])}</code></td>"
+        f"<td class='mono'>{_esc(m['component'])}</td>"
+        f"<td>{_esc(m['risk_tier'])}</td>"
+        f"<td class='mono'>{_esc(m['source_commit'][:12])}…</td>"
+        f"<td class='mono'>{_esc(m['binary_sha256'][:16])}…</td></tr>"
+        for m in p["members"])
+    return (
         f"<div class='panel'><h2 style='margin-top:0'>Quorum — who must agree before anything is trusted? {_help('member')} "
         f"<span class='pill ok'>{len(p['members'])} pinned</span></h2>"
         f"<p class='plain'>These are the {len(p['members'])} verifier programs this wallet "
@@ -418,21 +366,47 @@ def render_posture(posture: dict[str, Any]) -> str:
         "ledger's first entry so it cannot be quietly swapped. What this table does NOT "
         "prove: that the binaries correspond to the attested sources (reproducible builds "
         "are out of scope — that gap is grade R5 — stated in the paper and the claim cards)."
-        f"{_provenance('Wallet.capsule() / Wallet.posture()')}</div>"
-        # --- signing rules -------------------------------------------------
+        f"{_provenance('Wallet.capsule() / Wallet.posture()')}</div>")
+
+
+def _panel_policy(p: dict[str, Any]) -> str:
+    spending = p.get("spending_policy") or {}
+    no_rules = (not spending) or ("note" in spending and len(spending) == 1)
+    spending_note = (
+        "<p class='empty'>No spending rules are configured for this wallet: beyond the "
+        "quorum gate and the latch, outbound signing is unrestricted — the wallet's own "
+        "words below say so. A real deployment would define limits and allowlists in "
+        "<code>policy.json</code>.</p>" if no_rules else
+        "<p class='plain'>These rules are enforced by the signing firewall before anything "
+        "is signed. Shown verbatim from <code>policy.json</code>.</p>")
+    return (
         f"<div class='panel'><h2 style='margin-top:0'>Signing rules (spending policy)</h2>"
         f"{spending_note}"
         f"<pre style='margin:0;font-size:.8rem'>{_esc(json.dumps(spending, indent=2, sort_keys=True))}</pre>"
-        f"{_provenance('Wallet.policy() (policy.json, verbatim)')}</div>"
-        # --- recorded history ----------------------------------------------
+        f"{_provenance('Wallet.policy() (policy.json, verbatim)')}</div>")
+
+
+def _panel_history(p: dict[str, Any]) -> str:
+    return (
         f"<div class='panel'><h2 style='margin-top:0'>Recorded history</h2>"
         f"<p class='plain'>Incidents on file: <strong>{p['incidents']}</strong> · refusal "
         f"receipts on file: <strong>{p['refusal_receipts']}</strong> — read every one, "
         "verbatim, under <a href='/incidents'>Incidents</a>. An incident is the wallet "
         "noticing something wrong; a refusal receipt is the wallet saying no, in writing.</p>"
-        f"{_provenance('directory counts, recomputed')}</div>"
-    )
+        f"{_provenance('directory counts, recomputed')}</div>")
 
+
+def render_posture(posture: dict[str, Any]) -> str:
+    if not posture["ok"]:
+        return _failed_panel("Custody posture", posture["via"], posture["error"])
+    p = posture["data"]
+    return (_posture_verdict(p) + _panel_latch(p) + _panel_ledger(p)
+            + _panel_quorum(p) + _panel_policy(p) + _panel_history(p))
+
+
+# ---------------------------------------------------------------------------
+# queue / incidents / inspect instruments
+# ---------------------------------------------------------------------------
 
 def render_queue(airgap: dict[str, Any]) -> str:
     if not airgap["ok"]:
@@ -468,7 +442,7 @@ def render_queue(airgap: dict[str, Any]) -> str:
 
 def render_incidents(incidents: dict[str, Any], refusals: dict[str, Any]) -> str:
     def block(title: str, coll: dict[str, Any], intro: str, empty: str,
-              explain: str, via_note: str) -> str:
+              explain_body: str, via_note: str) -> str:
         if not coll["ok"]:
             return _failed_panel(title, coll["via"], coll["error"])
         items = coll["data"]
@@ -482,7 +456,7 @@ def render_incidents(incidents: dict[str, Any], refusals: dict[str, Any]) -> str
                 f"<pre style='font-size:.76rem;overflow-x:auto'>{_esc(json.dumps({k: v for k, v in i.items() if k != '_file'}, indent=2, sort_keys=True))}</pre></div>"
                 for i in items[:50])
         return (f"<div class='panel'><h2 style='margin-top:0'>{title}</h2>"
-                f"<p class='plain'>{intro}</p>{body}{_explain(explain)}"
+                f"<p class='plain'>{intro}</p>{body}{_explain(explain_body)}"
                 f"{_provenance(via_note)}</div>")
     return (
         block(f"Incidents — what the wallet noticed {_help('incident')}", incidents,
@@ -575,6 +549,89 @@ def render_inspect(result: dict[str, Any] | None,
     )
 
 
+# ---------------------------------------------------------------------------
+# bridge assembly - verdict strip + live crew snippets
+# ---------------------------------------------------------------------------
+
+def _bridge_strip(posture: dict[str, Any], airgap: dict[str, Any]) -> str:
+    if not posture["ok"]:
+        return _failed_panel("Custody verdict", posture["via"], posture["error"])
+    p = posture["data"]
+    ledger = p["ledger"]
+    chain = ('<span class="pill ok">chain verified</span>' if ledger["chain_ok"]
+             else '<span class="pill bad">CHAIN BROKEN</span>')
+    pending: Any = "?"
+    if airgap["ok"]:
+        pending = sum(1 for r in airgap["data"] if not r["answered"])
+    return (
+        _posture_verdict(p)
+        + "<div class='strip'>"
+        f"<span class='chip'>quorum <b>{len(p['members'])} pinned</b></span>"
+        f"<span class='chip'>ledger {chain}</span>"
+        f"<span class='chip'>incidents <b>{p['incidents']}</b> · refusals "
+        f"<b>{p['refusal_receipts']}</b></span>"
+        f"<span class='chip'>queue <b>{pending} awaiting device</b></span>"
+        "<span class='chip'>liveness — <a href='/station/operator?probe=1'>probe from "
+        "the Operator station</a></span>"
+        "</div>"
+        + _provenance("Wallet.posture() + airgap listing (liveness only on demand)")
+    )
+
+
+def _bridge_live(posture: dict[str, Any], airgap: dict[str, Any]) -> dict[str, str]:
+    live: dict[str, str] = {
+        "cryptographer": "<div class='live muted'>instrument ready: Inspect</div>",
+        "architect": "<div class='live muted'>estate view + drift tripwire ready</div>",
+        "newcomer": "<div class='live muted'>start: the Guide, then the demo</div>",
+    }
+    if posture["ok"]:
+        p = posture["data"]
+        seats = ", ".join(f"<span class='mono'>{_esc(m['component'])}</span>"
+                          for m in p["members"])
+        latch_word = ("LATCHED" if p["latch"].get("latched") else "unlatched")
+        live["quorum"] = f"<div class='live'>seats: {seats}</div>"
+        live["operator"] = (f"<div class='live'>incidents on file: <b>{p['incidents']}</b>"
+                            f" · latch: <b>{latch_word}</b></div>")
+    if airgap["ok"]:
+        pending = sum(1 for r in airgap["data"] if not r["answered"])
+        live["proposer"] = f"<div class='live'>queue: <b>{pending}</b> awaiting device</div>"
+    return live
+
+
+def _render_drift_panel() -> str:
+    coll = _collect_drift()
+    if not coll["ok"]:
+        return _failed_panel("Estate drift tripwire", coll["via"], coll["error"])
+    d = coll["data"]
+    if d["missing"] or not d["runtime_in_both"]:
+        missing = "".join(f"<li><code>{_esc(x)}</code></li>" for x in d["missing"]) or ""
+        runtime = ("" if d["runtime_in_both"] else
+                   "<li>the runtime dimension is missing from one rendering</li>")
+        body = (f"<p class='plain'><span class='pill bad'>DRIFT</span> the two renderings "
+                f"of the estate disagree:</p><ul class='diag'>{missing}{runtime}</ul>")
+    else:
+        body = (f"<p class='plain'><span class='pill ok'>renderings agree</span> all "
+                f"{d['sentinels']} sentinel names present in both <code>ESTATE.md</code> "
+                "and the cockpit estate view, and both carry the runtime dimension.</p>")
+    return (
+        "<div class='panel'><h3 style='margin-top:0'>Drift tripwire — map vs map</h3>"
+        "<p class='plain'>The estate map exists twice: the committed "
+        "<code>ESTATE.md</code> and the <a href='/estate'>estate view</a>. Two "
+        "renderings of one model need a tripwire — this panel compares them live, "
+        "name by name.</p>"
+        + body
+        + _explain(
+            "<ul><li>The comparison is name-level (sentinel entities + the runtime "
+            "dimension) — the same check the test suite runs.</li>"
+            "<li>On DRIFT: fix the stale rendering AND check its generator — a "
+            "published file that drifted from its source once will drift again.</li></ul>")
+        + _provenance(coll["via"]) + "</div>")
+
+
+# ---------------------------------------------------------------------------
+# guide instrument - the manual
+# ---------------------------------------------------------------------------
+
 def render_guide() -> str:
     """The manual: static plain-language explanations, no live data."""
     return (
@@ -589,12 +646,27 @@ def render_guide() -> str:
         # --- what is the cockpit -------------------------------------------
         "<div class='panel'><h2 style='margin-top:0' id='cockpit'>What is this cockpit?</h2>"
         "<p class='plain'>A local, read-only window onto one wallet directory, for the "
-        "human who ultimately answers for the money. Its design law: <strong>the cockpit "
+        "humans who ultimately answer for the money. Its design law: <strong>the cockpit "
         "renders evidence, it never asserts it</strong>. Every page is recomputed from "
         "the wallet's files at the moment you load it, by the same functions the wallet "
         "itself uses. It cannot approve, sign, unlatch, or change anything — the server "
         "has no writing routes, and the test suite proves a full click-through changes "
-        "not one byte of wallet state.</p></div>"
+        "not one byte of wallet state. What it does provide is the <em>work</em>: the "
+        "<a href='/'>Bridge</a> organizes everything a human crew would do if no AI were "
+        "around, as six role stations with runnable commands.</p></div>"
+        # --- the crew ------------------------------------------------------
+        "<div class='panel'><h2 style='margin-top:0' id='crew'>The crew model</h2>"
+        "<p class='plain'>Six roles run this estate: the <strong>Proposer</strong> asks "
+        "for signatures; the <strong>Quorum bench</strong> holds four independent "
+        "verifier seats; the <strong>Operator</strong> watches liveness and owns latch "
+        "recovery; the <strong>Cryptographer</strong> recomputes every piece of "
+        "evidence; the <strong>Architect</strong> keeps the estate map true; the "
+        "<strong>Newcomer</strong> learns — and supplies fresh eyes. Roles cooperate "
+        "through explicit handoffs and never blur: the one who proposes never approves, "
+        "the one who verifies never proposes, the one who watches never overrides the "
+        "bench. One person (or one agent) may hold several stations — explicitly, one "
+        "at a time, with the handoffs still applying. Each station page states its "
+        "mission, duties as commands, and what it <em>never</em> does.</p></div>"
         # --- how to read ---------------------------------------------------
         "<div class='panel'><h2 style='margin-top:0' id='reading'>How to read any page here</h2>"
         "<ol>"
@@ -619,8 +691,10 @@ def render_guide() -> str:
         # --- tour ----------------------------------------------------------
         "<div class='panel'><h2 style='margin-top:0' id='tour'>A five-minute tour</h2>"
         "<ol>"
-        "<li>Open <a href='/'>Posture</a> — read the verdict banner, then the panels top "
-        "to bottom: latch, ledger, quorum, signing rules, recorded history.</li>"
+        "<li>Open the <a href='/'>Bridge</a> — the verdict strip is the whole system in "
+        "one line; the crew cards are who does what.</li>"
+        "<li>Open <a href='/posture'>Posture</a> — read the verdict banner, then the "
+        "panels top to bottom: latch, ledger, quorum, signing rules, recorded history.</li>"
         "<li>Open <a href='/incidents'>Incidents</a> — on a healthy wallet both lists are "
         "empty, and the page says why that is the good state.</li>"
         "<li>Open <a href='/queue'>Queue</a> — empty unless a signature is waiting for "
@@ -629,6 +703,8 @@ def render_guide() -> str:
         "<code>examples/wallet-evidence/</code> and watch the deployed verifier run.</li>"
         "<li>Open the <a href='/estate'>Estate map</a> — where this wallet sits in the "
         "wider verified-crypto estate, and what is actually running where.</li>"
+        "<li>Then take the <a href='/station/newcomer'>Newcomer station</a> — your "
+        "first hour, mapped out.</li>"
         "</ol></div>"
         # --- glossary ------------------------------------------------------
         "<div class='panel'><h2 style='margin-top:0' id='glossary'>Glossary</h2>"
@@ -689,6 +765,11 @@ def render_guide() -> str:
         "<dd>The dashed footer on every panel, naming the exact function that recomputed "
         "the panel and when. It is the cockpit's signature move: evidence of freshness "
         "attached to every claim.</dd>"
+        "<dt id='station'>station</dt>"
+        "<dd>One human role's console on the Bridge: mission, duties as runnable "
+        "commands, live instruments, the never-list (separation of duties), and "
+        "handoffs. Six stations: Proposer, Quorum bench, Operator, Cryptographer, "
+        "Architect, Newcomer.</dd>"
         "<dt id='demo'>DEMO wallet</dt>"
         "<dd>A throwaway wallet sealed by <code>pacta wallet cockpit --demo</code> so you "
         "can explore this cockpit before creating a real wallet. Its members are fake "
@@ -703,6 +784,8 @@ def render_guide() -> str:
         "and the claim cards rather than hidden.</li>"
         "<li>Whether the machine this cockpit runs on is itself clean — a compromised "
         "operating system can lie to any dashboard, including this one.</li>"
+        "<li>Whether a live service is <em>honest</em> — the liveness board checks "
+        "pulses, not truth; truth is the Cryptographer's replay work.</li>"
         "<li>Anything it could not recompute just now — that renders as a red FAILED TO "
         "VERIFY panel, never as a guess and never as a stale green.</li>"
         "</ul></div>"
@@ -812,13 +895,45 @@ def make_handler(wallet_dir: Path):
         def _wallet(self) -> Wallet:
             return Wallet(wallet_dir)
 
+        def _station_embeds(self, station_id: str, probe: bool) -> list[str]:
+            wallet = self._wallet()
+            if station_id == "proposer":
+                return [render_queue(collect_airgap(wallet))]
+            if station_id == "quorum":
+                posture = collect("Wallet.posture()", wallet.posture)
+                return ([_panel_quorum(posture["data"])] if posture["ok"] else
+                        [_failed_panel("Quorum bench roster", posture["via"],
+                                       posture["error"])])
+            if station_id == "operator":
+                live = render_liveness(collect_liveness() if probe else None)
+                posture = collect("Wallet.posture()", wallet.posture)
+                if posture["ok"]:
+                    p = posture["data"]
+                    return [live, _panel_latch(p), _panel_history(p)]
+                return [live, _failed_panel("Custody posture", posture["via"],
+                                            posture["error"])]
+            if station_id == "cryptographer":
+                return [render_inspect(None)]
+            if station_id == "architect":
+                return [_render_drift_panel()]
+            return []
+
         def do_GET(self) -> None:  # noqa: N802 - http.server API
-            route = urllib.parse.urlparse(self.path).path
+            parsed = urllib.parse.urlparse(self.path)
+            route = parsed.path
+            query = urllib.parse.parse_qs(parsed.query)
             wd = str(wallet_dir)
             if route == "/":
                 wallet = self._wallet()
+                posture = collect("Wallet.posture()", wallet.posture)
+                airgap = collect_airgap(wallet)
+                body = render_bridge(_bridge_strip(posture, airgap),
+                                     _bridge_live(posture, airgap))
+                self._send(_page("bridge", "/", body, wd))
+            elif route == "/posture":
+                wallet = self._wallet()
                 body = render_posture(collect("Wallet.posture()", wallet.posture))
-                self._send(_page("posture", "/", body, wd))
+                self._send(_page("posture", "/posture", body, wd))
             elif route == "/queue":
                 body = render_queue(collect_airgap(self._wallet()))
                 self._send(_page("signature queue", "/queue", body, wd))
@@ -833,6 +948,19 @@ def make_handler(wallet_dir: Path):
             elif route == "/estate":
                 from .estateview import ESTATE_HTML
                 self._send(ESTATE_HTML + _ESTATE_BACK_CHIP)
+            elif route.startswith("/station/"):
+                station_id = route.removeprefix("/station/")
+                station = STATION_BY_ID.get(station_id)
+                if station is None:
+                    self._send(_page("not found", "",
+                                     "<div class='panel bad'>No such station. The "
+                                     "STATIONS row above lists the whole crew.</div>",
+                                     wd), 404)
+                    return
+                probe = query.get("probe", ["0"])[0] == "1"
+                body = render_station(station,
+                                      self._station_embeds(station_id, probe))
+                self._send(_page(f"{station['name']} station", route, body, wd))
             else:
                 self._send(_page("not found", "",
                                  "<div class='panel bad'>No such view. The tabs above list "
