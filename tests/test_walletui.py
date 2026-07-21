@@ -179,8 +179,9 @@ def test_server_routes_and_read_only_guarantee(tmp_path):
     thread.start()
     try:
         routes = ("/", "/posture", "/queue", "/incidents", "/inspect", "/guide",
-                  "/station/proposer", "/station/quorum", "/station/operator",
-                  "/station/operator?probe=1", "/station/cryptographer",
+                  "/deck", "/station/proposer", "/station/quorum",
+                  "/station/operator", "/station/operator?probe=1",
+                  "/station/operator?pane=1", "/station/cryptographer",
                   "/station/architect", "/station/newcomer")
         for route in routes:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}{route}") as resp:
@@ -401,6 +402,65 @@ def test_stations_are_distinct_roles(tmp_path):
                 if other != sid:
                     assert marker not in body, (
                         f"{other} bleeds into {sid}'s role ({marker})")
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_deck_serves_all_panes_and_wizard(tmp_path):
+    """The deck: every role live in its own pane (tmux-style grid), plus the
+    color-camouflaged wizard rail that walks a newcomer through each role."""
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/deck")
+        assert status == 200
+        for sid in STATION_IDS:
+            assert f'src="/station/{sid}?pane=1"' in body, f"deck missing pane: {sid}"
+        assert "The wizard" in body and "your first watch" in body
+        assert body.count('class="wizstep"') >= 8, "wizard lost its steps"
+        for sid in STATION_IDS:
+            assert f'data-role="{sid}"' in body, f"wizard never visits {sid}"
+        assert "Success looks like" in body  # every step tells the learner when they're done
+        assert "YOU ARE THE" in body         # the role-camouflage chip
+        assert "READ-ONLY" in body
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_pane_mode_is_chromeless_but_labeled(tmp_path):
+    """Panes are independent viewports: full station content, no page chrome,
+    still labeled read-only; links inside stay in pane mode via the shim."""
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/station/operator?pane=1")
+        assert status == 200
+        assert 'class="navrow"' not in body      # no nav chrome inside a pane
+        assert "warden custody cockpit" not in body  # no page h1 either
+        assert "Probe now" in body               # the actual station content
+        assert "READ-ONLY pane" in body          # but the guarantee stays visible
+        assert "searchParams.set('pane','1')" in body  # the stay-in-pane shim
+        status, body = _get(port, "/inspect?pane=1")
+        assert status == 200 and 'class="navrow"' not in body
+        assert "Verify (read-only)" in body
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_inspect_sample_prefill(tmp_path):
+    evidence = Path("examples") / "wallet-evidence"
+    if not (evidence / "log.pub").exists():
+        pytest.skip("example wallet evidence not present")
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/inspect?sample=1")
+        assert status == 200
+        assert "sample loaded" in body
+        assert "BEGIN PUBLIC KEY" in body  # log.pub really pre-filled
     finally:
         server.shutdown()
         thread.join(timeout=5)

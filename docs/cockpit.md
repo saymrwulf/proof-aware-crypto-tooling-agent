@@ -91,6 +91,38 @@ never-list/handoffs on all six), `test_stations_are_distinct_roles`
 (each role's signature phrase appears on its own station and on no
 other — no melting), `test_operator_probe_is_explicit_and_live`.
 
+## The deck (`/deck`) — all roles live, in parallel, with the wizard
+
+The **deck** is the crew law made physical: a tmux-style grid of six
+panes, one per role, all live at the same time — because a real crew
+works in parallel, roles do not take turns existing. Each pane is an
+independent viewport (an iframe onto that role's station in
+chrome-stripped **pane mode**, `?pane=1`): it scrolls, reloads (⟳), and
+zooms (⤢, tmux-style single-pane zoom) independently, and a tiny shim
+keeps every link and form inside the pane (`pane=1` is re-carried), so
+pressing «Probe now» in the operator pane runs the probe *in that pane*.
+Pane mode strips the page chrome but keeps the READ-ONLY label and the
+full station content — one source of truth, two shells.
+
+On the right rides the **wizard**: a ten-step guided first watch that
+takes a newcomer by the hand through every role's real actions on the
+live demo wallet — probe as the operator, read the queue and a refusal
+as the proposer, find the dissenting seat as the bench, verify (and then
+deliberately break) real sample evidence as the cryptographer
+(`/inspect?sample=1` pre-fills `examples/wallet-evidence/`), check the
+drift tripwire as the architect, then run the handoff lap. Each step
+card is **camouflaged in the color of the role being lived** ("YOU ARE
+THE OPERATOR"), and the matching pane **glows** — instruction and
+instrument are bound by hue. Every step states what success looks like
+and what was just learned. Step position is remembered per browser
+session.
+
+Deck contract tests: `test_deck_serves_all_panes_and_wizard` (six live
+panes + all six roles visited by the wizard + success criteria),
+`test_pane_mode_is_chromeless_but_labeled` (no chrome, READ-ONLY label,
+stay-in-pane shim), `test_inspect_sample_prefill`; the read-only byte
+sweep covers `/deck` and pane routes.
+
 ## The read-only guarantee
 
 The cockpit cannot approve, sign, unlatch, or modify custody state. It

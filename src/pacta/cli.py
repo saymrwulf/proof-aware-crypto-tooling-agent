@@ -693,7 +693,8 @@ def cmd_wallet_cockpit(args: argparse.Namespace) -> int:
     server = serve(wallet_dir, host=args.host, port=args.port)
     host, port = server.server_address[0], server.server_address[1]
     print(f"warden cockpit (READ-ONLY) on http://{host}:{port}  -  Ctrl-C to stop")
-    print(f"  first time? start at http://{host}:{port}/guide - every term explained")
+    print(f"  the deck:  http://{host}:{port}/deck  - all six roles live, guided by the wizard")
+    print(f"  the guide: http://{host}:{port}/guide - every term explained")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

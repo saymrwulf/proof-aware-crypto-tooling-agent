@@ -55,6 +55,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .attestation import load_attestation
+from .deck import render_deck
 from .liveness import collect_liveness, render_liveness
 from .stations import STATION_BY_ID, STATIONS, render_bridge, render_station
 from .transparency import load_receipt, verify_receipt
@@ -169,7 +170,8 @@ def _collect_drift() -> dict[str, Any]:
 # page shell - two-row navigation (stations / instruments), lead on every view
 # ---------------------------------------------------------------------------
 
-_STATION_TABS = [("/", "Bridge", "the whole system at a glance")] + [
+_STATION_TABS = [("/", "Bridge", "the whole system at a glance"),
+                 ("/deck", "Deck", "all stations live, side by side")] + [
     (f"/station/{s['id']}", s["name"], sub) for s, sub in zip(STATIONS, [
         "ask for signatures", "four seats, one answer each",
         "liveness + latch recovery", "recompute everything",
@@ -222,6 +224,68 @@ def _tabs(items: list[tuple[str, str, str]], active: str) -> str:
         f'<a href="{href}"{" class=here" if href == active else ""}>{label}'
         f'<span class="navsub">{sub}</span></a>'
         for href, label, sub in items)
+
+
+def _pane_shell(title: str, body: str) -> str:
+    """Chrome-stripped render for deck panes: same content, no h1/banner/nav.
+
+    A tiny script keeps navigation inside the pane (every same-origin link
+    and form submit re-carries ?pane=1), so a pane behaves like a tmux pane:
+    an independent, self-contained viewport onto the cockpit.
+    """
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>{_esc(title)} — pane</title>"
+        f"<style>{STYLE} body{{max-width:none;padding:.6rem .8rem 2.2rem}}</style>"
+        "</head><body>"
+        f"{body}"
+        "<div class='prov'>READ-ONLY pane — part of the "
+        "<a href='/deck' target='_top'>deck</a>. Links stay inside this pane; "
+        "use the pane header's ↗ for the full page.</div>"
+        "<script>(function(){"
+        "document.addEventListener('click',function(e){"
+        "var a=e.target.closest('a');if(!a||a.target==='_top'){return;}"
+        "try{var u=new URL(a.getAttribute('href'),location.href);"
+        "if(u.origin===location.origin&&!u.searchParams.has('pane')){"
+        "u.searchParams.set('pane','1');a.href=u.toString();}}catch(err){}});"
+        "document.addEventListener('submit',function(e){"
+        "try{var f=e.target;"
+        "var u=new URL(f.getAttribute('action')||location.href,location.href);"
+        "u.searchParams.set('pane','1');f.action=u.toString();}catch(err){}});"
+        "})();</script>"
+        "</body></html>")
+
+
+def _load_sample_evidence() -> tuple[dict[str, str] | None, str]:
+    """Pre-fill the inspector from examples/wallet-evidence (read-only)."""
+    root = Path(__file__).resolve().parents[2] / "examples" / "wallet-evidence"
+    attestations = sorted(root.glob("*.attestation.json"))
+    receipts = sorted(root.glob("*.receipt.json"))
+    key = root / "log.pub"
+    fallback_note = (
+        "<div class='panel'><p class='empty'>No sample evidence found on this "
+        "machine (expected under <code>examples/wallet-evidence/</code>). Fetch "
+        "real evidence from the live log instead: <code>pacta log-fetch --url "
+        "https://ltl.zkdefi.org --component dalek-ed25519-verified</code>, then "
+        "paste the two files and the log's <code>log.pub</code>.</p></div>")
+    if not (attestations and receipts and key.exists()):
+        return None, fallback_note
+    by_stem = {p.name.removesuffix(".attestation.json"): p for p in attestations}
+    for rec in receipts:
+        stem = rec.name.removesuffix(".receipt.json")
+        if stem in by_stem:
+            note = (
+                "<div class='panel'><p class='plain'>"
+                "<span class='pill ok'>sample loaded</span> evidence for "
+                f"<code>{_esc(stem)}</code> is pre-filled below — press «Verify "
+                "(read-only)» to watch the deployed verifier run. Then delete one "
+                "character from the receipt box and verify again: watch it refuse, "
+                "and read which check failed.</p></div>")
+            return ({"attestation": by_stem[stem].read_text(encoding="utf-8"),
+                     "receipt": rec.read_text(encoding="utf-8"),
+                     "pubkey": key.read_text(encoding="utf-8")}, note)
+    return None, fallback_note
 
 
 def _page(title: str, active: str, body: str, wallet_dir: str) -> str:
@@ -537,7 +601,10 @@ def render_inspect(result: dict[str, Any] | None,
             "duration of the check, and the wallet directory is never written.</li>"
             "<li><strong>If the input is malformed</strong>, the page shows FAILED TO "
             "VERIFY rather than guessing.</li></ul>")
-        + "<form method='post' action='/inspect'>"
+        + "<p><a class='btnlink' href='/inspect?sample=1'>Load the sample evidence</a> "
+        "<span class='muted'>from <code>examples/wallet-evidence/</code> — it fills the "
+        "three boxes below so you can watch a real verification.</span></p>"
+        "<form method='post' action='/inspect'>"
         f"<p><strong>attestation.json</strong> <span class='muted'>— the signed verification statement</span><br>"
         f"<textarea name='attestation'>{_esc(d.get('attestation', ''))}</textarea></p>"
         f"<p><strong>receipt.json</strong> <span class='muted'>— the log's proof that the statement is recorded</span><br>"
@@ -573,6 +640,8 @@ def _bridge_strip(posture: dict[str, Any], airgap: dict[str, Any]) -> str:
         f"<span class='chip'>queue <b>{pending} awaiting device</b></span>"
         "<span class='chip'>liveness — <a href='/station/operator?probe=1'>probe from "
         "the Operator station</a></span>"
+        "<span class='chip'><a href='/deck'><b>Open the deck →</b></a> all six "
+        "stations live, side by side, with the guided wizard</span>"
         "</div>"
         + _provenance("Wallet.posture() + airgap listing (liveness only on demand)")
     )
@@ -922,29 +991,42 @@ def make_handler(wallet_dir: Path):
             parsed = urllib.parse.urlparse(self.path)
             route = parsed.path
             query = urllib.parse.parse_qs(parsed.query)
+            pane = query.get("pane", ["0"])[0] == "1"
             wd = str(wallet_dir)
+
+            def page(title: str, active: str, body: str, status: int = 200) -> None:
+                self._send(_pane_shell(title, body) if pane
+                           else _page(title, active, body, wd), status)
+
             if route == "/":
                 wallet = self._wallet()
                 posture = collect("Wallet.posture()", wallet.posture)
                 airgap = collect_airgap(wallet)
                 body = render_bridge(_bridge_strip(posture, airgap),
                                      _bridge_live(posture, airgap))
-                self._send(_page("bridge", "/", body, wd))
+                page("bridge", "/", body)
+            elif route == "/deck":
+                self._send(render_deck(wd))
             elif route == "/posture":
                 wallet = self._wallet()
                 body = render_posture(collect("Wallet.posture()", wallet.posture))
-                self._send(_page("posture", "/posture", body, wd))
+                page("posture", "/posture", body)
             elif route == "/queue":
-                body = render_queue(collect_airgap(self._wallet()))
-                self._send(_page("signature queue", "/queue", body, wd))
+                page("signature queue", "/queue",
+                     render_queue(collect_airgap(self._wallet())))
             elif route == "/incidents":
                 wallet = self._wallet()
-                body = render_incidents(collect_incidents(wallet), collect_refusals(wallet))
-                self._send(_page("incidents", "/incidents", body, wd))
+                page("incidents", "/incidents",
+                     render_incidents(collect_incidents(wallet),
+                                      collect_refusals(wallet)))
             elif route == "/inspect":
-                self._send(_page("receipt inspector", "/inspect", render_inspect(None), wd))
+                defaults, note = (None, "")
+                if query.get("sample", ["0"])[0] == "1":
+                    defaults, note = _load_sample_evidence()
+                page("receipt inspector", "/inspect",
+                     note + render_inspect(None, defaults))
             elif route == "/guide":
-                self._send(_page("guide", "/guide", render_guide(), wd))
+                page("guide", "/guide", render_guide())
             elif route == "/estate":
                 from .estateview import ESTATE_HTML
                 self._send(ESTATE_HTML + _ESTATE_BACK_CHIP)
@@ -952,22 +1034,23 @@ def make_handler(wallet_dir: Path):
                 station_id = route.removeprefix("/station/")
                 station = STATION_BY_ID.get(station_id)
                 if station is None:
-                    self._send(_page("not found", "",
-                                     "<div class='panel bad'>No such station. The "
-                                     "STATIONS row above lists the whole crew.</div>",
-                                     wd), 404)
+                    page("not found", "",
+                         "<div class='panel bad'>No such station. The STATIONS "
+                         "row above lists the whole crew.</div>", 404)
                     return
                 probe = query.get("probe", ["0"])[0] == "1"
                 body = render_station(station,
                                       self._station_embeds(station_id, probe))
-                self._send(_page(f"{station['name']} station", route, body, wd))
+                page(f"{station['name']} station", route, body)
             else:
-                self._send(_page("not found", "",
-                                 "<div class='panel bad'>No such view. The tabs above list "
-                                 "everything this cockpit can show.</div>", wd), 404)
+                page("not found", "",
+                     "<div class='panel bad'>No such view. The tabs above list "
+                     "everything this cockpit can show.</div>", 404)
 
         def do_POST(self) -> None:  # noqa: N802
-            route = urllib.parse.urlparse(self.path).path
+            parsed = urllib.parse.urlparse(self.path)
+            route = parsed.path
+            pane = urllib.parse.parse_qs(parsed.query).get("pane", ["0"])[0] == "1"
             if route != "/inspect":
                 self._send("<div class='panel bad'>No such action.</div>", 404)
                 return
@@ -975,8 +1058,10 @@ def make_handler(wallet_dir: Path):
             form = urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8"))
             fields = {k: form.get(k, [""])[0] for k in ("attestation", "receipt", "pubkey")}
             result = inspect_receipt(fields["attestation"], fields["receipt"], fields["pubkey"])
-            self._send(_page("receipt inspector", "/inspect",
-                             render_inspect(result, fields), str(wallet_dir)))
+            body = render_inspect(result, fields)
+            self._send(_pane_shell("receipt inspector", body) if pane
+                       else _page("receipt inspector", "/inspect", body,
+                                  str(wallet_dir)))
 
         def log_message(self, fmt: str, *args: Any) -> None:  # quiet
             return
