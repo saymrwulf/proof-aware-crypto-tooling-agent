@@ -123,7 +123,7 @@ ESTATE_HTML = r'''<title>LTL estate map — repos, services, loops</title>
   <span class="fact">key <b class="mono">874c8a00…</b></span>
   <span class="fact">paper <b>v0.9 · 23 pp · camera-ready</b></span>
   <span class="fact">attested components <b>5</b></span>
-  <span class="fact">pacta suite <b>130 green</b></span>
+  <span class="fact">pacta suite <b>135 green</b></span>
   <span class="fact">state as of <b>2026-07-20</b></span>
 </div>
 <div class="facts" style="padding-top:.15rem">

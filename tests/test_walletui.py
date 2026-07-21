@@ -82,6 +82,7 @@ def _dir_fingerprint(root: Path) -> dict[str, str]:
 def test_posture_renders_recomputed_evidence(tmp_path):
     wallet = _seal_wallet(tmp_path)
     html = render_posture(collect("Wallet.posture()", wallet.posture))
+    assert "CUSTODY HEALTHY" in html  # the verdict, in words, before any evidence
     assert "chain verified" in html
     assert "unlatched" in html
     assert "dalek-ed25519-verified" in html and "anza-ed25519-verified" in html
@@ -96,6 +97,7 @@ def test_broken_ledger_renders_red(tmp_path):
     ledger.write_text(ledger.read_text().replace("genesis", "gene-sis"), encoding="utf-8")
     html = render_posture(collect("Wallet.posture()", wallet.posture))
     assert "CHAIN BROKEN" in html
+    assert "CUSTODY EVIDENCE BROKEN" in html  # verdict banner states it in words
 
 
 def test_collector_failure_is_loud_not_gray(tmp_path):
@@ -115,6 +117,7 @@ def test_latched_state_renders_frozen():
         "ledger": {"entries": 1, "head": "cd" * 32, "chain_ok": True, "problems": []},
         "incidents": 1, "refusal_receipts": 0, "generated_at": "now"}}
     html = render_posture(posture)
+    assert "CUSTODY FROZEN" in html  # verdict banner states it in words
     assert "LATCHED" in html and "outbound custody frozen" in html
     assert "quorum divergence" in html and "runbook-latch" in html
 
@@ -175,7 +178,7 @@ def test_server_routes_and_read_only_guarantee(tmp_path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        for route in ("/", "/queue", "/incidents", "/inspect"):
+        for route in ("/", "/queue", "/incidents", "/inspect", "/guide"):
             with urllib.request.urlopen(f"http://127.0.0.1:{port}{route}") as resp:
                 body = resp.read().decode()
                 assert resp.status == 200
@@ -245,6 +248,81 @@ def test_demo_wallet_seals_and_serves(tmp_path):
         assert resp.status == 200
         assert "dalek-ed25519-verified" in body and "4 pinned" in body
         assert "chain verified" in body
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+# ---------------------------------------------------------------------------
+# UX contract: the cockpit never leaves a human in the dark. Every view must
+# explain itself in plain language, every verdict must be stated in words,
+# every page must carry navigation and interpretation help.
+# ---------------------------------------------------------------------------
+
+def _serve(wallet_dir):
+    server = serve(wallet_dir, host="127.0.0.1", port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread, server.server_address[1]
+
+
+def _get(port, route):
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}{route}") as resp:
+        return resp.status, resp.read().decode()
+
+
+def test_guide_view_explains_every_term(tmp_path):
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/guide")
+        assert status == 200
+        assert "renders evidence" in body  # the design law, in the user's face
+        for term in ("custody capsule", "quorum member", "hash chain",
+                     "custody latch", "refusal receipt", "air-gap",
+                     "evidence grade", "DEMO wallet",
+                     "What this cockpit cannot tell you",
+                     "A five-minute tour"):
+            assert term in body, f"guide is missing: {term}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_every_view_carries_lead_nav_and_explainers(tmp_path):
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        for route in ("/", "/queue", "/incidents", "/inspect"):
+            status, body = _get(port, route)
+            assert status == 200
+            assert 'href="/guide"' in body, f"{route}: no path to the guide"
+            assert 'class="lead"' in body, f"{route}: no plain-language lead"
+            assert "<details" in body, f"{route}: no interpretation expander"
+            assert 'class="navsub"' in body, f"{route}: tabs do not say what they answer"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_empty_states_are_explained(tmp_path):
+    """A blank table is a UX failure; every empty list must say what empty
+    means and whether it is good news."""
+    wallet = _seal_wallet(tmp_path)
+    q = render_queue(collect_airgap(wallet))
+    assert "No signing requests are waiting" in q
+    inc = render_incidents(collect_incidents(wallet), collect_refusals(wallet))
+    assert "Empty is the good state" in inc
+    assert "nothing has been refused" in inc
+
+
+def test_estate_page_links_back_to_cockpit(tmp_path):
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/estate")
+        assert status == 200
+        assert "Back to cockpit" in body
     finally:
         server.shutdown()
         thread.join(timeout=5)

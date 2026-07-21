@@ -9,7 +9,7 @@ machinery hub and the only repo that changes freely.
 
 State snapshot (2026-07-19): log **13 leaves**, root `3488a2d0…`, key
 fingerprint `874c8a00…`, paper **v0.9 camera-ready (23 pp)**, five
-attested components, pacta suite 130 green.
+attested components, pacta suite 135 green.
 
 ```mermaid
 flowchart LR
