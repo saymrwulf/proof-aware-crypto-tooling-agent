@@ -179,7 +179,7 @@ def test_server_routes_and_read_only_guarantee(tmp_path):
     thread.start()
     try:
         routes = ("/", "/posture", "/queue", "/incidents", "/inspect", "/guide",
-                  "/deck", "/station/proposer", "/station/quorum",
+                  "/manual", "/deck", "/station/proposer", "/station/quorum",
                   "/station/operator", "/station/operator?probe=1",
                   "/station/operator?pane=1", "/station/cryptographer",
                   "/station/architect", "/station/newcomer")
@@ -464,6 +464,44 @@ def test_inspect_sample_prefill(tmp_path):
     finally:
         server.shutdown()
         thread.join(timeout=5)
+
+
+def test_manual_is_a_complete_course(tmp_path):
+    """The lab manual: a full study-club course — every role gets a session,
+    every session has a lab with checkpoints and a self-test, the capstone
+    crosses all chairs, and the answers exist."""
+    wallet = _seal_wallet(tmp_path)
+    server, thread, port = _serve(wallet.dir)
+    try:
+        status, body = _get(port, "/manual")
+        assert status == 200
+        assert "Syllabus" in body  # the TOC
+        for session in ("the world you are entering", "the Newcomer",
+                        "the Proposer", "the Quorum bench", "the Operator",
+                        "the Cryptographer", "the Architect",
+                        "Capstone: the incident day", "Graduation"):
+            assert session in body, f"manual lost session: {session}"
+        assert body.count("Checkpoint") >= 8, "labs lost their checkpoints"
+        assert body.count("Self-test") >= 6, "sessions lost their self-tests"
+        assert "Appendix B" in body and "self-test answers" in body.lower()
+        assert "tamper drill" in body.lower()  # the hands-on heart of Session 4
+        assert "Recap card" in body
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_manual_markdown_renders_cleanly(tmp_path):
+    """mdlite over the real manual: no raw Markdown artifacts may leak."""
+    from pacta.mdlite import render as render_markdown
+    md = (Path("docs") / "warden-lab-manual.md").read_text(encoding="utf-8")
+    html_out, toc = render_markdown(md)
+    for artifact in ("```", "](", "\n## ", "> ✔"):
+        assert artifact not in html_out, f"raw markdown leaked: {artifact!r}"
+    assert html_out.count("**") == 0, "unrendered bold markers leaked"
+    assert len(toc) >= 10  # sessions + appendices reach the syllabus
+    assert "<pre class='cmd'>" in html_out  # command blocks rendered
+    assert "<blockquote>" in html_out  # checkpoints rendered
 
 
 def test_operator_probe_is_explicit_and_live(tmp_path):

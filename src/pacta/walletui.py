@@ -57,6 +57,7 @@ from typing import Any, Callable
 from .attestation import load_attestation
 from .deck import render_deck
 from .liveness import collect_liveness, render_liveness
+from .mdlite import render as render_markdown
 from .stations import STATION_BY_ID, STATIONS, render_bridge, render_station
 from .transparency import load_receipt, verify_receipt
 from .uikit import (STYLE, esc as _esc, explain as _explain,
@@ -184,6 +185,7 @@ _INSTRUMENT_TABS = [
     ("/inspect", "Inspect", "check a receipt yourself"),
     ("/estate", "Estate map", "the territory, drawn"),
     ("/guide", "Guide", "every term, explained"),
+    ("/manual", "Lab manual", "the full course, chair by chair"),
 ]
 
 _LEADS: dict[str, str] = {
@@ -212,8 +214,14 @@ _LEADS: dict[str, str] = {
                  'own verifier on them, on your machine, without writing anything to the '
                  'wallet. Use it to check evidence somebody handed you before trusting it.'),
     "/guide": ('Plain-language explanations for everything this cockpit shows. Nothing on '
-               'this page is live data — this is the manual. The Bridge and the stations '
-               'are the working surfaces; the instruments are the shared evidence.'),
+               'this page is live data — this is the reference. The Bridge and the stations '
+               'are the working surfaces; the instruments are the shared evidence. For the '
+               'full course, open the <a href="/manual">Lab manual</a>.'),
+    "/manual": ('The full course: put this page on one monitor and the '
+                '<a href="/deck">deck</a> on the other, then work it like a lab — session '
+                'by session, chair by chair, from Newcomer to graduation. The table of '
+                'contents below is your syllabus; your place is wherever your last '
+                'checkpoint passed.'),
 }
 for _s in STATIONS:
     _LEADS[f"/station/{_s['id']}"] = _s["lead"]
@@ -698,7 +706,39 @@ def _render_drift_panel() -> str:
 
 
 # ---------------------------------------------------------------------------
-# guide instrument - the manual
+# lab manual instrument - the course, rendered from its canonical Markdown
+# ---------------------------------------------------------------------------
+
+def render_manual() -> str:
+    """The lab manual: docs/warden-lab-manual.md rendered with a syllabus.
+
+    The Markdown file in the repository is canonical (readable on the
+    mirror, diffable, committed); this route renders it so the course can
+    sit on one monitor while the deck flies on the other."""
+    def read() -> str:
+        path = Path(__file__).resolve().parents[2] / "docs" / "warden-lab-manual.md"
+        return path.read_text(encoding="utf-8")
+    coll = collect("docs/warden-lab-manual.md (canonical file, rendered live)", read)
+    if not coll["ok"]:
+        return _failed_panel("Lab manual", coll["via"], coll["error"])
+    body, toc = render_markdown(coll["data"])
+    toc_items = "".join(
+        f'<li class="toc{level}"><a href="#{anchor}">{_esc(text)}</a></li>'
+        for level, text, anchor in toc if level == 2)
+    return (
+        "<div class='panel toc'><h2 style='margin-top:0'>Syllabus</h2>"
+        f"<ol>{toc_items}</ol>"
+        "<p class='muted'>Sessions build on each other; the capstone assumes "
+        "all six chairs. Answers to every self-test are in Appendix B — "
+        "attempt first, then check. Marks: ▶ do · ✔ checkpoint · ✎ write · "
+        "⌂ optional.</p></div>"
+        f"<div class='manual'>{body}</div>"
+        f"{_provenance(coll['via'])}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# guide instrument - the reference
 # ---------------------------------------------------------------------------
 
 def render_guide() -> str:
@@ -1027,6 +1067,8 @@ def make_handler(wallet_dir: Path):
                      note + render_inspect(None, defaults))
             elif route == "/guide":
                 page("guide", "/guide", render_guide())
+            elif route == "/manual":
+                page("lab manual", "/manual", render_manual())
             elif route == "/estate":
                 from .estateview import ESTATE_HTML
                 self._send(ESTATE_HTML + _ESTATE_BACK_CHIP)

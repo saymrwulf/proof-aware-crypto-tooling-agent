@@ -85,6 +85,24 @@ STYLE = """
  .muted{color:var(--ink2);font-size:.85rem}
  .mono{font-family:ui-monospace,monospace}
  .breakany{overflow-wrap:anywhere}
+ /* lab manual */
+ .toc ol{margin:.3rem 0;padding-left:1.4rem;columns:2;column-gap:2rem}
+ @media(max-width:44rem){.toc ol{columns:1}}
+ .toc li{font-size:.88rem;margin:.15rem 0;break-inside:avoid}
+ .manual{background:#fff;border:1px solid var(--line);border-radius:8px;
+      padding:1.2rem 1.6rem;margin:.7rem 0;font-size:.94rem}
+ .manual h1{font-size:1.45rem;margin:.4rem 0 .2rem}
+ .manual h2{font-size:1.2rem;margin:2.2rem 0 .5rem;padding-top:1.1rem;
+      border-top:2px solid var(--accentbg)}
+ .manual h3{font-size:1rem;margin:1.3rem 0 .3rem}
+ .manual h4{font-size:.92rem;margin:1rem 0 .25rem}
+ .manual blockquote{margin:.9rem 0;padding:.65rem .9rem;border-left:4px solid var(--ok);
+      background:var(--okbg);border-radius:0 6px 6px 0;font-size:.9rem}
+ .manual blockquote p{margin:0}
+ .manual hr{border:0;border-top:2px solid var(--accentbg);margin:1.6rem 0}
+ .manual li{margin:.25rem 0}
+ .manual em{color:var(--ink)}
+ .manual pre.cmd{margin:.6rem 0}
  /* bridge */
  .strip{display:flex;gap:.45rem;flex-wrap:wrap;margin:.8rem 0}
  .chip{border:1px solid var(--line);background:#fff;border-radius:8px;

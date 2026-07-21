@@ -143,7 +143,8 @@ separate, explicitly reviewed milestone.
 | **Incidents** (`/incidents`) | *What has ever gone wrong?* Incident records and signed refusal receipts, verbatim, newest first — with the page explaining why empty is the good state | `incidents/*.json`, `receipts/*.json` |
 | **Inspect** (`/inspect`) | *Can I check a receipt myself?* Paste an attestation + transparency receipt + log public key; the verdict, per-signature results, and diagnostics come verbatim from the deployed verifier | `pacta.transparency.verify_receipt` |
 | **Estate map** (`/estate`) | *Where does this wallet sit in the whole endeavour?* Every repo, service, mirror, loop — with RUNTIME on every entity (always-on / on-demand / not-running / static) | rendering of ESTATE.md's model (drift-guarded by test) |
-| **Guide** (`/guide`) | *What does any of this mean?* The manual: plain-language explanations, color code, tour, full glossary, honest limits — static, no live data | — |
+| **Guide** (`/guide`) | *What does any of this mean?* The reference: plain-language explanations, color code, tour, full glossary, honest limits — static, no live data | — |
+| **Lab manual** (`/manual`) | *Teach me every role.* The full study-club course ([docs/warden-lab-manual.md](warden-lab-manual.md), canonical Markdown rendered live): eight sessions + capstone, one chair per role — labs with checkpoints, a safe tamper drill, self-tests with answers, graduation path to a real wallet. Built for two monitors: manual on one, deck on the other. | `mdlite` over the committed file |
 
 Every panel also states what it does **not** prove (e.g. the quorum
 table says binary hashes are pinned but source-to-binary correspondence
