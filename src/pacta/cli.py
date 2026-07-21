@@ -236,7 +236,8 @@ def build_parser() -> argparse.ArgumentParser:
     w_mcp.set_defaults(func=cmd_wallet_mcp)
 
     w_cockpit = wsub.add_parser("cockpit", help="Serve the read-only custody cockpit (local web UI) for the human operator.")
-    w_cockpit.add_argument("--wallet", required=True)
+    w_cockpit.add_argument("--wallet", help="Path to an existing wallet directory.")
+    w_cockpit.add_argument("--demo", action="store_true", help="No wallet yet? Serve a throwaway DEMO wallet (fake members, custody-inert) to explore the views.")
     w_cockpit.add_argument("--host", default="127.0.0.1", help="Bind address (default localhost; the cockpit is not meant to be exposed).")
     w_cockpit.add_argument("--port", type=int, default=8471)
     w_cockpit.set_defaults(func=cmd_wallet_cockpit)
@@ -680,8 +681,16 @@ def cmd_wallet_card(args: argparse.Namespace) -> int:
 
 
 def cmd_wallet_cockpit(args: argparse.Namespace) -> int:
-    from .walletui import serve
-    server = serve(args.wallet, host=args.host, port=args.port)
+    from .walletui import seal_demo_wallet, serve
+    if bool(args.wallet) == bool(args.demo):
+        print("error: pass exactly one of --wallet DIR or --demo")
+        return 2
+    wallet_dir = args.wallet
+    if args.demo:
+        wallet_dir = seal_demo_wallet()
+        print("DEMO wallet (throwaway, fake members, custody-inert):")
+        print(f"  {wallet_dir}")
+    server = serve(wallet_dir, host=args.host, port=args.port)
     host, port = server.server_address[0], server.server_address[1]
     print(f"warden cockpit (READ-ONLY) on http://{host}:{port}  -  Ctrl-C to stop")
     try:

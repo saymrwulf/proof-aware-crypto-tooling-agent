@@ -44,9 +44,14 @@ is out of scope until reproducible builds).
 ## Serving
 
 ```bash
+pacta wallet cockpit --demo                        # no wallet yet? throwaway
+                                                   # DEMO wallet, custody-inert
 pacta wallet cockpit --wallet ~/my-wallet          # 127.0.0.1:8471
 pacta wallet cockpit --wallet ~/my-wallet --port 9000
 ```
+
+(Uninstalled, from the repo root:
+`PYTHONPATH=src:provider/src python3 -m pacta wallet cockpit --demo`.)
 
 The server binds localhost by default and is not meant to be exposed;
 there is no authentication because there is nothing to operate.

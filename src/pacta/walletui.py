@@ -336,6 +336,82 @@ def render_inspect(result: dict[str, Any] | None,
 
 
 # ---------------------------------------------------------------------------
+# demo wallet - custody-inert, for exploring the cockpit from zero
+# ---------------------------------------------------------------------------
+
+def seal_demo_wallet(root: str | Path | None = None) -> Path:
+    """Seal a throwaway DEMO wallet: four fake quorum members (shell stubs,
+    NOT the verified binaries), a genesis ledger, a fresh keypair, and one
+    sample incident / refusal / airgap request so every view has content.
+
+    Custody-inert by construction: nothing here can sign anything real,
+    and the wallet lives in a throwaway directory whose name says DEMO.
+    """
+    import stat
+
+    from .quorum import binary_path
+    from .signing import generate_ed25519_keypair
+
+    if root is None:
+        root = Path(tempfile.mkdtemp(prefix="warden-DEMO-"))
+    root = Path(root)
+    state_dir = root / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    def _sha(data: bytes) -> str:
+        import hashlib
+        return hashlib.sha256(data).hexdigest()
+
+    members = []
+    for name in ("dalek", "anza", "risc0", "betrusted"):
+        binary = binary_path(name, state_dir)
+        binary.write_text("#!/bin/sh\necho OK\nexit 0\n")
+        binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
+        members.append({
+            "backend": name, "component": f"{name}-ed25519-verified",
+            "semantics": "DEMO", "entry_point": "DEMO",
+            "source_commit": "deadbeef" * 5, "repo_commit": "cafe" * 10,
+            "binary_sha256": _sha(binary.read_bytes()),
+            "backend_cfg": "DEMO", "risk_tier": "R4",
+            "evidence": {"leaf_hash": "00", "leaf_index": 0, "tree_size": 1,
+                         "inclusion_proof": [],
+                         "sth": {"timestamp": "2099-01-01T00:00:00Z"}},
+        })
+    wallet = Wallet(root / "wallet")
+    for sub in (wallet.keys_dir, wallet.incidents_dir, wallet.receipts_dir,
+                wallet.quarantine_dir, wallet.airgap_dir / "outbox",
+                wallet.airgap_dir / "inbox"):
+        sub.mkdir(parents=True, exist_ok=True)
+    capsule = {
+        "type": "pacta.wallet.custody_capsule.v1",
+        "created_at": _now(), "members": members,
+        "policy": {"require_unanimity": True, "min_members": 4,
+                   "require_tier": "R4", "freshness_max_age_days": 0},
+        "signing": {"backend": "DEMO"}, "problems_at_init": [],
+    }
+    wallet.capsule_path.write_text(json.dumps(capsule, indent=2, sort_keys=True) + "\n")
+    wallet._append_ledger("genesis", {
+        "type": "pacta.wallet.ledger_genesis.v1",
+        "capsule_sha256": _sha(json.dumps(capsule, sort_keys=True,
+                                          separators=(",", ":")).encode())})
+    generate_ed25519_keypair(wallet.keys_dir / "warden.key.pem",
+                             wallet.keys_dir / "warden.pub.pem")
+    (wallet.incidents_dir / "incident-0001.json").write_text(json.dumps(
+        {"type": "pacta.wallet.incident.v1", "severity": "divergence",
+         "detail": "DEMO sample: member risc0 returned INVALID where the "
+                   "other three returned OK",
+         "at": _now(), "payload_sha256": "ab" * 32}, indent=2))
+    (wallet.receipts_dir / "refusal-0001.json").write_text(json.dumps(
+        {"type": "pacta.wallet.refusal.v1", "code": "POLICY_DENIED",
+         "missing": ["allowlisted destination"],
+         "remediation": "DEMO sample: add destination to policy.json allowlist",
+         "at": _now()}, indent=2))
+    (wallet.airgap_dir / "outbox" / "req-demo.request.json").write_text(json.dumps(
+        {"created_at": _now(), "payload_sha256": "cd" * 32}))
+    return wallet.dir
+
+
+# ---------------------------------------------------------------------------
 # server
 # ---------------------------------------------------------------------------
 

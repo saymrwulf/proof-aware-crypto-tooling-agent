@@ -230,3 +230,21 @@ def test_estate_view_and_estate_md_do_not_drift():
     # the runtime dimension must exist in BOTH renderings
     assert "What is running" in estate_md
     assert "ALWAYS ON" in ESTATE_HTML
+
+
+def test_demo_wallet_seals_and_serves(tmp_path):
+    from pacta.walletui import seal_demo_wallet
+    wallet_dir = seal_demo_wallet(tmp_path)
+    server = serve(wallet_dir, host="127.0.0.1", port=0)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/") as resp:
+            body = resp.read().decode()
+        assert resp.status == 200
+        assert "dalek-ed25519-verified" in body and "4 pinned" in body
+        assert "chain verified" in body
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
