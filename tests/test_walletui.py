@@ -232,6 +232,7 @@ def test_estate_view_and_estate_md_do_not_drift():
     for name in ("lean-transparency-log", "ltl-accumulator-verified",
                  "proof-aware-crypto-tooling-agent", "verifying-crypto-with-lean",
                  "dalek-ed25519-verified", "pasta-pallas-verified",
+                 "fips205-source", "fips205-slhdsa-verified",
                  "ltl.zkdefi.org", "Forgejo"):
         assert name in ESTATE_HTML, f"estate view lost: {name}"
         assert name in estate_md, f"ESTATE.md lost: {name}"

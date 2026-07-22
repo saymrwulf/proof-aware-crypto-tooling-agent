@@ -36,6 +36,8 @@ SERVICES: list[tuple[str, str, str]] = [
 ]
 
 # local working copies expected as siblings of this repo checkout
+# (the upstream-source shelf — curve25519-dalek-source, fips205-source, … —
+# lives outside this root and is deliberately not probed here)
 LOCAL_REPOS: list[str] = [
     "lean-transparency-log",
     "ltl-accumulator-verified",
@@ -45,6 +47,7 @@ LOCAL_REPOS: list[str] = [
     "risc0-ed25519-verified",
     "betrusted-ed25519-verified",
     "pasta-pallas-verified",
+    "fips205-slhdsa-verified",
     "proof-aware-crypto-tooling-agent",
 ]
 

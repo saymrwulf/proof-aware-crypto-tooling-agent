@@ -123,8 +123,9 @@ ESTATE_HTML = r'''<title>LTL estate map — repos, services, loops</title>
   <span class="fact">key <b class="mono">874c8a00…</b></span>
   <span class="fact">paper <b>v0.9 · 23 pp · camera-ready</b></span>
   <span class="fact">attested components <b>5</b></span>
-  <span class="fact">pacta suite <b>135 green</b></span>
-  <span class="fact">state as of <b>2026-07-20</b></span>
+  <span class="fact">pacta suite <b>144 green</b></span>
+  <span class="fact">SLH-DSA campaign <b>open — 0 certificates</b></span>
+  <span class="fact">state as of <b>2026-07-22</b></span>
 </div>
 <div class="facts" style="padding-top:.15rem">
   <span class="fact" style="border-color:#1e7f4f"><b style="color:#1e7f4f">ALWAYS ON</b> droplet: caddy (TLS, static blog) &middot; LTL web service (read-only container) &middot; Forgejo (+ 03:00 mirror cron)</span>
@@ -155,6 +156,7 @@ ESTATE_HTML = r'''<title>LTL estate map — repos, services, loops</title>
           <div class="node" id="srcRisc0"><h3 class="mono">risc0-…-dalek-source</h3><div class="role">RISC Zero fork, pinned clone</div></div>
           <div class="node" id="srcBet"><h3 class="mono">betrusted-…-dalek-source</h3><div class="role">Betrusted fork (+ xous-core, litex-boards context)</div></div>
           <div class="node" id="srcPasta"><h3 class="mono">pasta_curves-source</h3><div class="role">Pasta curves, pinned clone</div></div>
+          <div class="node" id="srcFips205"><h3 class="mono">fips205-source</h3><div class="role">integritychain FIPS 205 (SLH-DSA), pinned snapshot</div></div>
         </div>
       </div>
 
@@ -170,6 +172,8 @@ ESTATE_HTML = r'''<title>LTL estate map — repos, services, loops</title>
             <div class="chips"><span class="chip ok">attested</span></div></div>
           <div class="node" id="pasta"><h3 class="mono">pasta-pallas-verified</h3><div class="role">field layer proven · curve layer pending</div>
             <div class="chips"><span class="chip warn">not attested</span></div></div>
+          <div class="node" id="fips"><h3 class="mono">fips205-slhdsa-verified</h3><div class="role">SLH-DSA-SHA2-128s verify path · skeleton — 0 certificates</div>
+            <div class="chips"><span class="chip warn">campaign in progress</span><span class="chip warn">not attested</span></div></div>
           <div class="node" id="corpus"><h3 class="mono">ltl-accumulator-verified</h3><div class="role">61 certs · proofs about the log's own accumulator model</div>
             <div class="chips"><span class="chip ok">attested · entry 13</span><span class="chip frz">frozen 172a1d0</span><span class="chip l2">loop 2</span></div></div>
         </div>
@@ -241,9 +245,11 @@ const RUNTIME = {
   srcDalek:"frozen clone — nothing runs", srcAnza:"frozen clone — nothing runs",
   srcRisc0:"frozen clone — nothing runs", srcBet:"frozen clone — nothing runs",
   srcPasta:"frozen clone — nothing runs",
+  srcFips205:"pinned snapshot — nothing runs; moves only for documented Aeneas-compat patches",
   dalek:"static repo — proofs replay on demand", anza:"static repo — proofs replay on demand",
   risc0:"static repo — proofs replay on demand", bet:"static repo — proofs replay on demand",
   pasta:"static repo — open work, run manually", corpus:"frozen repo — replay on demand",
+  fips:"static repo — no process; campaign sessions are episodic operator-machine runs under lean-guard; check.sh exits non-green by design",
   provider:"SPLIT: the write side (check/append/publish) runs ON DEMAND on the operator machine, only during a ceremony; the read-only web face runs ALWAYS ON in the droplet container",
   signer:"on demand — invoked only while signing during a ceremony; key offline otherwise",
   conslib:"library — runs inside whichever consumer invokes it",
@@ -269,11 +275,13 @@ const DOSSIER = {
   srcRisc0:{lane:"Upstream inputs",mut:"frozen",facts:["Pinned clone of the RISC Zero dalek fork.","Input to extraction; never modified."]},
   srcBet:{lane:"Upstream inputs",mut:"frozen",facts:["Pinned clone of the Betrusted dalek fork.","xous-core and litex-boards sit alongside as platform context.","Input to extraction; never modified."]},
   srcPasta:{lane:"Upstream inputs",mut:"frozen",facts:["Pinned clone of the Pasta curves crate.","Feeds pasta-pallas-verified; never modified."]},
+  srcFips205:{lane:"Upstream inputs",mut:"frozen",facts:["Verbatim snapshot of integritychain/fips205 — pure-Rust FIPS 205 / SLH-DSA (zero unsafe, no_std, const-generic).","Pinned at upstream 30bac08 (2025-09-01); snapshot head 5dca0db — the single deviation from verbatim is stripping upstream CI workflows, documented in that commit.","Aeneas-compat patches land HERE as transparent, individually-justified commits; nothing is proposed upstream (no affiliation)."]},
   dalek:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates: field, group law, scalars, signature apex (T1–T4).","Attested in all three log generations; current leaf 8.","LOOP 1 anchor: the dogfood signer binary is built from this source — the log's heads are signed by code whose proofs are inside the log.","Attestation pins a commit; the branch only moves for docs."]},
   anza:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates; current leaf 9.","Same proof pyramid as dalek, rebuilt for the fork's code structure."]},
   risc0:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates; current leaf 10.","Differs from Betrusted's corpus by 27 changed proof lines (the paper's portability datum)."]},
   bet:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates; current leaf 11."]},
-  pasta:{lane:"Verified subjects",mut:"free",facts:["Field layer proven from own extraction; curve layer (group law + scalar mul) is the one open verification task in the estate.","NOT attested — the log carries only the four Ed25519 forks + the corpus."]},
+  pasta:{lane:"Verified subjects",mut:"free",facts:["Field layer proven from own extraction; curve layer (group law + scalar mul) remains open work.","NOT attested — the log carries only the four Ed25519 forks + the corpus."]},
+  fips:{lane:"Verified subjects",mut:"free",facts:["CAMPAIGN IN PROGRESS — ZERO certificates: verification/check.sh exits non-green and says so; that script is the only source of the word «proven» for this repo.","Scope: the FIPS 205 verify path only (slh_verify → fors / hypertree → xmss → wots → chain), parameter set SLH-DSA-SHA2-128s; keygen and signing are trusted base, exactly as ed25519 signing was.","The six SHA-2 hash oracles are opaque external models (TRUSTED-BASE.md), kept outside every future certificate's dependency cone.","Gate-0 (2026-07-22): Charon clean; Aeneas translated the whole cone with exactly one obstruction class (the Hashers fn-pointer struct) — campaign phase 1 is the compat patch in fips205-source.","NOT attested — the log carries nothing from this campaign yet."]},
   corpus:{lane:"Verified subjects",mut:"frozen",facts:["61 certificates over one boundary axiom (LTLAcc.sha256); 222-constant environment inventory; 15-gap honest ledger.","Mechanizes the archived report's §6: extractors, consistency binding, per-step pin safety.","LOOP 2 anchor: attested INTO the log as entry 13 — the log carries kernel-checked proofs about its own accumulator model.","Frozen at 172a1d0 (the attested commit); doc-only commits may move the branch.","Docs carry numbering notes: paper references are v0.2 numbering."]},
   provider:{lane:"pacta · machinery",mut:"free",facts:["pacta_provider: attestation check → log-append → log-publish; webdocs homepage + /v1 API code.","Holds the publish TEMPLATES for the mirror's verify.py / selftest / README — since 2026-07-19 pinned by CI (test_published_assets) after the audit caught a stale fail-open template.","Deploys to the droplet as the ltl container."]},
   signer:{lane:"pacta · machinery",mut:"free",facts:["verified-dalek-serial: the Ed25519 binary built from the attested dalek source.","Signs every tree head; before signing, the provider re-checks inclusion of the signer's own leaf.","LOOP 1: signature vouches for the tree; the tree contains the attestation of the signer's source (leaf 8). Execution provenance is reported, not proven — stated in the paper."]},
@@ -299,6 +307,7 @@ const EDGES = [
   ["srcDalek","dalek","","extract"],["srcAnza","anza","","extract"],
   ["srcRisc0","risc0","","extract"],["srcBet","bet","","extract"],
   ["srcPasta","pasta","","extract"],
+  ["srcFips205","fips","","extract"],
   ["dalek","provider","","attest"],["anza","provider","","attest"],
   ["risc0","provider","","attest"],["bet","provider","","attest"],
   ["provider","opstate","append","publish"],
