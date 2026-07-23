@@ -141,3 +141,82 @@ def test_recursive_consistency_equals_deployed_exhaustive():
             assert verify_consistency(m, n, r0, r1, P)
             assert _paper_cons(m, n, r0, r1, P)
     assert total == 164_224, total  # the count cited in the paper
+
+
+# --- independent faithful RFC 9162 2.1.4.2 verifier, incl. Step-7 sn==0 -----
+# A THIRD oracle, structurally distinct from the recursive _paper_cons model,
+# so the harness below is three-way (deployed / recursive model / RFC loop).
+def _rfc_cons(first, second, fh, sh, path):
+    if first == 0:
+        return True
+    if first > second:
+        return False
+    if first == second:
+        return fh == sh and not path
+    if not path:
+        return False
+    p = ([fh] + list(path)) if (first & (first - 1)) == 0 else list(path)
+    fn, sn = first - 1, second - 1
+    while fn & 1:
+        fn >>= 1
+        sn >>= 1
+    fr = sr = p[0]
+    for c in p[1:]:
+        if sn == 0:
+            return False
+        if (fn & 1) or (fn == sn):
+            fr = _hnode(c, fr)
+            sr = _hnode(c, sr)
+            if not (fn & 1):
+                while (fn & 1) == 0 and fn != 0:
+                    fn >>= 1
+                    sn >>= 1
+        else:
+            sr = _hnode(sr, c)
+        fn >>= 1
+        sn >>= 1
+    return fr == fh and sr == sh and sn == 0
+
+
+def test_consistency_lied_size_three_way_agreement():
+    """Regression for the RFC 9162 Step-7 terminal check (sn==0).
+
+    The deployed iterative verify_consistency, the recursive ConsRec model
+    (_paper_cons), and an independent faithful RFC 9162 2.1.4.2 transliteration
+    (_rfc_cons) must agree on BOTH the honest family AND the lied-size family.
+    The lied-size dimension is the one the historical differential test above
+    never varied; it is exactly where the pre-fix verifier (which omitted RFC
+    Step 7's terminal sn==0) accepted semantically-false size claims. Flagship:
+    a valid 2->3 proof presented as 1->3 with the size-2 root. This test FAILS
+    against the pre-fix verifier and passes once sn==0 is restored.
+    """
+    # Flagship named example: rejected by all three verifiers.
+    L = [f"leaf-{i}".encode() for i in range(3)]
+    P23 = consistency_proof(L, 2)
+    R2, R3 = merkle_root(L[:2]), merkle_root(L)
+    assert verify_consistency(1, 3, R2, R3, P23) is False
+    assert _paper_cons(1, 3, R2, R3, P23) is False
+    assert _rfc_cons(1, 3, R2, R3, P23) is False
+
+    N = 48
+    honest_total = lied_total = 0
+    for n in range(1, N + 1):
+        data = [f"leaf-{i}".encode() for i in range(n)]
+        rn = merkle_root(data)
+        for m in range(1, n + 1):
+            P = consistency_proof(data, m)
+            rm = merkle_root(data[:m])
+            assert (verify_consistency(m, n, rm, rn, P)
+                    == _paper_cons(m, n, rm, rn, P)
+                    == _rfc_cons(m, n, rm, rn, P) is True), ("honest", n, m)
+            honest_total += 1
+            for mlie in range(1, n):
+                if mlie == m:
+                    continue
+                dep = verify_consistency(mlie, n, rm, rn, P)
+                mod = _paper_cons(mlie, n, rm, rn, P)
+                rfc = _rfc_cons(mlie, n, rm, rn, P)
+                assert dep == mod == rfc, ("lied", n, m, mlie, dep, mod, rfc)
+                lied_total += 1
+    assert honest_total == N * (N + 1) // 2
+    assert lied_total == sum((n - 1) ** 2 for n in range(1, N + 1))

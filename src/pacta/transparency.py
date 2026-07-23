@@ -121,7 +121,12 @@ def verify_consistency(
         fn >>= 1
         sn >>= 1
 
-    return old_hash == old_root_hash and new_hash == new_root_hash
+    # RFC 9162 2.1.4.2 Step 7 requires the new-size navigation counter to reach
+    # zero: the consumed proof length must match the claimed tree sizes. Without
+    # it, distinct (false) old-size claims can navigate one proof to the same
+    # reconstructed roots, so a valid proof for one transition verifies under a
+    # lied size. Reconstructing both roots is necessary but not sufficient.
+    return old_hash == old_root_hash and new_hash == new_root_hash and sn == 0
 
 
 def attestation_leaf(attestation: dict[str, Any]) -> dict[str, Any]:
