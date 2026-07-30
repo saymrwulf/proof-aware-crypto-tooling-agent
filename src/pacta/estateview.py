@@ -173,7 +173,7 @@ ESTATE_HTML = r'''<title>LTL estate map — repos, services, loops</title>
           <div class="node" id="pasta"><h3 class="mono">pasta-pallas-verified</h3><div class="role">field layer proven · curve layer pending</div>
             <div class="chips"><span class="chip warn">not attested</span></div></div>
           <div class="node" id="fips"><h3 class="mono">fips205-slhdsa-verified</h3><div class="role">SLH-DSA-SHA2-128s verify path · skeleton — 0 certificates</div>
-            <div class="chips"><span class="chip warn">campaign in progress</span><span class="chip warn">not attested</span></div></div>
+            <div class="chips"><span class="chip warn">11 certs · reviewer attest-with-conditions</span><span class="chip warn">not attested</span></div></div>
           <div class="node" id="corpus"><h3 class="mono">ltl-accumulator-verified</h3><div class="role">61 certs · proofs about the log's own accumulator model</div>
             <div class="chips"><span class="chip ok">attested · entry 13</span><span class="chip frz">frozen 172a1d0</span><span class="chip l2">loop 2</span></div></div>
         </div>
@@ -249,7 +249,7 @@ const RUNTIME = {
   dalek:"static repo — proofs replay on demand", anza:"static repo — proofs replay on demand",
   risc0:"static repo — proofs replay on demand", bet:"static repo — proofs replay on demand",
   pasta:"static repo — open work, run manually", corpus:"frozen repo — replay on demand",
-  fips:"static repo — no process; campaign sessions are episodic operator-machine runs under lean-guard; check.sh exits non-green by design",
+  fips:"static repo — no process; campaign sessions are episodic operator-machine runs under lean-guard; check.sh GREEN with an 18-attack self-test",
   provider:"SPLIT: the write side (check/append/publish) runs ON DEMAND on the operator machine, only during a ceremony; the read-only web face runs ALWAYS ON in the droplet container",
   signer:"on demand — invoked only while signing during a ceremony; key offline otherwise",
   conslib:"library — runs inside whichever consumer invokes it",
@@ -276,10 +276,10 @@ const DOSSIER = {
   srcBet:{lane:"Upstream inputs",mut:"frozen",facts:["Pinned clone of the Betrusted dalek fork.","xous-core and litex-boards sit alongside as platform context.","Input to extraction; never modified."]},
   srcPasta:{lane:"Upstream inputs",mut:"frozen",facts:["Pinned clone of the Pasta curves crate.","Feeds pasta-pallas-verified; never modified."]},
   srcFips205:{lane:"Upstream inputs",mut:"frozen",facts:["Verbatim snapshot of integritychain/fips205 — pure-Rust FIPS 205 / SLH-DSA (zero unsafe, no_std, const-generic).","Pinned at upstream 30bac08 (2025-09-01); snapshot head 5dca0db — the single deviation from verbatim is stripping upstream CI workflows, documented in that commit.","Aeneas-compat patches land HERE as transparent, individually-justified commits; nothing is proposed upstream (no affiliation)."]},
-  dalek:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates: field, group law, scalars, signature apex (T1–T4).","Attested in all three log generations; current leaf 8.","LOOP 1 anchor: the dogfood signer binary is built from this source — the log's heads are signed by code whose proofs are inside the log.","Attestation pins a commit; the branch only moves for docs."]},
-  anza:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates; current leaf 9.","Same proof pyramid as dalek, rebuilt for the fork's code structure."]},
-  risc0:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates; current leaf 10.","Differs from Betrusted's corpus by 27 changed proof lines (the paper's portability datum)."]},
-  bet:{lane:"Verified subjects",mut:"frozen",facts:["16 reviewed certificates; current leaf 11."]},
+  dalek:{lane:"Verified subjects",mut:"frozen",facts:["31 bound certificates (field, group law, scalars, signature apex T1–T4) and 3022 inventoried constants; 16 of the certificates are the curated attested subset in the log.","Attested in all three log generations; current leaf 8.","LOOP 1 anchor: the dogfood signer binary is built from this source — the log's heads are signed by code whose proofs are inside the log.","Attestation pins a commit; the branch only moves for docs."]},
+  anza:{lane:"Verified subjects",mut:"frozen",facts:["31 bound certificates, 3022 inventoried constants; attested subset is 16; current leaf 9.","Same proof pyramid as dalek, rebuilt for the fork's code structure."]},
+  risc0:{lane:"Verified subjects",mut:"frozen",facts:["31 bound certificates, 3022 inventoried constants; attested subset is 16; current leaf 10.","Differs from Betrusted's corpus by 27 changed proof lines (the paper's portability datum)."]},
+  bet:{lane:"Verified subjects",mut:"frozen",facts:["31 bound certificates, 3022 inventoried constants; attested subset is 16; current leaf 11."]},
   pasta:{lane:"Verified subjects",mut:"free",facts:["Field layer proven from own extraction; curve layer (group law + scalar mul) remains open work.","NOT attested — the log carries only the four Ed25519 forks + the corpus."]},
   fips:{lane:"Verified subjects",mut:"free",facts:["CAMPAIGN IN PROGRESS — ZERO certificates: verification/check.sh exits non-green and says so; that script is the only source of the word «proven» for this repo.","Scope: the FIPS 205 verify path only (slh_verify → fors / hypertree → xmss → wots → chain), parameter set SLH-DSA-SHA2-128s; keygen and signing are trusted base, exactly as ed25519 signing was.","The six SHA-2 hash oracles are opaque external models (TRUSTED-BASE.md), kept outside every future certificate's dependency cone.","Gate-0 (2026-07-22): Charon clean; Aeneas translated the whole cone with exactly one obstruction class (the Hashers fn-pointer struct) — campaign phase 1 is the compat patch in fips205-source.","NOT attested — the log carries nothing from this campaign yet."]},
   corpus:{lane:"Verified subjects",mut:"frozen",facts:["61 certificates over one boundary axiom (LTLAcc.sha256); 222-constant environment inventory; 15-gap honest ledger.","Mechanizes the archived report's §6: extractors, consistency binding, per-step pin safety.","LOOP 2 anchor: attested INTO the log as entry 13 — the log carries kernel-checked proofs about its own accumulator model.","Frozen at 172a1d0 (the attested commit); doc-only commits may move the branch.","Docs carry numbering notes: paper references are v0.2 numbering."]},
@@ -418,3 +418,135 @@ window.addEventListener("resize",()=>requestAnimationFrame(draw));
 requestAnimationFrame(draw);setTimeout(draw,150);
 </script>
 '''
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MEASURED PROGRESS PANEL
+#
+# Everything above this line is hand-written prose. That is why, between
+# 2026-07-22 and 2026-07-30, this page told the operator that the SLH-DSA
+# campaign was "in progress" with a button "non-green by design" while it had
+# eleven proven certificates and a green button, and that the ed25519 forks had
+# "16 reviewed certificates" while they had 31 bound and 3022 inventoried. A
+# page that asserts cannot notice it has gone out of date; only a page that
+# measures can.
+#
+# So this panel renders ONLY what formal-verification-control's
+# tools/estate-progress.py derived from the repositories, and it states three
+# things a reader would otherwise have to assume: when it was measured, whether
+# the repositories have moved since, and which parts of this page are measured
+# at all. If there is no snapshot it renders that fact loudly rather than
+# quietly rendering nothing.
+# ─────────────────────────────────────────────────────────────────────────────
+
+import json as _json
+import os as _os
+import subprocess as _sp
+
+PROGRESS_JSON = _os.environ.get(
+    "PACTA_PROGRESS_JSON",
+    "/home/oho/GitClone/FormalVerification/formal-verification-control/ESTATE-PROGRESS.json")
+ESTATE_ROOT = _os.environ.get(
+    "ESTATE_ROOT", "/home/oho/GitClone/Claude/FormalVerification")
+
+
+def _live_head(repo: str):
+    try:
+        r = _sp.run(["git", "-C", _os.path.join(ESTATE_ROOT, repo),
+                     "rev-parse", "--short", "HEAD"],
+                    capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() or None
+    except Exception:
+        return None
+
+
+def _panel(cls: str, title: str, body: str) -> str:
+    return (f'<section class="mprog {cls}"><h2>{title}</h2>{body}</section>')
+
+
+def progress_panel() -> str:
+    """The measured half of this page. Never falls back to prose."""
+    style = """
+<style>
+  .mprog{max-width:62rem;margin:1.2rem 1.4rem;padding:1rem 1.2rem;
+         border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  .mprog h2{margin:.1rem 0 .5rem;font-size:1rem}
+  .mprog.warn{background:var(--warn);border-color:#e0b877}
+  .mprog.bad{background:#fdecea;border-color:#e3a7a0}
+  .mprog table{border-collapse:collapse;width:100%;font-size:.86rem}
+  .mprog th,.mprog td{text-align:left;padding:.28rem .5rem;border-bottom:1px solid var(--line)}
+  .mprog .num{text-align:right;font-variant-numeric:tabular-nums}
+  .mprog .note{color:var(--ink2);font-size:.78rem;margin-top:.6rem}
+  .bar{height:.5rem;background:#eef1f5;border-radius:3px;overflow:hidden;min-width:7rem}
+  .bar>i{display:block;height:100%;background:var(--sub)}
+</style>"""
+
+    if not _os.path.exists(PROGRESS_JSON):
+        return style + _panel("bad", "Progress: NOT MEASURED", f"""
+        <p>No snapshot at <code>{PROGRESS_JSON}</code>, so this page is showing
+        you <em>nothing</em> rather than something stale. That is deliberate:
+        the previous version of this page displayed hand-typed claims that were
+        eight days out of date, and looked exactly as confident as this one.</p>
+        <p>To populate it:
+        <code>formal-verification-control/tools/estate-progress.py --json</code></p>""")
+
+    try:
+        d = _json.load(open(PROGRESS_JSON))
+    except Exception as e:
+        return style + _panel("bad", "Progress: SNAPSHOT UNREADABLE", f"<p>{e}</p>")
+
+    moved = []
+    for repo, recorded in (d.get("repo_heads") or {}).items():
+        live = _live_head(repo)
+        if live and recorded and live != recorded:
+            moved.append((repo, recorded, live))
+
+    rows = []
+    for c in d["campaigns"]:
+        ax = c["axes"]
+        for axis, label in (("proof", "act one · proof"), ("attestation", "act two · attestation")):
+            if axis not in ax:
+                continue
+            a = ax[axis]
+            unm = (f' <span title="only a human or an outside party can establish these">'
+                   f'+{a["unmeasurable"]} unmeasurable</span>' if a["unmeasurable"] else "")
+            rows.append(
+                f'<tr><td>{c["title"]}</td><td>{label}</td>'
+                f'<td class="num">{a["earned"]} / {a["identified"]}</td>'
+                f'<td><div class="bar"><i style="width:{a["pct"]:.0f}%"></i></div></td>'
+                f'<td class="num">{a["pct"]}%{unm}</td>'
+                f'<td>{c["reproduction_note"]}</td></tr>')
+
+    t = d["totals"]
+    head = (f'<p><strong>act one — proof {t["proof"]["pct"]}%</strong> · '
+            f'<strong>act two — attestation {t["attestation"]["pct"]}%</strong> '
+            f'<span class="note">(two numbers, never one: a single figure is what let the '
+            f'old metric report 100% for work nobody had attacked)</span></p>')
+
+    table = ('<table><tr><th>campaign</th><th>axis</th><th class="num">band-points</th>'
+             '<th></th><th class="num">verified</th><th>reproduction</th></tr>'
+             + "".join(rows) + "</table>")
+
+    contra = ""
+    if d.get("contradictions"):
+        items = "".join(f"<li><code>{c['id']}</code>: {c['detail']}</li>"
+                        for c in d["contradictions"])
+        contra = (f'<p><strong>The ledger contradicts the repositories.</strong> '
+                  f'These numbers are not trustworthy until this list is empty:</p><ul>{items}</ul>')
+
+    note = (f'<p class="note">Measured {d["generated_at"]} by <code>{d["generator"]}</code>, '
+            f'from the repositories as they were at that moment. Nothing here is cached or '
+            f'carried forward. <strong>Everything on this page ABOVE this panel is '
+            f'hand-written prose</strong> and can be out of date; only this panel is derived.</p>')
+
+    if moved:
+        rowsm = "".join(f"<li><code>{r}</code>: measured at <code>{a}</code>, "
+                        f"now <code>{b}</code></li>" for r, a, b in moved)
+        return style + _panel(
+            "warn", "Progress: MEASURED, BUT THE REPOSITORIES HAVE MOVED SINCE",
+            f'<p>{len(moved)} repository(ies) changed after this snapshot, so the figures '
+            f'below describe an earlier state:</p><ul>{rowsm}</ul>{head}{table}{contra}{note}'
+            f'<p class="note">Re-run <code>tools/estate-progress.py --json</code> to refresh.</p>')
+
+    return style + _panel("", "Progress — measured, not asserted",
+                          head + table + contra + note)

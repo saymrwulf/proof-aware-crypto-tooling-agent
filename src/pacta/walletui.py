@@ -1070,8 +1070,11 @@ def make_handler(wallet_dir: Path):
             elif route == "/manual":
                 page("lab manual", "/manual", render_manual())
             elif route == "/estate":
-                from .estateview import ESTATE_HTML
-                self._send(ESTATE_HTML + _ESTATE_BACK_CHIP)
+                from .estateview import ESTATE_HTML, progress_panel
+                # The map is hand-written prose; the panel is derived from the
+                # repositories. Serving them together, in that order, is what
+                # stops a reader mistaking the first for the second.
+                self._send(ESTATE_HTML + progress_panel() + _ESTATE_BACK_CHIP)
             elif route.startswith("/station/"):
                 station_id = route.removeprefix("/station/")
                 station = STATION_BY_ID.get(station_id)
