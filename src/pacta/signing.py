@@ -92,12 +92,20 @@ def sign_payload_ed25519_detailed(payload: bytes, private_key_path: str | Path) 
     library) and falling back to OpenSSL. Returns (base64 signature, the
     backend that actually signed) - the backend is recorded next to every
     signature so the provenance is never silent."""
-    from .dogfood import BACKEND_OPENSSL, BACKEND_VERIFIED, locate_verifier, sign_payload_dogfood
+    from .dogfood import (BACKEND_OPENSSL, BACKEND_VERIFIED, REQUIRE_VERIFIED_ENV,
+                          default_binary_path, locate_verifier, require_verified_signer,
+                          sign_payload_dogfood)
 
     binary = locate_verifier()
     if binary is not None:
         signature_bytes = sign_payload_dogfood(payload, private_key_path, binary)
         return base64.b64encode(signature_bytes).decode("ascii"), BACKEND_VERIFIED
+    if require_verified_signer():
+        raise SignatureError(
+            f"{REQUIRE_VERIFIED_ENV} is set, so falling back to OpenSSL is refused, but the "
+            f"attested signer was not found at {default_binary_path()}. "
+            f"Build it, or point {'PACTA_DOGFOOD_VERIFIER'} at it, or unset "
+            f"{REQUIRE_VERIFIED_ENV} to accept the recorded downgrade.")
     return _sign_payload_openssl(payload, private_key_path), BACKEND_OPENSSL
 
 

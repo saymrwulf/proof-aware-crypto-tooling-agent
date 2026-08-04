@@ -12,7 +12,27 @@ from pathlib import Path
 from typing import Any
 
 DOGFOOD_ENV = "PACTA_DOGFOOD_VERIFIER"
-DEFAULT_STATE_DIR = Path("dogfood") / "state"
+REQUIRE_VERIFIED_ENV = "PACTA_REQUIRE_VERIFIED_SIGNER"
+
+# Anchored to the PACKAGE, not to the caller's working directory.
+#
+# This was `Path("dogfood") / "state"` — a relative path, so it resolved against
+# whatever directory the process happened to start in. The consequence was not a
+# crash but something quieter and worse: run the provider from the repository
+# root and it signs with the attested dalek build; run it from anywhere else and
+# locate_verifier() finds nothing, signing falls back to OpenSSL, and the head
+# records `signing_backend: openssl`. WHICH IMPLEMENTATION SIGNS THE
+# TRANSPARENCY LOG WAS AN ACCIDENT OF THE CURRENT DIRECTORY.
+#
+# Found 2026-08-04 by re-signing the published head 13 as a reproducibility
+# check: the byte comparison passed, but the backend came back `openssl` while
+# the published head says `verified-dalek-serial`. Both produced identical bytes
+# — Ed25519 is deterministic, so that is expected and is itself useful evidence
+# — which is exactly why the substitution was invisible. A silent backend swap
+# that changes no output is one nobody notices until the outputs differ.
+#
+# __file__ is <repo>/src/pacta/dogfood.py, so parents[2] is the repo root.
+DEFAULT_STATE_DIR = Path(__file__).resolve().parents[2] / "dogfood" / "state"
 BACKEND_VERIFIED = "verified-dalek-serial"
 BACKEND_OPENSSL = "openssl"
 
@@ -110,6 +130,21 @@ def locate_verifier(state_dir: str | Path | None = None) -> Path | None:
         return path if path.exists() else None
     path = default_binary_path(state_dir)
     return path if path.exists() else None
+
+
+def require_verified_signer() -> bool:
+    """Whether a downgrade to OpenSSL is forbidden for this process.
+
+    Recording a downgrade truthfully, which this code already does, tells you
+    afterwards which implementation signed. It does not let you DECIDE which
+    one will. For an operation as consequential as signing a transparency-log
+    head, the choice should be stated up front and enforced, not discovered in
+    the provenance field once the head exists.
+
+    Off by default: every existing caller keeps the fall-back-and-record
+    behaviour. Set PACTA_REQUIRE_VERIFIED_SIGNER=1 and signing raises instead
+    of quietly substituting OpenSSL."""
+    return os.environ.get(REQUIRE_VERIFIED_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_provenance(binary_path: str | Path) -> dict[str, Any]:
