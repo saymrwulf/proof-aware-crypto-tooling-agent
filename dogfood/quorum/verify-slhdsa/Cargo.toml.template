@@ -1,0 +1,13 @@
+# Rendered by build-verify-slhdsa.sh — {{SOURCE}} is replaced with the exported
+# copy of the PINNED proven source plus expose-mono.patch. Committed as a
+# template so the repo never hardcodes a machine path.
+[package]
+name = "pacta-verify-slhdsa"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+fips205 = { path = "{{SOURCE}}", default-features = false, features = ["slh_dsa_sha2_128s"] }
+
+[workspace]

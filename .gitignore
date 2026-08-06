@@ -23,3 +23,6 @@ dogfood/quorum/*/Cargo.lock
 dogfood/quorum/*/target/
 dogfood/state/quorum/
 paper/eprint-submission.md
+dogfood/quorum/.build-slhdsa/
+dogfood/quorum/verify-slhdsa/Cargo.toml
+dogfood/quorum/verify-slhdsa/Cargo.lock

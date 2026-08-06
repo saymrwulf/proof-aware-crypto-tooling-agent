@@ -1,0 +1,49 @@
+Expose the proven verify root so a quorum binary can call it.
+
+APPLIED TO A COPY of fips205-source at the pinned commit, never to the pinned
+checkout itself. Two hunks, and the reason each is the smallest possible:
+
+  1. `mod verify_mono;` -> `pub mod verify_mono;`
+     A visibility keyword. Rust's `src/bin/` and `examples/` targets are
+     SEPARATE crates, so neither can reach a `pub(crate)` item; the module has
+     to be public for any binary to call into it at all.
+
+  2. A new `verify_mono_bytes` function, appended.
+     It only assembles arguments: split the 32-byte public key into pk_seed and
+     pk_root, deserialize the 7856-byte signature, call `slh_verify_128s`. The
+     body is copied from the crate's OWN test helper `internal_inputs`, so the
+     conversion is the one the crate already trusts rather than one invented
+     here. Exposing the argument types and their fields instead would have
+     meant four more visibility changes across two files.
+
+WHAT THIS DOES NOT CHANGE. No existing line's semantics. The extraction root
+`slh_verify_128s` is untouched -- same body, same callees. Module visibility and
+an added sibling function do not alter the MIR of an existing function, so the
+code the certificates cover compiles to what it compiled to before. What IS
+true and must be said: the binary is built from `pinned commit + this patch`,
+not from the pinned commit alone, and the diff below is the whole of the
+difference.
+
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@
+-mod verify_mono; // Aeneas-compat monomorphic verify path (formal-verification campaign; additive)
++pub mod verify_mono; // Aeneas-compat monomorphic verify path (formal-verification campaign; additive)
+
+--- a/src/verify_mono.rs
++++ b/src/verify_mono.rs
+@@ (appended after slh_verify_128s)
++/// Byte-level entry to the PROVEN root, for out-of-crate callers.
++///
++/// Assembles arguments only. `mprime` is FIPS 205's M' and is built by the
++/// CALLER -- its construction is outside every certificate (TRUSTED-BASE item
++/// 10), which is exactly why it is a parameter here and not computed inside.
++pub fn verify_mono_bytes(mprime: &[u8], sig_bytes: &[u8; 7856], pk_bytes: &[u8; 32]) -> bool {
++    let mut pk_seed = [0u8; 16];
++    let mut pk_root = [0u8; 16];
++    pk_seed.copy_from_slice(&pk_bytes[0..16]);
++    pk_root.copy_from_slice(&pk_bytes[16..32]);
++    let pk = SlhPublicKey { pk_seed, pk_root };
++    let sig = SlhDsaSig::<12, 7, 9, 14, 35, 16>::deserialize(sig_bytes);
++    slh_verify_128s(mprime, &sig, &pk)
++}
