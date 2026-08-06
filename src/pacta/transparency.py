@@ -158,6 +158,8 @@ def make_signed_tree_head(
     private_key_path: str | Path,
     public_key_path: str | Path,
     signing_provenance: dict[str, Any] | None = None,
+    slhdsa_private_key_path: str | Path | None = None,
+    slhdsa_public_key_path: str | Path | None = None,
 ) -> dict[str, Any]:
     sth: dict[str, Any] = {
         "schema_version": 1,
@@ -170,6 +172,17 @@ def make_signed_tree_head(
     }
     payload = signed_tree_head_payload(sth)
     signature_base64, signing_backend = sign_payload_ed25519_detailed(payload, private_key_path)
+    # slh_dsa is a SEPARATE block (operator decision 2026-08-06): ml_dsa keeps
+    # its truthful not-configured disclosure; no algorithm is swapped inside a
+    # field that names a different one. ADDITIVE: ed25519 remains the signature
+    # consumers must check; a head without an SLH-DSA key carries the honest
+    # not-configured slot, exactly as ml_dsa always has.
+    from .slhdsa import slh_dsa_not_configured_block, slh_dsa_signature_block
+
+    if slhdsa_private_key_path and slhdsa_public_key_path:
+        slh_block = slh_dsa_signature_block(payload, slhdsa_private_key_path, slhdsa_public_key_path)
+    else:
+        slh_block = slh_dsa_not_configured_block()
     sth["signatures"] = {
         "ed25519": {
             "scheme": "openssl-ed25519",
@@ -181,6 +194,7 @@ def make_signed_tree_head(
             **({"signing_provenance": signing_provenance} if signing_provenance else {}),
         },
         "ml_dsa": detect_ml_dsa().to_signature_slot(),
+        "slh_dsa": slh_block,
     }
     return sth
 
