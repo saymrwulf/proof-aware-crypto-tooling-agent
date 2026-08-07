@@ -46,7 +46,8 @@ into an alarm with a machine-checked guarantee behind it.
 | SHA-512 | opaque oracle inside the theorems |
 | wire parsers | outcomes are hypotheses |
 | reproducible builds, side channels | not claimed (that is R5) |
-| ML-DSA / PQC | fail-closed: no proven implementation exists |
+| ML-DSA | fail-closed: no proven implementation exists; slot stays `not_configured` |
+| SLH-DSA | verify path PROVEN (fips205-slhdsa-verified, 11 certs); signing deterministic + parameter-locked, trusted base |
 
 The asymmetry is the point: warden is strongest exactly where it matters
 most for custody — deciding whether an inbound authorization is real — and

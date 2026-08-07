@@ -23,10 +23,10 @@ flowchart LR
     s6["fips205-source"]
   end
   subgraph V["VERIFIED SUBJECTS"]
-    d["dalek-ed25519-verified<br/>16 certs · leaf 8 · signer source"]
-    a["anza-ed25519-verified<br/>16 certs · leaf 9"]
-    r["risc0-ed25519-verified<br/>16 certs · leaf 10"]
-    b["betrusted-ed25519-verified<br/>16 certs · leaf 11"]
+    d["dalek-ed25519-verified<br/>44 certs today · attested at 16 (leaf 8 · signer source)"]
+    a["anza-ed25519-verified<br/>44 certs today · attested at 16 (leaf 9)"]
+    r["risc0-ed25519-verified<br/>44 certs today · attested at 16 (leaf 10)"]
+    b["betrusted-ed25519-verified<br/>44 certs today · attested at 16 (leaf 11)"]
     p["pasta-pallas-verified<br/>field layer only · NOT attested"]
     f["fips205-slhdsa-verified<br/>11 certs proven · reviewer attest-with-conditions · NOT in the log"]
     c["ltl-accumulator-verified<br/>61 certs · entry-13 subject · frozen 172a1d0"]
@@ -119,8 +119,8 @@ deployed verifier; see the corpus KNOWN-GAPS ledger).
 | Repository | Lane | Role | Mutability |
 |---|---|---|---|
 | `curve25519-dalek-source`, `anza-cryptography-source`, `risc0-…-source`, `betrusted-…-source`, `pasta_curves-source` (+ `xous-core`, `litex-boards` context) | upstream | pinned inputs to extraction | **frozen — never modified** |
-| `fips205-source` | upstream | verbatim snapshot of `integritychain/fips205` (pure-Rust FIPS 205 / SLH-DSA); upstream pin `30bac08`, snapshot head `5dca0db` — single deviation: upstream CI workflows stripped, documented in-commit | pinned; moves only for transparent, individually-justified Aeneas-compat patches (nothing proposed upstream) |
-| `dalek-` / `anza-` / `risc0-` / `betrusted-ed25519-verified` | subject | Rust source + Lean proofs; 16 certs each; attested (leaves 8–11, generations at 0–7) | frozen at attested commits; branch moves only for docs |
+| `fips205-source` | upstream | verbatim snapshot of `integritychain/fips205` (pure-Rust FIPS 205 / SLH-DSA); upstream pin `30bac08`, snapshot head `a3ce8e8` — deviations: CI workflows stripped + the documented Aeneas-compat/de-plumbing patch series (each commit individually justified) | pinned; moves only for transparent, individually-justified Aeneas-compat patches (nothing proposed upstream) |
+| `dalek-` / `anza-` / `risc0-` / `betrusted-ed25519-verified` | subject | Rust source + Lean proofs; 44 certs each today (27 main + 4 apex + 13 scalar; 16 at the leaf 8–11 attestations, generations at 0–7) | attested commits fixed; branches carry substantial post-attestation proof work (scalar layer, apex tier, hardening rounds), staged for re-attestation |
 | `pasta-pallas-verified` | subject | field layer proven; curve layer pending; **not attested** | changes freely |
 | `fips205-slhdsa-verified` | subject | SLH-DSA (FIPS 205) verify-path campaign, parameter set SLH-DSA-SHA2-128s; **11 certificates proven, `check.sh` green with an 18-attack self-test, outside-reviewer attest-with-conditions**; not appended to the log | changes freely — campaign |
 | `ltl-accumulator-verified` | subject | 61-cert corpus about the log's accumulator model; **entry-13 subject**, frozen `172a1d0` | frozen; doc-only commits allowed |

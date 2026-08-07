@@ -47,7 +47,9 @@ cover the **verification** path. Signing is declared trusted base
 (mitigated by the firewall below), SHA-512 is an oracle, wire parsing
 is hypothesis, side channels and reproducible builds are the R5
 frontier. ML-DSA remains fail-closed: no proven implementation exists,
-so the PQC slot reports `unavailable` rather than pretending.
+so that slot reports `unavailable` rather than pretending. (Update
+2026-08: an SLH-DSA slot with a proven verify path now exists beside it —
+the PQC story is no longer a single unavailable slot.)
 
 ## The four semantic edges (why divergence needs a taxonomy)
 

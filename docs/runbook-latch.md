@@ -35,7 +35,7 @@ hash at the moment of divergence. That table is your suspect list.
 
 1. **A corrupted/updated member binary.** Compare each member's current
    hash against the capsule:
-   `sha256sum dogfood/state/quorum/pacta-verify-*` vs
+   `shasum -a 256 dogfood/state/quorum/pacta-verify-*` (GNU: `sha256sum`) vs
    `capsule.json` → `members[].binary_sha256`. A mismatch on exactly the
    dissenting member is the common benign case (a rebuild happened);
    a mismatch you cannot explain is not benign.

@@ -26,7 +26,7 @@
 
 warden speaks MCP over stdio: `pacta wallet mcp --wallet <dir>`. Tools:
 `wallet_status`, `verify_inbound`, `request_signature`, `custody_card`,
-`posture_challenge`, `list_incidents`, `explain_refusal`. Errors are
+`posture_challenge`, `list_incidents`, `explain_refusal`, `airgap_pending`. Errors are
 structured objects (code / missing / remediation). The custody card at
 `.well-known/custody-card.json` is self-proving: it embeds transparency-log
 inclusion proofs a counterparty recomputes rather than trusts.
@@ -36,4 +36,4 @@ inclusion proofs a counterparty recomputes rather than trusts.
 Verification paths are certificate-covered; signing is trusted base (the
 attested artifact, fenced by the firewall). SHA-512 is an opaque oracle;
 wire parsers are hypotheses; reproducible builds and side channels are R5,
-not claimed; ML-DSA (PQC) fails closed — no proven implementation exists.
+not claimed; ML-DSA fails closed — no proven implementation exists; the SLH-DSA verify path IS proven (verify only; signing remains trusted base).
