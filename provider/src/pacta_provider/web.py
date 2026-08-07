@@ -65,11 +65,16 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
-            elif route == "/log-public-key":
+            elif route in ("/log-public-key", "/log-slhdsa-public-key"):
                 # TOFU mitigation depends on the key being published in two
                 # independent locations; this is the site's copy (the mirror
                 # carries the other). Serving only a fingerprint would not do.
-                key_path = Path(log.log_dir) / "provider.ed25519.pub"
+                # The SLH-DSA key (additive post-quantum signature, 2026-08)
+                # is published THE SAME WAY as the Ed25519 one — same route
+                # shape, same two-location rule.
+                fname = ("provider.ed25519.pub" if route == "/log-public-key"
+                         else "provider.slhdsa.pub")
+                key_path = Path(log.log_dir) / fname
                 if not key_path.is_file():
                     self._send(404, {"error": "log public key not present in this log directory"})
                     return
@@ -152,6 +157,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                         f"{base}/docs",
                         f"{base}/paper",
                         f"{base}/log-public-key",
+                        f"{base}/log-slhdsa-public-key",
                         f"{base}/healthz",
                         f"{base}/{API_VERSION}/metadata",
                         f"{base}/{API_VERSION}/sth",
