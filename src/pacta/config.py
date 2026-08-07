@@ -28,6 +28,17 @@ class RepoConfig:
     env_script: str | None = None
     lean_project_dir: str | None = None
     lean_guard: str | None = None
+    # Files the provider REPLAY does not compile (globs relative to the
+    # verification dir). Exists because the hardened forks ship audit
+    # INSTRUMENTS — kernel-gate modules that read other modules' object files
+    # via readModuleData and only run inside the button's own environment
+    # (its cwd, LEAN_PATH and compile order). The replay's generic
+    # topological compile breaks on them (register:
+    # replay-pipeline-lags-hardened-forks). The replay checks the CERTIFICATES;
+    # the deeper self-auditing gates are the repository's own and run there.
+    # Every exclusion actually applied is recorded in the attestation's replay
+    # block, so the leaf discloses what its replay did not compile.
+    replay_exclude: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "RepoConfig":
@@ -53,6 +64,7 @@ class RepoConfig:
             env_script=raw.get("env_script"),
             lean_project_dir=raw.get("lean_project_dir"),
             lean_guard=raw.get("lean_guard"),
+            replay_exclude=[str(g) for g in (raw.get("replay_exclude") or [])],
         )
 
 

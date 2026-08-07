@@ -16,6 +16,86 @@ repos:
       - compiler correctness
       - SIMD/AVX/accelerator paths
 
+    # certificates + imports MEASURED from the two buttons (CERTS arrays;
+    # apex recovered the way Phase 3c itself recovers it). replay_exclude:
+    # the button-owned audit instruments the replay does not compile —
+    # disclosed per-leaf in replay.instruments_excluded.
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+      - CurveFieldProofs.naf_table_spec
+      - CurveFieldProofs.naf_select_spec
+      - CurveFieldProofs.proj_double_law
+      - CurveFieldProofs.compl_as_projective_law
+      - CurveFieldProofs.dsm_step_p_law
+      - CurveFieldProofs.dsm_step_b_law
+      - CurveFieldProofs.dsm_loop_spec
+      - CurveFieldProofs.naf_load_spec
+      - CurveFieldProofs.naf_exit
+      - CurveFieldProofs.naf_digit_loop_spec
+      - CurveFieldProofs.non_adjacent_form_spec
+      - CurveFieldProofs.run_basepoint
+      - CurveFieldProofs.vartime_double_base_mul_spec
+      - CurveFieldProofs.verify_loop_full
+      - CurveFieldProofs.to_bytes_spec
+      - CurveFieldProofs.ed_compress_spec
+      - ScalarProofs.from_bytes_mod_order_wide_spec
+      - CurveFieldProofs.vartime_dsm_basepoint_spec
+      - CurveFieldProofs.enc_point_inj
+      - CurveFieldProofs.pow_p58_spec
+      - CurveFieldProofs.fe_ct_eq_spec
+      - CurveFieldProofs.sqrt_core
+      - CurveFieldProofs.sqrt_ratio_i_sq_spec
+      - CurveFieldProofs.from_bytes_spec
+      - CurveFieldProofs.decompress_of_canonical
+      - CurveFieldProofs.verify_accepts_iff
+      - CurveFieldProofs.verify_accepts_iff_decompress
+      - CurveFieldProofs.verify_accepts_iff_point
+      - CurveFieldProofs.verify_accepts_iff_point_eq
+      - ScalarProofs.L_val
+      - ScalarProofs.sub_loop_spec
+      - ScalarProofs.cond_add_l_one_spec
+      - ScalarProofs.sub_val_spec
+      - ScalarProofs.add_val_spec
+      - ScalarProofs.mul_internal_spec
+      - ScalarProofs.part1_spec
+      - ScalarProofs.montgomery_reduce_spec
+      - ScalarProofs.mul_spec
+      - ScalarProofs.scalarImplementation
+      - ScalarProofs.montgomery_mul_spec
+      - ScalarProofs.bytes_unpack_spec
+      - ScalarProofs.from_bytes_wide_spec
+    axiom_imports:
+      - Proofs.FieldMain
+      - Proofs.EdMain
+      - Proofs.ScalarMain
+      - Proofs.ToBytesSpec
+      - Proofs.CompressSpec
+      - Proofs.ScalarPackSpec
+      - Proofs.DsmMulSpec
+      - Proofs.SigApexSpec
+      - Proofs.PointLiftSpec
+      - Proofs.PointEqSpec
+      - Proofs.DecompressSpec
+      - Proofs.FromBytesSpec
+      - Proofs.DecompressMain
+      - Proofs.ScalarDenote
+      - Proofs.ScalarLoop
+      - Proofs.ScalarSubSpec
+      - Proofs.ScalarAddSpec
+      - Proofs.ScalarMulSpec
+      - Proofs.ScalarMontSpec
+      - Proofs.ScalarReduceSpec
+      - Proofs.ScalarFullMulSpec
+      - Proofs.ScalarWideSpec
+      - Proofs.ScalarBytesSpec
+      - Proofs.ScalarUnpackSpec
+      - Proofs.ScalarFromBytesSpec
+    replay_exclude:
+      - "Proofs/Audit.lean"
+      - "Proofs/ScalarAudit.lean"
+      - "Proofs/AxiomCheck.lean"
+      - "Proofs/Inventory*.lean"
   - name: anza-ed25519-verified
     url: https://github.com/saymrwulf/anza-ed25519-verified.git
     kind: ed25519
@@ -32,6 +112,86 @@ repos:
       - the default HEEA/Zebra verify() path
       - accelerator paths
 
+    # certificates + imports MEASURED from the two buttons (CERTS arrays;
+    # apex recovered the way Phase 3c itself recovers it). replay_exclude:
+    # the button-owned audit instruments the replay does not compile —
+    # disclosed per-leaf in replay.instruments_excluded.
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+      - CurveFieldProofs.naf_table_spec
+      - CurveFieldProofs.naf_select_spec
+      - CurveFieldProofs.proj_double_law
+      - CurveFieldProofs.compl_as_projective_law
+      - CurveFieldProofs.dsm_step_p_law
+      - CurveFieldProofs.dsm_step_b_law
+      - CurveFieldProofs.dsm_loop_spec
+      - CurveFieldProofs.naf_load_spec
+      - CurveFieldProofs.naf_exit
+      - CurveFieldProofs.naf_digit_loop_spec
+      - CurveFieldProofs.non_adjacent_form_spec
+      - CurveFieldProofs.run_basepoint
+      - CurveFieldProofs.vartime_double_base_mul_spec
+      - CurveFieldProofs.verify_loop_full
+      - CurveFieldProofs.to_bytes_spec
+      - CurveFieldProofs.ed_compress_spec
+      - ScalarProofs.from_bytes_mod_order_wide_spec
+      - CurveFieldProofs.vartime_dsm_basepoint_spec
+      - CurveFieldProofs.enc_point_inj
+      - CurveFieldProofs.pow_p58_spec
+      - CurveFieldProofs.fe_ct_eq_spec
+      - CurveFieldProofs.sqrt_core
+      - CurveFieldProofs.sqrt_ratio_i_sq_spec
+      - CurveFieldProofs.from_bytes_spec
+      - CurveFieldProofs.decompress_of_canonical
+      - CurveFieldProofs.verify_accepts_iff
+      - CurveFieldProofs.verify_accepts_iff_decompress
+      - CurveFieldProofs.verify_accepts_iff_point
+      - CurveFieldProofs.verify_accepts_iff_point_eq
+      - ScalarProofs.L_val
+      - ScalarProofs.sub_loop_spec
+      - ScalarProofs.cond_add_l_one_spec
+      - ScalarProofs.sub_val_spec
+      - ScalarProofs.add_val_spec
+      - ScalarProofs.mul_internal_spec
+      - ScalarProofs.part1_spec
+      - ScalarProofs.montgomery_reduce_spec
+      - ScalarProofs.mul_spec
+      - ScalarProofs.scalarImplementation
+      - ScalarProofs.montgomery_mul_spec
+      - ScalarProofs.bytes_unpack_spec
+      - ScalarProofs.from_bytes_wide_spec
+    axiom_imports:
+      - Proofs.FieldMain
+      - Proofs.EdMain
+      - Proofs.ScalarMain
+      - Proofs.ToBytesSpec
+      - Proofs.CompressSpec
+      - Proofs.ScalarPackSpec
+      - Proofs.DsmMulSpec
+      - Proofs.SigApexSpec
+      - Proofs.PointLiftSpec
+      - Proofs.PointEqSpec
+      - Proofs.DecompressSpec
+      - Proofs.FromBytesSpec
+      - Proofs.DecompressMain
+      - Proofs.ScalarDenote
+      - Proofs.ScalarLoop
+      - Proofs.ScalarSubSpec
+      - Proofs.ScalarAddSpec
+      - Proofs.ScalarMulSpec
+      - Proofs.ScalarMontSpec
+      - Proofs.ScalarReduceSpec
+      - Proofs.ScalarFullMulSpec
+      - Proofs.ScalarWideSpec
+      - Proofs.ScalarBytesSpec
+      - Proofs.ScalarUnpackSpec
+      - Proofs.ScalarFromBytesSpec
+    replay_exclude:
+      - "Proofs/Audit.lean"
+      - "Proofs/ScalarAudit.lean"
+      - "Proofs/AxiomCheck.lean"
+      - "Proofs/Inventory*.lean"
   - name: risc0-ed25519-verified
     url: https://github.com/saymrwulf/risc0-ed25519-verified.git
     kind: ed25519
@@ -43,6 +203,86 @@ repos:
     lean_guard: verification/lean-guard
     backend_warning: pure Rust path only; do not treat zkVM accelerator/syscall path as verified
 
+    # certificates + imports MEASURED from the two buttons (CERTS arrays;
+    # apex recovered the way Phase 3c itself recovers it). replay_exclude:
+    # the button-owned audit instruments the replay does not compile —
+    # disclosed per-leaf in replay.instruments_excluded.
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+      - CurveFieldProofs.naf_table_spec
+      - CurveFieldProofs.naf_select_spec
+      - CurveFieldProofs.proj_double_law
+      - CurveFieldProofs.compl_as_projective_law
+      - CurveFieldProofs.dsm_step_p_law
+      - CurveFieldProofs.dsm_step_b_law
+      - CurveFieldProofs.dsm_loop_spec
+      - CurveFieldProofs.naf_load_spec
+      - CurveFieldProofs.naf_exit
+      - CurveFieldProofs.naf_digit_loop_spec
+      - CurveFieldProofs.non_adjacent_form_spec
+      - CurveFieldProofs.run_basepoint
+      - CurveFieldProofs.vartime_double_base_mul_spec
+      - CurveFieldProofs.verify_loop_full
+      - CurveFieldProofs.to_bytes_spec
+      - CurveFieldProofs.ed_compress_spec
+      - ScalarProofs.from_bytes_mod_order_wide_spec
+      - CurveFieldProofs.vartime_dsm_basepoint_spec
+      - CurveFieldProofs.enc_point_inj
+      - CurveFieldProofs.pow_p58_spec
+      - CurveFieldProofs.fe_ct_eq_spec
+      - CurveFieldProofs.sqrt_core
+      - CurveFieldProofs.sqrt_ratio_i_sq_spec
+      - CurveFieldProofs.from_bytes_spec
+      - CurveFieldProofs.decompress_of_canonical
+      - CurveFieldProofs.verify_accepts_iff
+      - CurveFieldProofs.verify_accepts_iff_decompress
+      - CurveFieldProofs.verify_accepts_iff_point
+      - CurveFieldProofs.verify_accepts_iff_point_eq
+      - ScalarProofs.L_val
+      - ScalarProofs.sub_loop_spec
+      - ScalarProofs.sub_loop1_one_spec
+      - ScalarProofs.sub_val_spec
+      - ScalarProofs.add_val_spec
+      - ScalarProofs.mul_internal_spec
+      - ScalarProofs.part1_spec
+      - ScalarProofs.montgomery_reduce_spec
+      - ScalarProofs.mul_spec
+      - ScalarProofs.scalarImplementation
+      - ScalarProofs.montgomery_mul_spec
+      - ScalarProofs.bytes_unpack_spec
+      - ScalarProofs.from_bytes_wide_spec
+    axiom_imports:
+      - Proofs.FieldMain
+      - Proofs.EdMain
+      - Proofs.ScalarMain
+      - Proofs.ToBytesSpec
+      - Proofs.CompressSpec
+      - Proofs.ScalarPackSpec
+      - Proofs.DsmMulSpec
+      - Proofs.SigApexSpec
+      - Proofs.PointLiftSpec
+      - Proofs.PointEqSpec
+      - Proofs.DecompressSpec
+      - Proofs.FromBytesSpec
+      - Proofs.DecompressMain
+      - Proofs.ScalarDenote
+      - Proofs.ScalarLoop
+      - Proofs.ScalarSubSpec
+      - Proofs.ScalarAddSpec
+      - Proofs.ScalarMulSpec
+      - Proofs.ScalarMontSpec
+      - Proofs.ScalarReduceSpec
+      - Proofs.ScalarFullMulSpec
+      - Proofs.ScalarWideSpec
+      - Proofs.ScalarBytesSpec
+      - Proofs.ScalarUnpackSpec
+      - Proofs.ScalarFromBytesSpec
+    replay_exclude:
+      - "Proofs/Audit.lean"
+      - "Proofs/ScalarAudit.lean"
+      - "Proofs/AxiomCheck.lean"
+      - "Proofs/Inventory*.lean"
   - name: betrusted-ed25519-verified
     url: https://github.com/saymrwulf/betrusted-ed25519-verified.git
     kind: ed25519
@@ -54,6 +294,86 @@ repos:
     lean_guard: verification/lean-guard
     backend_warning: pure Rust path only; do not treat Engine25519/hardware accelerator as verified
 
+    # certificates + imports MEASURED from the two buttons (CERTS arrays;
+    # apex recovered the way Phase 3c itself recovers it). replay_exclude:
+    # the button-owned audit instruments the replay does not compile —
+    # disclosed per-leaf in replay.instruments_excluded.
+    certificates:
+      - CurveFieldProofs.fieldImplementation
+      - CurveFieldProofs.edwardsImplementation
+      - CurveFieldProofs.naf_table_spec
+      - CurveFieldProofs.naf_select_spec
+      - CurveFieldProofs.proj_double_law
+      - CurveFieldProofs.compl_as_projective_law
+      - CurveFieldProofs.dsm_step_p_law
+      - CurveFieldProofs.dsm_step_b_law
+      - CurveFieldProofs.dsm_loop_spec
+      - CurveFieldProofs.naf_load_spec
+      - CurveFieldProofs.naf_exit
+      - CurveFieldProofs.naf_digit_loop_spec
+      - CurveFieldProofs.non_adjacent_form_spec
+      - CurveFieldProofs.run_basepoint
+      - CurveFieldProofs.vartime_double_base_mul_spec
+      - CurveFieldProofs.verify_loop_full
+      - CurveFieldProofs.to_bytes_spec
+      - CurveFieldProofs.ed_compress_spec
+      - ScalarProofs.from_bytes_mod_order_wide_spec
+      - CurveFieldProofs.vartime_dsm_basepoint_spec
+      - CurveFieldProofs.enc_point_inj
+      - CurveFieldProofs.pow_p58_spec
+      - CurveFieldProofs.fe_ct_eq_spec
+      - CurveFieldProofs.sqrt_core
+      - CurveFieldProofs.sqrt_ratio_i_sq_spec
+      - CurveFieldProofs.from_bytes_spec
+      - CurveFieldProofs.decompress_of_canonical
+      - CurveFieldProofs.verify_accepts_iff
+      - CurveFieldProofs.verify_accepts_iff_decompress
+      - CurveFieldProofs.verify_accepts_iff_point
+      - CurveFieldProofs.verify_accepts_iff_point_eq
+      - ScalarProofs.L_val
+      - ScalarProofs.sub_loop_spec
+      - ScalarProofs.sub_loop1_one_spec
+      - ScalarProofs.sub_val_spec
+      - ScalarProofs.add_val_spec
+      - ScalarProofs.mul_internal_spec
+      - ScalarProofs.part1_spec
+      - ScalarProofs.montgomery_reduce_spec
+      - ScalarProofs.mul_spec
+      - ScalarProofs.scalarImplementation
+      - ScalarProofs.montgomery_mul_spec
+      - ScalarProofs.bytes_unpack_spec
+      - ScalarProofs.from_bytes_wide_spec
+    axiom_imports:
+      - Proofs.FieldMain
+      - Proofs.EdMain
+      - Proofs.ScalarMain
+      - Proofs.ToBytesSpec
+      - Proofs.CompressSpec
+      - Proofs.ScalarPackSpec
+      - Proofs.DsmMulSpec
+      - Proofs.SigApexSpec
+      - Proofs.PointLiftSpec
+      - Proofs.PointEqSpec
+      - Proofs.DecompressSpec
+      - Proofs.FromBytesSpec
+      - Proofs.DecompressMain
+      - Proofs.ScalarDenote
+      - Proofs.ScalarLoop
+      - Proofs.ScalarSubSpec
+      - Proofs.ScalarAddSpec
+      - Proofs.ScalarMulSpec
+      - Proofs.ScalarMontSpec
+      - Proofs.ScalarReduceSpec
+      - Proofs.ScalarFullMulSpec
+      - Proofs.ScalarWideSpec
+      - Proofs.ScalarBytesSpec
+      - Proofs.ScalarUnpackSpec
+      - Proofs.ScalarFromBytesSpec
+    replay_exclude:
+      - "Proofs/Audit.lean"
+      - "Proofs/ScalarAudit.lean"
+      - "Proofs/AxiomCheck.lean"
+      - "Proofs/Inventory*.lean"
   - name: pasta-pallas-verified
     url: https://github.com/saymrwulf/pasta-pallas-verified.git
     kind: pasta_pallas

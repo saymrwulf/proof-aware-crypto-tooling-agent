@@ -30,8 +30,26 @@ def build_attestation(
     profile = get_profile(repo.kind, repo)
     layout = discover_layout(path, repo.verification_dir)
     lean_guard = resolve_lean_guard(repo.lean_guard, path)
+    # The replay compiles the certificate corpus, not the button's audit
+    # instruments (see RepoConfig.replay_exclude). Filter by the path relative
+    # to the verification dir; record what was actually excluded so the LEAF
+    # says it — a silent exclusion here would be the exact defect class the
+    # estate keeps finding.
+    import fnmatch as _fnmatch
+    verification_root = path / repo.verification_dir
+    compile_order = layout.compile_order
+    instruments_excluded: list[str] = []
+    if repo.replay_exclude:
+        kept = []
+        for f in compile_order:
+            rel = str(Path(f).resolve().relative_to(verification_root.resolve()))
+            if any(_fnmatch.fnmatch(rel, g) for g in repo.replay_exclude):
+                instruments_excluded.append(rel)
+            else:
+                kept.append(f)
+        compile_order = kept
     check = lean_check_files(
-        layout.compile_order,
+        compile_order,
         layout.verification_dir,
         timeout=timeout,
         log_dir=log_dir,
@@ -103,6 +121,10 @@ def build_attestation(
             "check_log_path": check.log_path,
             "checked_files": len(check.checked_files),
             "failed_files": check.failed_files,
+            # The button's audit instruments this replay did NOT compile —
+            # disclosed in the leaf rather than silently absent. Empty for
+            # repositories without a replay_exclude list.
+            "instruments_excluded": sorted(instruments_excluded),
             "diagnostics": check.diagnostics,
             "axiom_attempted": axiom.attempted if axiom else False,
             "axiom_ok": axiom.ok if axiom else False,
