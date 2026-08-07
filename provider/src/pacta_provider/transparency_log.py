@@ -96,6 +96,8 @@ class TransparencyLog:
         private_key_path: str | Path,
         public_key_path: str | Path,
         timestamp: str | None = None,
+        slhdsa_private_key_path: str | Path | None = None,
+        slhdsa_public_key_path: str | Path | None = None,
     ) -> dict[str, Any]:
         metadata = self.metadata()
         entries = self.entries()
@@ -108,6 +110,8 @@ class TransparencyLog:
             private_key_path,
             public_key_path,
             signing_provenance=self.signing_provenance(entries),
+            slhdsa_private_key_path=slhdsa_private_key_path,
+            slhdsa_public_key_path=slhdsa_public_key_path,
         )
         dump_data(sth, self.sth_path)
         self._record_sth(sth)
@@ -119,6 +123,8 @@ class TransparencyLog:
         private_key_path: str | Path,
         public_key_path: str | Path,
         receipt_out: str | Path | None = None,
+        slhdsa_private_key_path: str | Path | None = None,
+        slhdsa_public_key_path: str | Path | None = None,
     ) -> dict[str, Any]:
         metadata = self.metadata()
         attestation = load_data(attestation_path)
@@ -151,6 +157,8 @@ class TransparencyLog:
             private_key_path,
             public_key_path,
             signing_provenance=self.signing_provenance(entries),
+            slhdsa_private_key_path=slhdsa_private_key_path,
+            slhdsa_public_key_path=slhdsa_public_key_path,
         )
         dump_data(sth, self.sth_path)
         self._record_sth(sth)
@@ -302,6 +310,12 @@ class TransparencyLog:
         (out / "README.md").write_text(README_MD, encoding="utf-8")
         if public_key_path is not None:
             (out / "provider.ed25519.pub").write_bytes(Path(public_key_path).read_bytes())
+            # The SLH-DSA verification key travels beside the Ed25519 one the
+            # moment it exists (operator decision 2026-08-06: additive second
+            # signature). Public key only — nothing secret lives near this path.
+            slh_pub = Path(public_key_path).parent / "provider.slhdsa.pub"
+            if slh_pub.exists():
+                (out / "provider.slhdsa.pub").write_bytes(slh_pub.read_bytes())
         return {"entries": len(entries), "components": sorted(components), "out": str(out)}
 
     def consistency_from(self, old_tree_size: int) -> dict[str, Any]:
