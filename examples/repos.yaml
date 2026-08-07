@@ -221,3 +221,56 @@ repos:
       LTLAcc.take_append_drop: []
       LTLAcc.take_drop_prefix: ["propext", "Classical.choice", "Quot.sound"]
       LTLAcc.take_take_le: ["propext", "Quot.sound"]
+
+  - name: fips205-slhdsa-verified
+    url: https://github.com/saymrwulf/fips205-slhdsa-verified.git
+    kind: slh_dsa
+    verification_dir: verification
+    verified_backend: verify-mono/sha2-128s
+    env_script: ~/aeneas-toolchain/env.sh
+    lean_project_dir: $AENEAS_HOME/backends/lean
+    lean_guard: verification/lean-guard
+    backend_warning: >-
+      proved subject is the private verify_mono facade; the bridge to the
+      deployed generic pk.verify() is a 137-case differential test, not a
+      machine-checked refinement (TRUSTED-BASE item 9)
+    known_exclusions:
+      - the five verify-path hash oracles h_msg/f/h/t_l/t_len (assumed, not proven against FIPS 180-4)
+      - signing and key generation (out of extraction scope entirely)
+      - "everything above the extraction root: M' assembly, the pure/prehash domain-separator byte, ctx length bound, deserialization (TRUSTED-BASE item 10)"
+      - the base_2b inner loop (threaded opaquely, no certificate)
+      - parameter sets other than SLH-DSA-SHA2-128s
+      - compiler correctness and side channels
+    axiom_imports:
+      - Proofs.ApexSpec
+      - Proofs.ChainSpec
+      - Proofs.ForsInnerSpec
+      - Proofs.ForsOuterSpec
+      - Proofs.HtSpec
+      - Proofs.InputPrepSpec
+      - Proofs.WotsSpec
+      - Proofs.XmssSpec
+    certificates:
+      - fips205.base2b_outer_loop_eq
+      - fips205.chain_free_loop_eq
+      - fips205.fors_inner_loop_eq
+      - fips205.fors_outer_loop_eq
+      - fips205.ht_loop_eq
+      - fips205.slh_verify_128s_accepts_iff
+      - fips205.to_byte_loop_eq
+      - fips205.to_int_loop_eq
+      - fips205.wots_csum_loop_eq
+      - fips205.wots_loop1_eq
+      - fips205.xmss_loop_eq
+    certificate_axioms:
+      fips205.base2b_outer_loop_eq: ["Classical.choice", "Quot.sound", "propext"]
+      fips205.chain_free_loop_eq: ["Classical.choice", "Quot.sound", "propext", "verify_mono.oracle.f"]
+      fips205.fors_inner_loop_eq: ["Classical.choice", "Quot.sound", "propext", "verify_mono.oracle.h"]
+      fips205.fors_outer_loop_eq: ["Classical.choice", "Quot.sound", "propext", "verify_mono.oracle.f", "verify_mono.oracle.h"]
+      fips205.ht_loop_eq: ["Classical.choice", "Quot.sound", "propext", "verify_mono.oracle.f", "verify_mono.oracle.h", "verify_mono.oracle.t_l"]
+      fips205.slh_verify_128s_accepts_iff: ["Classical.choice", "Quot.sound", "propext", "verify_mono.oracle.f", "verify_mono.oracle.h", "verify_mono.oracle.h_msg", "verify_mono.oracle.t_l", "verify_mono.oracle.t_len"]
+      fips205.to_byte_loop_eq: ["Classical.choice", "Quot.sound", "propext"]
+      fips205.to_int_loop_eq: ["Classical.choice", "Quot.sound", "propext"]
+      fips205.wots_csum_loop_eq: ["Classical.choice", "Quot.sound", "propext"]
+      fips205.wots_loop1_eq: ["Classical.choice", "Quot.sound", "propext", "verify_mono.oracle.f"]
+      fips205.xmss_loop_eq: ["Classical.choice", "Quot.sound", "propext", "verify_mono.oracle.h"]
