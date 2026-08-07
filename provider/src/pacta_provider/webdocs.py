@@ -50,7 +50,7 @@ def _leaf_ok(entry: LogEntry) -> bool:
     )
 
 
-def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str) -> str:
+def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str, head_label: str = "Ed25519") -> str:
     """The accumulator, drawn from its real leaves."""
     if not entries:
         return "<p class='muted'>(log is empty)</p>"
@@ -94,7 +94,7 @@ def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str) -> s
                         out.append(f'<line x1="{x}" y1="{y+15}" x2="{cx}" y2="{cy-22 if level_index==1 else cy-15}" stroke="#ccc"/>')
     root_x, root_y = positions[(len(levels) - 1, 0)]
     out.append(f'<rect x="{root_x-190}" y="{root_y-72}" width="380" height="34" rx="6" fill="#e2f2e9" stroke="#1e7f4f" stroke-width="1.6"/>')
-    out.append(f'<text x="{root_x}" y="{root_y-58}" text-anchor="middle" fill="#1e7f4f" font-weight="bold">Signed Tree Head — Ed25519({root_hex[:12]}…)</text>')
+    out.append(f'<text x="{root_x}" y="{root_y-58}" text-anchor="middle" fill="#1e7f4f" font-weight="bold">Signed Tree Head — {escape(head_label)}({root_hex[:12]}…)</text>')
     out.append(f'<text x="{root_x}" y="{root_y-46}" text-anchor="middle" fill="#1e7f4f" font-size="9">signed by: {escape(signing_backend)} (the proof-attested library itself)</text>')
     out.append(f'<line x1="{root_x}" y1="{root_y-38}" x2="{root_x}" y2="{root_y-15}" stroke="#1e7f4f" stroke-width="1.4"/>')
     out.append("</svg>")
@@ -114,6 +114,28 @@ def _trust_anchor_html(log: TransparencyLog, metadata: dict[str, Any], base: str
             f'<a href="{mirror}/blob/main/provider.ed25519.pub">mirror</a> instead.</div>'
         )
     pem = escape(key_path.read_text(encoding="utf-8").strip())
+    # The SLH-DSA verification key (additive post-quantum head signature,
+    # 2026-08) is published THE SAME WAY: full PEM on the page, raw endpoint,
+    # mirror comparison. Heads before tree 14 carry no SLH-DSA signature and
+    # verify.py reports them ABSENT — allowed; an append-only log keeps its
+    # history.
+    slh_path = log.log_dir / "provider.slhdsa.pub"
+    if slh_path.is_file():
+        import hashlib as _h
+        slh_pem = escape(slh_path.read_text(encoding="utf-8").strip())
+        slh_fp = _h.sha256(slh_path.read_bytes()).hexdigest()
+        slh_block = f"""<hr style="border:none;border-top:1px solid #ddd;margin:.8rem 0">
+<p style="margin-top:0"><strong>Second, additive anchor — post-quantum.</strong> Heads from
+tree&nbsp;14 on additionally carry a deterministic <strong>SLH-DSA-SHA2-128s</strong> (FIPS&nbsp;205)
+signature over the same payload. The Ed25519 signature above remains the one every consumer must
+check; this one is checked where tooling allows (OpenSSL&nbsp;≥&nbsp;3.5). Its verify path is the
+proof subject of leaf&nbsp;18.</p>
+<pre style="margin-bottom:.4rem">{slh_pem}</pre>
+<p class="muted" style="margin:.2rem 0 0">SHA-256 fingerprint <code>{slh_fp}</code>
+&nbsp;·&nbsp; raw: <a href="{base}/log-slhdsa-public-key"><code>{base or ''}/log-slhdsa-public-key</code></a>
+&nbsp;·&nbsp; mirror: <a href="{mirror}/blob/main/provider.slhdsa.pub">provider.slhdsa.pub</a></p>"""
+    else:
+        slh_block = ""
     return f"""<div class="card">
 <p style="margin-top:0">This key is the <strong>sole cryptographic identity anchor</strong>: it
 authenticates that these statements were made by the operator. It does not, by itself, make
@@ -126,7 +148,7 @@ Pin it, and compare this copy byte-for-byte with the independently hosted
 <p class="muted" style="margin:.2rem 0 0">SHA-256 fingerprint <code>{escape(fingerprint)}</code>
 &nbsp;·&nbsp; raw: <a href="{base}/log-public-key"><code>{base or ''}/log-public-key</code></a>
 &nbsp;·&nbsp; <code>curl -s ltl.zkdefi.org/log-public-key</code></p>
-</div>"""
+{slh_block}</div>"""
 
 
 def render_docs(log: TransparencyLog, base_path: str) -> str:
@@ -161,7 +183,9 @@ def render_docs(log: TransparencyLog, base_path: str) -> str:
         f"<td><span class='pill ok'>{escape(_counts(newest[c]))}</span></td></tr>"
         for c in components
     )
-    tree_svg = _svg_tree(entries, str(latest.get("root_hash", "")), signing_backend)
+    slh_signed = ((latest.get("signatures") or {}).get("slh_dsa") or {}).get("status") == "signed"
+    head_label = "Ed25519 + SLH-DSA" if slh_signed else "Ed25519"
+    tree_svg = _svg_tree(entries, str(latest.get("root_hash", "")), signing_backend, head_label)
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -176,7 +200,8 @@ def render_docs(log: TransparencyLog, base_path: str) -> str:
 accumulator of <em>signed statements that the Lean&nbsp;4 formal proofs of specific
 cryptographic Rust libraries, at specific git commits, machine-re-check with exactly
 their documented assumptions</em> — so that you can trust a proof result by checking
-<strong>one signature and ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes in
+<strong>one required signature (Ed25519; heads from tree&nbsp;14 add an additive post-quantum
+SLH-DSA signature) and ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes in
 milliseconds</strong>, instead of running a theorem prover for hours.</p>
 
 <h2>The trust anchor — pin this key</h2>
@@ -216,11 +241,12 @@ which observed axiom cones, what machine protection — signed by the provider.<
 <td>table above, or <a href="{mirror}">mirror</a> <code>entries/</code></td></tr>
 <tr><td><b>3</b></td><td><code>&lt;library&gt;.receipt.json</code></td>
 <td><strong>The proof of inclusion.</strong> Binds artifact&nbsp;2 into the signed tree:
-leaf index, sibling hashes, the Signed Tree Head. ~25 lines of stdlib Python verify it.</td>
+leaf index, sibling hashes, the Signed Tree Head. ~25 lines of Python verify it (stdlib hashing; signature checks shell out to the <code>openssl</code> binary).</td>
 <td>table above, or <a href="{mirror}">mirror</a> <code>receipts/</code></td></tr>
 <tr><td>+</td><td>the full mirror clone</td>
 <td><strong>Maximal benefit: become a witness.</strong> Every leaf + every signed head
-ever issued + <code>verify.py</code> (stdlib-only). <code>python3 verify.py --all</code>
+ever issued + <code>verify.py</code> (Python stdlib + the <code>openssl</code> binary for
+signatures; fails closed without them). <code>python3 verify.py --all</code>
 recomputes the entire tree and every historical head — you then hold a retained view that can
 later EXPOSE a conflicting head shown to someone else. (A single clone cannot by itself prove the
 log never split its view toward another consumer; that requires comparing heads across
@@ -292,18 +318,38 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 23 pages, v0.9) — the trust decomposition (expensive verification produces an
+(PDF, 23 pages, v0.9 — <strong>frozen while under journal review</strong>; it describes the
+log as of its 16&nbsp;July&nbsp;2026 snapshot) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
 accountability GAMES with an explicit composition theorem (head authenticity, position
 binding, history binding with a fully proved prefix-transport induction, context-scoped
 fork evidence — all discharged by named reductions), the policy boundary where
-operator labels can veto but never grant acceptance, the live thirteen-leaf deployment
+operator labels can veto but never grant acceptance, the then-thirteen-leaf deployment
 whose entry 13 attests the accumulator's own mechanized model, and the measured
 model/deployment divergence (3,867 lied-size cases, every one accepted only by the
 deployed verifier) reported as a result rather than hidden.
 <span class="muted">Previous versions: <a href="{base}/paper/v0.2">v0.2</a> (19 pages, the
 system report) · <a href="{base}/paper/v0.1">v0.1</a> (4 pages).</span></div>
+
+<div class="card"><strong>Reading the paper against today's log.</strong> The paper is frozen
+under review; the log is append-only and has kept moving. Nothing the paper describes was
+altered, so every number in it remains checkable against the live history: the thirteen leaves
+it analyses are still leaves 0–12, byte-identical, and the head it pins (tree&nbsp;13, root
+<code>3488a2d0…</code>) is still head&nbsp;#5 of <code>sth-history.jsonl</code> —
+<code>python3 verify.py --all</code> re-verifies the paper-era prefix together with everything
+after it. What has moved since the snapshot is additive: leaves&nbsp;13–16 re-attest the four
+Ed25519 libraries at 44 certificates each (the paper's sixteen-certificate corpora describe the
+leaf&nbsp;8–11 generation, which those leaves still record); leaf&nbsp;17 re-attests the
+accumulator's mechanized model at its hardened state; and leaf&nbsp;18 is the log's first
+post-quantum subject, the SLH-DSA-SHA2-128s verify path. Heads from tree&nbsp;14 on carry an
+additive SLH-DSA signature beside the Ed25519 signature the paper describes; earlier heads have
+none, by design, and the verifier reports them as <code>ABSENT</code> rather than failing them.
+One result has changed in the good direction: the 3,867-case model/deployment divergence the
+paper honestly reports was closed on 23&nbsp;July&nbsp;2026 (the <code>sn==0</code> fix); the
+current pinned divergence count is 0, and both the divergence and its fix are part of the
+retained record. Where the paper and the live log disagree on a number, the paper is describing
+its snapshot — and the log's history contains that snapshot, unchanged, inside it.</div>
 
 <p class="muted">Log heads are signed offline; this service is read-only and holds no
 key material. Provider tooling, agent tooling, and the full course (12 Jupyter
