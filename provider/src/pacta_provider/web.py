@@ -235,7 +235,7 @@ def serve(
         docs_html = render_docs(log, base_path)
     paper_dir = Path(__file__).resolve().parents[3] / "paper"
     variants = {
-        "current": paper_dir / "ltl.pdf",       # v0.3 reinvention, the live one
+        "current": paper_dir / "ltl.pdf",       # v0.9 submitted version, under review
         "v0.1": paper_dir / "ltl-v0.1.pdf",     # prior 4-page version
         "v0.2": paper_dir / "ltl-v0.2.pdf",     # prior 19-page system report
     }
