@@ -1,8 +1,13 @@
 # Which file is current?
 
-**`ltl.pdf` / `ltl.tex` — the current paper.** This is the version
-submitted to the journal on 2026-07-17 and now frozen during review; the
-live copy served at <https://ltl.zkdefi.org/paper> is byte-identical.
+**`ltl.pdf` / `ltl.tex` — the current paper (v0.10, revised August 2026).**
+The review process concluded in August 2026; this revision folds in the
+corrections queued during the freeze (certificate-count update, the
+closed consistency-verifier divergence with its `sn = 0` root cause, a
+replay-harness-integrity limitation, and an added claim-matrix row). The
+version submitted for review (July 17, 2026, sha256 `7f140356…`) is
+preserved unchanged in this repository's git history. The live copy at
+<https://ltl.zkdefi.org/paper> serves the current revision.
 
 The other files are kept as honest history, not as reading material:
 

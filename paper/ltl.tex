@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026}
+\date{July 2026 \\ {\normalsize Revised: August 2026}}
 
 \begin{document}
 \maketitle
@@ -174,7 +174,11 @@ verifier and the recursive model proved in Lean are not extensionally equal:
 there are malformed size/root combinations accepted only by the deployed
 verifier. We characterize 3,867 divergences in 73,573 pinned boundary tests
 --- every one deployed-accepts-only --- and scope the public attestation
-accordingly.
+accordingly. (Post-submission closure, July 2026: the divergence was traced to
+the deployed verifier omitting RFC~9162 \S2.1.4.2 Step~7's terminal
+$sn=0$ condition; restoring that one conjunct removes every divergence in the
+pinned family, confirmed by a three-way regression against an independent
+faithful RFC transliteration.)
 \end{enumerate}
 
 \paragraph{Non-claims.}
@@ -375,7 +379,8 @@ EUF-CMA security of the head-signature scheme, and correct initial acquisition
 of the operator public key.
 
 The model deliberately does not cryptographically exclude fabricated kernel
-observations. That is a statement about a physical execution on the operator's
+observations; the same holds when the operator's replay harness is defective
+rather than dishonest. That is a statement about a physical execution on the operator's
 machine. The mechanism instead makes the claimed execution target precise
 enough for a third party to replay.
 
@@ -621,6 +626,10 @@ reconstruction with the supplied old root and consults the size claims only as
 bit-navigation state, so several distinct old-size claims navigate one proof
 identically. In 73,573 lied-size boundary cases, 3,867 divergences were
 observed; all were one-sided (deployed accepts, recursive model rejects).
+The root cause was later identified and closed: the deployed loop omitted
+RFC~9162 \S2.1.4.2 Step~7's terminal $sn=0$ condition; with the conjunct
+restored the pinned family shows zero divergences (three-way regression:
+deployed verifier, recursive model, independent RFC transliteration).
 
 The intended consumer flow binds $(n_0,r_0)$ in local persistent state and
 binds $(n_1,r_1)$ together in a signed head. The present corpus does not prove
@@ -1045,7 +1054,9 @@ for a large class of safe Rust programs~\cite{aeneas}. A recent independent
 experience report likewise applies a Rust-to-Lean pipeline to cryptographic
 code~\cite{klaus2026}.
 
-Each fork's corpus contains sixteen reviewed certificates covering:
+Each fork's corpus contained sixteen reviewed certificates at the
+historical leaves studied here (the corpora have since grown to forty-four
+per fork --- the log records both generations as separate leaves), covering:
 \begin{itemize}[leftmargin=1.6em,itemsep=2pt]
 \item five-limb field arithmetic over $\Fp$ with value and bound preservation;
 \item complete twisted-Edwards group operations~\cite{edwards,twisted};
@@ -1224,7 +1235,9 @@ stable regression boundary.
 
 \begin{remark}[Model/deployment seam]
 For malformed size claims, the deployed iterative verifier and the recursive
-model are not extensionally equal. In all 3,867 divergences observed across
+model are not extensionally equal (figures are the pre-closure measurement;
+the $sn=0$ restoration reduces the divergence count in this family to zero).
+In all 3,867 divergences observed across
 the pinned families the deployed verifier accepted and the model rejected; the
 reverse direction was not observed, and no global inclusion relation between
 the two acceptance sets is claimed.
@@ -1306,6 +1319,14 @@ with their closure options; this section groups the load-bearing ones.
 A malicious operator can fabricate a replay report. Signatures and Merkle
 proofs make the lie attributable and persistent; they do not make it true.
 Targeted independent replay is the corrective mechanism.
+
+\paragraph{Replay-harness integrity.}
+A wrong observation needs no malice: a defective replay harness --- a bug in
+the audit driver, a fail-open guard, a truncated transcript --- produces the
+same evidentiary damage as a dishonest operator, with the same accountability
+answer (the record is attributable and persistent; independent replay corrects
+it). The subject corpus's adversarial gate self-tests exist for exactly this
+reason and reduce, but cannot eliminate, the exposure.
 
 \paragraph{Theorem identity.}
 Names and repository commits are not canonical semantic identifiers, and
@@ -1494,6 +1515,7 @@ Equal-size unequal roots in one log context conflict & two valid signatures & co
 Observed cone matches local boundary policy & exact set equality & semantic identity of named declarations \\
 Operator claims the kernel produced the observation & attestation signature and leaf inclusion & correct provider key; EUF-CMA \\
 Kernel actually produced the recorded observation & not cryptographically established; independently checkable by replay & operator and replay-pipeline honesty, or faithful independent replay \\
+Recorded cone was produced by an audit that performed its checks & not established --- the audit driver is itself part of the replay pipeline & audit-gate integrity; adversarial gate self-tests reduce this exposure, they do not eliminate it \\
 Source corresponds to deployed binary & not established & reproducible build and compiler assurance \\
 Claimed signer implementation produced STH & not established & execution provenance \\
 \bottomrule
