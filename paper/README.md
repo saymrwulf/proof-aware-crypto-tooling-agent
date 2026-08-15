@@ -9,12 +9,9 @@ version submitted for review (July 17, 2026, sha256 `7f140356…`) is
 preserved unchanged in this repository's git history. The live copy at
 <https://ltl.zkdefi.org/paper> serves the current revision.
 
-The other files are kept as honest history, not as reading material:
-
-| File | What it is |
-|---|---|
-| `ltl-v0.1.pdf` / `.tex` | early 4-page draft (July 2026), superseded |
-| `ltl-v0.2.pdf` / `.tex` | 19-page system-report draft, superseded by a full rewrite |
+Superseded early drafts (v0.1, v0.2) were removed from the working tree
+on 2026-08-15; like every prior state of this folder, they remain
+retrievable from this repository's git history.
 
 Revisions v0.3–v0.9 were successive overwrites of `ltl.tex`; they live in
 this repository's git history. v0.9 is the submitted version — the

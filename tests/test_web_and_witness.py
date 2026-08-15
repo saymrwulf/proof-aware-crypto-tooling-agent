@@ -63,16 +63,16 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
         with urllib.request.urlopen(base + "/paper", timeout=10) as r:
             assert r.headers["Content-Type"] == "application/pdf"
             assert r.read(5) == b"%PDF-"
-        # the prior paper version stays reachable for citability
-        for path in ("/paper/ltl.pdf", "/paper/v0.1"):
-            with urllib.request.urlopen(base + path, timeout=10) as r:
-                assert r.read(5) == b"%PDF-", path
-        # the removed pseudonymous version must be gone entirely
-        try:
-            urllib.request.urlopen(base + "/paper/v0.0", timeout=10)
-            raise AssertionError("expected 404 for removed /paper/v0.0")
-        except urllib.error.HTTPError as exc:
-            assert exc.code == 404
+        with urllib.request.urlopen(base + "/paper/ltl.pdf", timeout=10) as r:
+            assert r.read(5) == b"%PDF-"
+        # superseded drafts were retired from the site 2026-08-15 (git
+        # history retains them); every old variant route must 404
+        for gone in ("/paper/v0.0", "/paper/v0.1", "/paper/v0.2"):
+            try:
+                urllib.request.urlopen(base + gone, timeout=10)
+                raise AssertionError(f"expected 404 for retired {gone}")
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 404, gone
         # the site's copy of the trust anchor (TOFU: two independent locations)
         with urllib.request.urlopen(base + "/log-public-key", timeout=10) as r:
             assert r.read() == (tmp_path / "k.pub").read_bytes()

@@ -45,17 +45,11 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
 
             if route in ("/", "/docs"):
                 self._send_html(docs_html)
-            elif route in ("/paper", "/paper/ltl.pdf",
-                           "/paper/v0.1", "/paper/v0.1/ltl.pdf",
-                           "/paper/v0.2", "/paper/v0.2/ltl.pdf"):
-                # /paper is the current paper; /paper/v0.N are prior versions,
-                # preserved for citability, linked from the docs page.
-                variant = "current"
-                if route.startswith("/paper/v0.1"):
-                    variant = "v0.1"
-                elif route.startswith("/paper/v0.2"):
-                    variant = "v0.2"
-                body = paper_pdfs.get(variant)
+            elif route in ("/paper", "/paper/ltl.pdf"):
+                # /paper serves the current paper only (v0.10, revised
+                # August 2026). Superseded drafts were retired from the
+                # site 2026-08-15; git history retains them.
+                body = paper_pdfs.get("current")
                 if body is None:
                     self._send(404, {"error": f"paper ({variant}) not available on this deployment"})
                     return
@@ -235,9 +229,7 @@ def serve(
         docs_html = render_docs(log, base_path)
     paper_dir = Path(__file__).resolve().parents[3] / "paper"
     variants = {
-        "current": paper_dir / "ltl.pdf",       # v0.9 submitted version, under review
-        "v0.1": paper_dir / "ltl-v0.1.pdf",     # prior 4-page version
-        "v0.2": paper_dir / "ltl-v0.2.pdf",     # prior 19-page system report
+        "current": paper_dir / "ltl.pdf",       # v0.10, revised August 2026
     }
     paper_pdfs = {name: p.read_bytes() for name, p in variants.items() if p.is_file()}
     handler = make_handler(log, base_path, docs_html, paper_pdfs)

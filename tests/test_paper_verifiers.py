@@ -1,5 +1,5 @@
 """Historical regression pin from the archived v0.2 system report
-(hosted at /paper/v0.2), which cited these exact differential-testing
+(retrievable from paper/ git history; retired from the site 2026-08-15), which cited these exact differential-testing
 counts (164,479 inclusion; 164,224 consistency) for its recursive forms
 against the deployed iterative RFC 9162 verifiers over these families.
 The CURRENT paper makes no extensional-equality claim: it cites the

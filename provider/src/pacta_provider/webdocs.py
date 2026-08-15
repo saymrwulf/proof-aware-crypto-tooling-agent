@@ -318,40 +318,27 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 23 pages, v0.9 — <strong>frozen while under journal review</strong>; it describes the
-log as of its 16&nbsp;July&nbsp;2026 snapshot) — the trust decomposition (expensive verification produces an
+(PDF, 23 pages, <strong>v0.10 — revised August&nbsp;2026</strong>; the version is printed on the
+title page) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
 accountability GAMES with an explicit composition theorem (head authenticity, position
 binding, history binding with a fully proved prefix-transport induction, context-scoped
 fork evidence — all discharged by named reductions), the policy boundary where
-operator labels can veto but never grant acceptance, the then-thirteen-leaf deployment
-whose entry 13 attests the accumulator's own mechanized model, and the measured
-model/deployment divergence (3,867 lied-size cases, every one accepted only by the
-deployed verifier) reported as a result rather than hidden.
-<span class="muted">Previous versions: <a href="{base}/paper/v0.2">v0.2</a> (19 pages, the
-system report) · <a href="{base}/paper/v0.1">v0.1</a> (4 pages).</span></div>
+operator labels can veto but never grant acceptance, and the measured model/deployment
+divergence reported as a result rather than hidden — now together with its closure: the
+divergence traced to one omitted RFC&nbsp;9162 conjunct (Step&nbsp;7's <code>sn&nbsp;=&nbsp;0</code>),
+zero divergences after the one-line restoration, confirmed by a three-way regression.</div>
 
-<div class="card"><strong>Reading the paper against today's log.</strong> The paper is frozen
-under review; the log is append-only and has kept moving. Nothing the paper describes was
-altered, so every number in it remains checkable against the live history: the thirteen leaves
-it analyses are still leaves 0–12, byte-identical, and the head it pins (tree&nbsp;13, root
-<code>3488a2d0…</code>) is still head&nbsp;#5 of <code>sth-history.jsonl</code> —
+<div class="card"><strong>The paper's snapshot vs. today's log.</strong> The paper analyses
+the log's 16&nbsp;July&nbsp;2026 snapshot — thirteen leaves, still leaves&nbsp;0–12 today,
+byte-identical, its pinned head still head&nbsp;#5 of <code>sth-history.jsonl</code>. Everything
+since is additive: the four Ed25519 corpora re-attested at 44 certificates each
+(leaves&nbsp;13–16), the accumulator's hardened model (leaf&nbsp;17), the first post-quantum
+subject (leaf&nbsp;18), and dual-signed heads from tree&nbsp;14 on.
 <code>python3 verify.py --all</code> re-verifies the paper-era prefix together with everything
-after it. What has moved since the snapshot is additive: leaves&nbsp;13–16 re-attest the four
-Ed25519 libraries at 44 certificates each (the paper's sixteen-certificate corpora describe the
-leaf&nbsp;8–11 generation, which those leaves still record); leaf&nbsp;17 re-attests the
-accumulator's mechanized model at its hardened state; and leaf&nbsp;18 is the log's first
-post-quantum subject, the SLH-DSA-SHA2-128s verify path. Heads from tree&nbsp;14 on carry an
-additive SLH-DSA signature beside the Ed25519 signature the paper describes; earlier heads have
-none, by design, and the verifier reports them as <code>ABSENT</code> rather than failing them.
-One result has changed in the good direction: the 3,867-case model/deployment divergence the
-paper honestly reports was closed on 23&nbsp;July&nbsp;2026 (the <code>sn==0</code> fix); the
-current pinned divergence count is 0, and both the divergence and its fix are part of the
-retained record. Where the paper and the live log disagree on a number, the paper is describing
-its snapshot — and the log's history contains that snapshot, unchanged, inside it.</div>
+after it.</div>
 
 <p class="muted">Log heads are signed offline; this service is read-only and holds no
-key material. Provider tooling, agent tooling, and the full course (12 Jupyter
-lectures) live in the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a>.</p>
+key material. Provider tooling, agent tooling, and the full Jupyter course live in the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a>.</p>
 </body></html>"""
