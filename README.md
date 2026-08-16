@@ -324,7 +324,9 @@ The log has three synchronized faces, transport being orthogonal to trust:
 2. **Git mirror** ([saymrwulf/lean-transparency-log](https://github.com/saymrwulf/lean-transparency-log), mirrored on Forgejo):
    every leaf, every signed tree head (the WITNESS CHANNEL - all cloners
    see the same heads), per-component receipts, the provider public key,
-   and a standalone stdlib-only `verify.py`. Anyone: `python3 verify.py --all`.
+   and a standalone `verify.py` (Python stdlib + the system `openssl`
+   binary; fails closed without it). Anyone, from inside a clone:
+   `python3 verify.py --all`.
 3. **HTTP service** (deployed at `ltl.zkdefi.org`, see
    `DEPLOY.md`): read-only CT-style endpoints + customer docs. The web
    process never touches private keys - heads are signed offline; a

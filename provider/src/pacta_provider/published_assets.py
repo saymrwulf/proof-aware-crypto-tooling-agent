@@ -498,7 +498,7 @@ This repository is the **git-published face** of a transparency log of
 formal-verification attestations: signed statements that the Lean 4 proofs
 of specific software, at specific git commits, re-check with exactly their
 documented assumptions. Its first twelve leaves attest four cryptographic
-Rust libraries (Ed25519 implementations); as of **entry 13 (2026-07-16)**
+Rust libraries (Ed25519 implementations); as of **its thirteenth entry (leaf index 12, 2026-07-16)**
 the log also attests **its own accumulator machinery** — a kernel-checked
 mechanization of the log's security analysis, so the log carries
 kernel-checked proofs *about the accumulator model* underlying its own
@@ -506,7 +506,7 @@ inclusion and consistency reasoning, as one of its own entries (subject
 [`ltl-accumulator-verified`](https://github.com/saymrwulf/ltl-accumulator-verified);
 scoped to the mechanized model — it does not prove operator honesty,
 signing, or execution provenance). As of **2026-08** the log also attests
-the **SLH-DSA (FIPS 205) verify-path proofs**
+the **SLH-DSA (FIPS 205) verify-path proofs** (leaf 18)
 ([`fips205-slhdsa-verified`](https://github.com/saymrwulf/fips205-slhdsa-verified))
 and its heads carry an **additive post-quantum SLH-DSA-SHA2-128s signature**
 beside the required Ed25519 one. The current head is `latest-sth.json` —

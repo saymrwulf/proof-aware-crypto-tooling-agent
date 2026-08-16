@@ -7,10 +7,11 @@ including the two self-referential loops that make the estate hard to
 keep in one head. Maintained here in pacta because pacta is the
 machinery hub and the only repo that changes freely.
 
-State snapshot (2026-07-22): log **13 leaves**, root `3488a2d0…`, key
-fingerprint `874c8a00…`, paper **v0.9 camera-ready (23 pp)**, five
-attested components, one campaign open (SLH-DSA — **eleven
-certificates**), pacta suite 144 green.
+State snapshot (2026-08-16): log **19 leaves**, root `7ee23940…`, key
+fingerprint `874c8a00…`, heads dual-signed (Ed25519 + SLH-DSA) since
+size 14, paper **v0.11 (25 pp, revised August 2026)**, six attested
+components (SLH-DSA verify path = leaf 18, the first post-quantum
+entry), pacta suite 153 green.
 
 ```mermaid
 flowchart LR
@@ -23,20 +24,20 @@ flowchart LR
     s6["fips205-source"]
   end
   subgraph V["VERIFIED SUBJECTS"]
-    d["dalek-ed25519-verified<br/>44 certs today · attested at 16 (leaf 8 · signer source)"]
-    a["anza-ed25519-verified<br/>44 certs today · attested at 16 (leaf 9)"]
-    r["risc0-ed25519-verified<br/>44 certs today · attested at 16 (leaf 10)"]
-    b["betrusted-ed25519-verified<br/>44 certs today · attested at 16 (leaf 11)"]
+    d["dalek-ed25519-verified<br/>attested 44/44 (leaf 13 · signer source; earlier gens 0/4/8)"]
+    a["anza-ed25519-verified<br/>attested 44/44 (leaf 14; earlier gens 1/5/9)"]
+    r["risc0-ed25519-verified<br/>attested 44/44 (leaf 15; earlier gens 2/6/10)"]
+    b["betrusted-ed25519-verified<br/>attested 44/44 (leaf 16; earlier gens 3/7/11)"]
     p["pasta-pallas-verified<br/>field layer only · NOT attested"]
-    f["fips205-slhdsa-verified<br/>11 certs proven · reviewer attest-with-conditions · NOT in the log"]
-    c["ltl-accumulator-verified<br/>61 certs · entry-13 subject · frozen 172a1d0"]
+    f["fips205-slhdsa-verified<br/>11 certs proven · attested — leaf 18 (first post-quantum)"]
+    c["ltl-accumulator-verified<br/>61 certs · leaf 12 subject · re-attested leaf 17 (hardened)"]
   end
   subgraph M["MACHINERY — pacta + operator-held"]
     prov["provider service<br/>check · append · publish · site code · templates (CI-pinned)"]
     sig["dogfood signer<br/>verified-dalek binary"]
     lib["consumer library<br/>receipts · pin store · R0–R5"]
     wal["warden (code)<br/>quorum wallet · MCP · cockpit (local, read-only)"]
-    pap["paper<br/>v0.9 + v0.1/v0.2 archives"]
+    pap["paper<br/>v0.11 (archives in git history)"]
     crs["course + llms.txt<br/>14 notebooks"]
     key["SIGNING KEY (offline)"]
     ops["operational log state<br/>the true accumulator"]
@@ -81,7 +82,7 @@ flowchart LR
   d ==>|"LOOP 1: built from"| sig
   sig ==>|"LOOP 1: signs the log"| ops
   mir ==>|"LOOP 1: contains the signer's own attestation (leaf 8)"| d
-  c ==>|"LOOP 2: attested as entry 13"| prov
+  c ==>|"LOOP 2: attested as leaf 12 (13th entry)"| prov
   mir ==>|"LOOP 2: carries proofs about its own accumulator"| c
   classDef src fill:#f1f3f5,stroke:#8a93a0,color:#1c2430
   classDef sub fill:#e2f2e9,stroke:#1e7f4f,color:#1c2430
@@ -110,7 +111,7 @@ paper says so explicitly.)
 **Loop 2 — the self-attestation.** `ltl-accumulator-verified` is a Lean
 corpus proving soundness of the log's own accumulator *model*
 (extractors, consistency binding, per-step pin safety). It was attested
-into the log as **entry 13** — the log carries kernel-checked proofs
+into the log as **leaf 12** (the log's thirteenth entry) — the log carries kernel-checked proofs
 about its own machinery, scoped honestly (recursive model, not the
 deployed verifier; see the corpus KNOWN-GAPS ledger).
 
@@ -120,10 +121,10 @@ deployed verifier; see the corpus KNOWN-GAPS ledger).
 |---|---|---|---|
 | `curve25519-dalek-source`, `anza-cryptography-source`, `risc0-…-source`, `betrusted-…-source`, `pasta_curves-source` (+ `xous-core`, `litex-boards` context) | upstream | pinned inputs to extraction | **frozen — never modified** |
 | `fips205-source` | upstream | verbatim snapshot of `integritychain/fips205` (pure-Rust FIPS 205 / SLH-DSA); upstream pin `30bac08`, snapshot head `a3ce8e8` — deviations: CI workflows stripped + the documented Aeneas-compat/de-plumbing patch series (each commit individually justified) | pinned; moves only for transparent, individually-justified Aeneas-compat patches (nothing proposed upstream) |
-| `dalek-` / `anza-` / `risc0-` / `betrusted-ed25519-verified` | subject | Rust source + Lean proofs; 44 certs each today (27 main + 4 apex + 13 scalar; 16 at the leaf 8–11 attestations, generations at 0–7) | attested commits fixed; branches carry substantial post-attestation proof work (scalar layer, apex tier, hardening rounds), staged for re-attestation |
+| `dalek-` / `anza-` / `risc0-` / `betrusted-ed25519-verified` | subject | Rust source + Lean proofs; 44 certs each, attested 44/44 as leaves 13–16 (2026-08-08); earlier 16-cert generations at leaves 8–11, first generations at 0–7 | attested commits fixed |
 | `pasta-pallas-verified` | subject | field layer proven; curve layer pending; **not attested** | changes freely |
-| `fips205-slhdsa-verified` | subject | SLH-DSA (FIPS 205) verify-path campaign, parameter set SLH-DSA-SHA2-128s; **11 certificates proven, `check.sh` green with an 18-attack self-test, outside-reviewer attest-with-conditions**; not appended to the log | changes freely — campaign |
-| `ltl-accumulator-verified` | subject | 61-cert corpus about the log's accumulator model; **entry-13 subject**, frozen `172a1d0` | frozen; doc-only commits allowed |
+| `fips205-slhdsa-verified` | subject | SLH-DSA (FIPS 205) verify-path campaign, parameter set SLH-DSA-SHA2-128s; **11 certificates proven, `check.sh` green with an 18-attack self-test**; attested — leaf 18 (2026-08-08), the log's first post-quantum entry | attested commit fixed |
+| `ltl-accumulator-verified` | subject | 61-cert corpus about the log's accumulator model; **leaf 12 subject**, frozen `172a1d0`; hardened model re-attested as leaf 17 (2026-08-08) | frozen; doc-only commits allowed |
 | `proof-aware-crypto-tooling-agent` (this repo) | machinery | provider service, consumer library, warden (+ local read-only cockpit), dogfood signer, paper, course, tests | **changes freely — the hub** |
 | `lean-transparency-log` | published | the public mirror: leaves, heads, receipts, fail-closed `verify.py` + selftest | **generated by publish** — canonical files here, templates in pacta, CI-pinned |
 | `verifying-crypto-with-lean` | published | undergraduate book; zero coupling to log state | changes freely |

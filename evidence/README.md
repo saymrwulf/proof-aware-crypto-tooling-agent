@@ -17,10 +17,11 @@ today's full state.
 | `log-metadata.json`, `latest-sth.yaml` | Log identity and the Signed Tree Head at capture time (tree size 8) |
 | `log-audit.txt` | Monitor self-check output (recomputed root matches the signed root) |
 
-The log holds EIGHT leaves: entries 0-3 are the first run's attestations,
+At the time of this capture (2026-07) the log held eight leaves: entries 0-3 are the first run's attestations,
 which honestly record an AUDIT FAILURE (two bugs in pacta's audit step,
-since fixed - see the commit history); entries 4-7 are the definitive
-16/16-proven attestations. An append-only trust ledger keeps its bad day.
+since fixed - see the commit history); entries 4-7 are that run's
+16/16-proven attestations (the forks were later re-attested at 44/44 as
+leaves 13-16; the live log now holds nineteen leaves). An append-only trust ledger keeps its bad day.
 
 Re-verify everything yourself (signature via the proven-path verifier if
 built, STH pinning, freshness):

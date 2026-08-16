@@ -705,7 +705,7 @@ tripwire that screams when the map forks from itself.
     Ed25519 implementation that is itself verified and attested *inside the
     log it signs* (leaf 8). The tool guards the evidence; the evidence
     covers the tool.
-  - **Loop 2, the self-attesting mechanization:** entry 13 of the log is the
+  - **Loop 2, the self-attesting mechanization:** leaf 12 of the log (its thirteenth entry) is the
     kernel-checked mechanization of the very soundness arguments the log's
     accumulator relies on. The proofs about the machinery live inside the
     ledger the machinery protects — scoped honestly, with a published list
@@ -975,7 +975,7 @@ boolean.
 
 **6.1** Loop 1: the log's signing machinery runs on an Ed25519
 implementation that is itself verified and attested inside the log it
-signs (leaf 8). Loop 2: entry 13 is the kernel-checked mechanization of
+signs (leaf 8). Loop 2: leaf 12 is the kernel-checked mechanization of
 the accumulator arguments the log itself relies on — the proofs about the
 machinery live in the ledger the machinery protects.
 **6.2** Because "what is running" is invisible from any single machine and

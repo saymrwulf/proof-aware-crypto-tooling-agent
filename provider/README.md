@@ -2,7 +2,7 @@
 
 This nested project is a prototype third-party proof-checking service. It reuses host Lean/Aeneas infrastructure, runs portable PACTA replay/audit checks, and emits signed attestation certificates.
 
-It does not modify anything outside this repository. It may read configured toolchains such as `/Users/oho/GitClone/ClaudeCodeProjects/your-lean-project/aeneas-toolchain/env.sh`.
+It does not modify anything outside this repository. It may read configured toolchains such as `~/aeneas-toolchain/env.sh`.
 
 It can also maintain a local transparency log. The log is an RFC 9162-style Merkle accumulator over signed attestations. It emits Signed Tree Heads with Ed25519 today; heads are dual-sign capable with an additive SLH-DSA-SHA2-128s slot (proven verify path), and the ML-DSA/FIPS 204 slot stays honestly `not_configured`/`unavailable` — never silently filled. Agents that require both signatures must reject such receipts.
 

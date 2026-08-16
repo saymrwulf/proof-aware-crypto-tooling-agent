@@ -68,14 +68,14 @@ return old_hash == old_root_hash and new_hash == new_root_hash and sn == 0
 
 This defect is the corpus's Known Gap 14: the project's own fidelity harness
 **found** the divergence (3,867 deployed-accepts-only cases in a pinned
-73,573-case family) and recorded it in public log entry 13. What the two-way
+73,573-case family) and recorded it in public log leaf 12 (the thirteenth entry). What the two-way
 harness could not do was assign blame — with only the deployed verifier and the
 Lean model disagreeing, and both labelled "RFC 9162", the divergence was filed
 as a scoped gap rather than a conformance bug. A post-appeal review round added
 the missing third oracle (a faithful RFC verifier), which showed the deployed
 side was the deviant one, and traced it to the omitted Step 7.
 
-Public log entry 13 and the attested accumulator commit are unchanged: the
+Public log leaf 12 and the attested accumulator commit are unchanged: the
 historical experiment remains truthfully recorded and reproducible at the
 tagged pre-fix commit. The IACR submission PDF is unchanged. The corpus
 Known-Gaps ledger records this closure.
