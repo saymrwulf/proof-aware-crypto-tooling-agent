@@ -212,12 +212,12 @@ The log uses:
 
 The deployed instance ([ltl.zkdefi.org](https://ltl.zkdefi.org),
 mirror [`lean-transparency-log`](https://github.com/saymrwulf/lean-transparency-log))
-is live at **19 leaves** (2026-08-08). Entry 12 (2026-07-16) attests the log's own
+is live at **19 leaves** (2026-08-08). Leaf 12 (2026-07-16) attests the log's own
 accumulator machinery — a kernel-checked mechanization of the log's
 security analysis ([`ltl-accumulator-verified`](https://github.com/saymrwulf/ltl-accumulator-verified)),
 appended into the log itself and scoped to the mechanized model; entries
-13–16 re-attest the four Ed25519 forks at 44 certificates each, entry 17
-the accumulator's hardened model, and entry 18 the SLH-DSA verify path —
+13–16 re-attest the four Ed25519 forks at 44 certificates each, leaf 17
+the accumulator's hardened model, and leaf 18 the SLH-DSA verify path —
 the log's first post-quantum entry. The
 producer path that generated it now emits a `scope` block into each leaf
 (guarantees / exclusions / deployment-constraints), so a leaf carries its

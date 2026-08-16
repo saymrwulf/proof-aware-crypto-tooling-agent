@@ -48,7 +48,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.11}}
+\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.12}}
 
 \begin{document}
 \maketitle
@@ -146,7 +146,7 @@ The Lean Transparency Log (LTL)\footnote{The acronym collides with linear
 temporal logic~\cite{pnueli}; we note the collision once and rely on context.}
 is the complete instantiation evaluated in this paper. Its subjects are four
 Rust Ed25519 codebases with Lean~4~\cite{lean4} certificates against extracted
-models. Its thirteenth public leaf attests the Lean corpus
+models. Leaf 12 --- its thirteenth entry --- attests the Lean corpus
 that mechanizes the log's own accumulator arguments. Thus the paper's central
 claim survives replacement of Lean, Ed25519, or RFC~9162 by other components;
 what is essential is the distribution and accountability model.
@@ -171,7 +171,7 @@ identity of theorem statements.
 \item \textbf{A deployed cryptographic case study.}
 The log contains nineteen leaves: three four-fork replay generations for the
 Ed25519 codebases (the newest at 44 certificates per fork), two attestations
-of the accumulator's own Lean corpus (entry 13 carries an environment-derived
+of the accumulator's own Lean corpus (leaf 12 carries an environment-derived
 audit inventory of 222 compiled constants, 61 human-reviewed certificate
 cones, and a single uninterpreted SHA-256 axiom; leaf 17 re-attests the
 hardened state), and --- as leaf 18 --- the log's first post-quantum subject:
@@ -1051,7 +1051,7 @@ operator as first-class adversary, policy separation added.
 
 \begin{remark}[What is mechanized, what is not]\label{rem:gamescope}
 The games are stated for the scheme's specified verifiers --- the recursive
-model whose honest-reference specializations are kernel-checked in entry~13
+model whose honest-reference specializations are kernel-checked in leaf~12
 (the named extractors and per-step pin safety). The two-transcript
 comparisons and the transport induction are paper-level proofs in the same
 discipline --- the induction reuses the corpus's mechanized
@@ -1249,7 +1249,7 @@ path. Heads are dual-signed from size 14 on.}
 
 \subsection{Mechanization coverage}
 
-Entry 13 is not a claim that the whole service is formally verified. The Lean
+Leaf 12 is not a claim that the whole service is formally verified. The Lean
 corpus covers the recursive Merkle model, inclusion completeness and
 collision-extracting soundness, the consistency extractor, and the Merkle-layer
 share of pin-store safety. The abstract root-binding lemma from the paper is
@@ -1269,7 +1269,7 @@ Inclusion & completeness and named collision extractor & collision resistance in
 Consistency & recursive-model soundness and extractor & no general consistency-completeness theorem \\
 Pinning & per-step monotonicity and prefix correctness & signature layer and multi-step closure external \\
 Deployment refinement & finite differential harness & no theorem for iterative verifier under authentic-pair invariant \\
-Policy separation & deterministic tooling logic and regression tests & not mechanized in the entry-13 corpus \\
+Policy separation & deterministic tooling logic and regression tests & not mechanized in the leaf-12 corpus \\
 Scheme-level games (\S\ref{sec:games}) & paper-level explicit reductions & two-transcript comparisons and prefix transport not mechanized \\
 \bottomrule
 \end{tabularx}
@@ -1374,7 +1374,7 @@ about their replay.
 
 \paragraph{Verification of transparency protocols.}
 Cheval et al. mechanize transparency-protocol reasoning~\cite{cheval}.
-The entry-13 corpus approaches the composition from the opposite direction: it
+The leaf-12 corpus approaches the composition from the opposite direction: it
 mechanizes accumulator arguments and then logs that replay result. The
 remaining refinement from the deployed state machine to the recursive model is
 explicitly open.
@@ -1446,7 +1446,7 @@ become attributable when compared.
 The Lean Transparency Log demonstrates the complete construction. It amortizes
 expensive replay over lightweight consumers, retains failed and superseded
 observations, and carries a scoped attestation of the accumulator's own Lean
-corpus as entry 13. Just as importantly, the mechanization and differential
+corpus as leaf 12. Just as importantly, the mechanization and differential
 harness exposed a mismatch between the recursive model and the deployed
 consistency verifier. Recording that mismatch in the public leaf is not a
 failure of the method; it is evidence that the trust decomposition is doing
@@ -1460,7 +1460,7 @@ replay attestation provides an immediate infrastructure layer while those
 stronger validity mechanisms are developed.
 
 \section*{Artifact availability}
-The live service is \url{https://ltl.zkdefi.org}. Entry 13 has leaf hash
+The live service is \url{https://ltl.zkdefi.org}. Leaf 12 (the log's thirteenth entry) has leaf hash
 \begin{center}\small\ttfamily
 8cb258d657f1fd00baaa9e0091e26c316cb69b591cb249a9543f51cade57c50a
 \end{center}
@@ -1605,8 +1605,8 @@ Claimed signer implementation produced STH & not established & execution provena
 \end{tabularx}
 \end{center}
 
-\section{Deployed entry-13 scope}\label{app:entry13}
-The thirteenth public leaf contains the following deployment constraint,
+\section{Deployed leaf-12 scope}\label{app:entry13}
+Leaf 12 contains the following deployment constraint,
 quoted verbatim, in its machine-readable scope block:
 \begin{quote}\small
 Attestation scope: this corpus kernel-checks the listed theorems about the

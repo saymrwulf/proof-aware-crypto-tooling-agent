@@ -319,7 +319,7 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 of the Jupyter c
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 25 pages, <strong>v0.11 — revised August&nbsp;2026</strong>; the version is printed on the
+(PDF, 25 pages, <strong>v0.12 — revised August&nbsp;2026</strong>; the version is printed on the
 title page) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
@@ -330,12 +330,12 @@ operator labels can veto but never grant acceptance, and the measured model/depl
 divergence reported as a result rather than hidden — now together with its closure: the
 divergence traced to one omitted RFC&nbsp;9162 conjunct (Step&nbsp;7's <code>sn&nbsp;=&nbsp;0</code>),
 zero divergences after the one-line restoration, confirmed by a three-way regression.
-New in v0.11: the deployment evaluated to its current nineteen-leaf, dual-signed state, an
+New in the August 2026 revisions: the deployment evaluated to its current nineteen-leaf, dual-signed state, an
 instantiation section for the SLH-DSA (FIPS&nbsp;205) verify path — eleven certificates,
 five uninterpreted hash oracles, exact cones — and a certificate appendix mirroring the
 Ed25519 tiers.</div>
 
-<div class="card"><strong>Paper and log, one story.</strong> Since v0.11 the paper
+<div class="card"><strong>Paper and log, one story.</strong> Since the August 2026 revisions the paper
 describes this deployment as it runs — nineteen leaves, dual-signed heads, the
 post-quantum verify path as leaf&nbsp;18 with its own certificate appendix. The log is
 append-only and keeps growing past any paper revision; every number the paper states
