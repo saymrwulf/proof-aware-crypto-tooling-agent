@@ -46,7 +46,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
             if route in ("/", "/docs"):
                 self._send_html(docs_html)
             elif route in ("/paper", "/paper/ltl.pdf"):
-                # /paper serves the current paper only (v0.10, revised
+                # /paper serves the current paper only (v0.11, revised
                 # August 2026). Superseded drafts were retired from the
                 # site 2026-08-15; git history retains them.
                 body = paper_pdfs.get("current")
@@ -229,7 +229,7 @@ def serve(
         docs_html = render_docs(log, base_path)
     paper_dir = Path(__file__).resolve().parents[3] / "paper"
     variants = {
-        "current": paper_dir / "ltl.pdf",       # v0.10, revised August 2026
+        "current": paper_dir / "ltl.pdf",       # v0.11, revised August 2026
     }
     paper_pdfs = {name: p.read_bytes() for name, p in variants.items() if p.is_file()}
     handler = make_handler(log, base_path, docs_html, paper_pdfs)

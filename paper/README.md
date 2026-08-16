@@ -16,5 +16,5 @@ on 2026-08-15; like every prior state of this folder, they remain
 retrievable from this repository's git history.
 
 Revisions v0.3–v0.9 were successive overwrites of `ltl.tex`; they live in
-this repository's git history. v0.9 is the submitted version — the
-current `ltl.pdf` above.
+this repository's git history. v0.9 is the version that was submitted
+for review; v0.10 and v0.11 supersede it.
