@@ -95,7 +95,7 @@ def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str, head
     root_x, root_y = positions[(len(levels) - 1, 0)]
     out.append(f'<rect x="{root_x-190}" y="{root_y-72}" width="380" height="34" rx="6" fill="#e2f2e9" stroke="#1e7f4f" stroke-width="1.6"/>')
     out.append(f'<text x="{root_x}" y="{root_y-58}" text-anchor="middle" fill="#1e7f4f" font-weight="bold">Signed Tree Head — {escape(head_label)}({root_hex[:12]}…)</text>')
-    out.append(f'<text x="{root_x}" y="{root_y-46}" text-anchor="middle" fill="#1e7f4f" font-size="9">signed by: {escape(signing_backend)} (the proof-attested library itself)</text>')
+    out.append(f'<text x="{root_x}" y="{root_y-46}" text-anchor="middle" fill="#1e7f4f" font-size="9">signed by: {escape(signing_backend)} (verify path attested; signing itself not proven)</text>')
     out.append(f'<line x1="{root_x}" y1="{root_y-38}" x2="{root_x}" y2="{root_y-15}" stroke="#1e7f4f" stroke-width="1.4"/>')
     out.append("</svg>")
     return "".join(out)
@@ -213,7 +213,7 @@ milliseconds</strong>, instead of running a theorem prover for hours.</p>
 <span><span class="sw" style="background:#f4f4f6;border:1px solid #8a93a0"></span>historical audit-failure attestation — kept forever; an append-only ledger does not erase its bad day (leaves&nbsp;0–3: an early audit round that failed; leaves&nbsp;4–7 re-attest the same four libraries cleanly)</span>
 </p>
 <p class="muted">Every box above is computed from the live log at page render — leaf hashes,
-internal nodes, the root, and the signature are the real ones. The code that signs the log is itself an entry in the log — and checks its own entry before signing. In detail: before signing this
+internal nodes, the root, and the signature are the real ones. The library that signs the log is itself an entry in the log — what that entry proves is its <em>verify</em> path (no signing code is proven, here or anywhere) — and it checks its own entry before signing. In detail: before signing this
 root, the provider Merkle-verified its own signing library's leaf
 (index {provenance.get('signing_library_leaf_index','?')},
 certificates {escape(str(provenance.get('signing_library_certificates_proven','?')))})
