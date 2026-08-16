@@ -159,3 +159,25 @@ def test_standalone_verify_py_runs(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     # hardened verifier: full mode (signatures verified) must report exactly this
     assert "RESULT: OK [full]" in result.stdout
+
+
+def test_webdocs_source_carries_no_stale_paper_claims():
+    # Regression for the 2026-08-16 operator finding: the paper card said
+    # "23 pages" and the July-snapshot card survived a silently failed
+    # replace (an invisible NBSP defeated the pattern). Guard the shipped
+    # STRINGS, not just version markers.
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "provider" / "src" / "pacta_provider" / "webdocs.py"
+    text = source.read_text(encoding="utf-8")
+    for stale in ("snapshot", "thirteen leaves", "16 July", "16&nbsp;July",
+                  "16\xa0July", "v0.9", "v0.10", "23 pages"):
+        assert stale not in text, f"stale marker {stale!r} in webdocs"
+    # printed commands must work as printed: curl needs the scheme
+    # (http->https redirect yields empty output), the clone one-liner
+    # needs the cd into the cloned directory
+    assert "curl -s ltl.zkdefi.org" not in text
+    assert "cd lean-transparency-log" in text
+    # first-use glosses the page promised: STH and axiom cones
+    assert "Signed Tree Head (STH)" in text
+    assert "axiom cones (the exact set of assumptions" in text

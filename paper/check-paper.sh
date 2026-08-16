@@ -69,6 +69,14 @@ VERSION=$(grep -oP '\\date\{[^}]*---\s*\Kv[0-9.]+' ltl.tex || true)
 pdftotext -f 1 -l 1 ltl.pdf - | grep -q "$VERSION" || fail "title page does not carry $VERSION"
 ! pdftotext ltl.pdf - | grep -q '??' || fail "unresolved ?? reference in PDF"
 
+# --- 5b. site claim binding: the webdocs paper card's page count ---------
+WEBDOCS=../provider/src/pacta_provider/webdocs.py
+if [[ -f "$WEBDOCS" ]]; then
+  STATED=$(grep -oP '\(PDF, \K[0-9]+(?= pages)' "$WEBDOCS" || true)
+  [[ -n "$STATED" ]] || fail "webdocs paper card lost its '(PDF, N pages' claim"
+  [[ "$STATED" -eq "$NPAGES" ]] || fail "webdocs says $STATED pages, PDF has $NPAGES"
+fi
+
 # --- 6. render for the mandatory eye pass --------------------------------
 rm -rf "$PAGES_DIR"; mkdir -p "$PAGES_DIR"
 pdftoppm -png -r 110 ltl.pdf "$PAGES_DIR/p"

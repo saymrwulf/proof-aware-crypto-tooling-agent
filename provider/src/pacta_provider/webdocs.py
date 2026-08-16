@@ -138,16 +138,16 @@ proof subject of leaf&nbsp;18.</p>
         slh_block = ""
     return f"""<div class="card">
 <p style="margin-top:0">This key is the <strong>sole cryptographic identity anchor</strong>: it
-authenticates that these statements were made by the operator. It does not, by itself, make
+authenticates that these statements were made by the operator (the same party the artifacts call “the provider”). It does not, by itself, make
 those statements true — each attestation's truth additionally rests on the replay, theorem,
-extraction and toolchain assumptions stated in that leaf. Every tree head and attestation is
+extraction and toolchain assumptions stated in that leaf (one signed entry of the tree below). Every tree head and attestation is
 signature-checked against this key.
-Pin it, and compare this copy byte-for-byte with the independently hosted
-<a href="{mirror}/blob/main/provider.ed25519.pub">mirror copy</a>; they must be identical.</p>
+Pin it (save your own copy; from then on trust only what checks against that copy), and compare this copy byte-for-byte with the independently hosted
+<a href="{mirror}/blob/main/provider.ed25519.pub">mirror copy</a>; they must be identical. The first fetch is trust-on-first-use; the two-host byte-comparison is what bounds it.</p>
 <pre style="margin-bottom:.4rem">{pem}</pre>
 <p class="muted" style="margin:.2rem 0 0">SHA-256 fingerprint <code>{escape(fingerprint)}</code>
 &nbsp;·&nbsp; raw: <a href="{base}/log-public-key"><code>{base or ''}/log-public-key</code></a>
-&nbsp;·&nbsp; <code>curl -s ltl.zkdefi.org/log-public-key</code></p>
+&nbsp;·&nbsp; <code>curl -s https://ltl.zkdefi.org/log-public-key</code></p>
 {slh_block}</div>"""
 
 
@@ -197,11 +197,10 @@ def render_docs(log: TransparencyLog, base_path: str) -> str:
 · <a href="https://zkdefi.com/">cv</a></p>
 <h1>LTL — the Lean Transparency Log</h1>
 <p class="tagline"><strong>One sentence:</strong> a public, append-only Merkle
-accumulator of <em>signed statements that the Lean&nbsp;4 formal proofs of specific
-cryptographic Rust libraries, at specific git commits, machine-re-check with exactly
+accumulator (a hash tree that only ever grows) of <em>signed statements that the <a href="https://lean-lang.org">Lean&nbsp;4</a> formal proofs of specific
+cryptographic Rust libraries, at specific git commits, re-check by machine with exactly
 their documented assumptions</em> — so that you can trust a proof result by checking
-<strong>one required signature (Ed25519; heads from tree&nbsp;14 add an additive post-quantum
-SLH-DSA signature) and ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes in
+<strong>one required signature (Ed25519) and ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes in
 milliseconds</strong>, instead of running a theorem prover for hours.</p>
 
 <h2>The trust anchor — pin this key</h2>
@@ -211,10 +210,10 @@ milliseconds</strong>, instead of running a theorem prover for hours.</p>
 {tree_svg}
 <p class="legend">
 <span><span class="sw" style="background:#e2f2e9;border:1px solid #1e7f4f"></span>verified attestation (all certificates proven, axiom cones boundary-exact)</span>
-<span><span class="sw" style="background:#f4f4f6;border:1px solid #8a93a0"></span>historical audit-failure attestation — kept forever; an append-only ledger does not erase its bad day</span>
+<span><span class="sw" style="background:#f4f4f6;border:1px solid #8a93a0"></span>historical audit-failure attestation — kept forever; an append-only ledger does not erase its bad day (leaves&nbsp;0–3: an early audit round that failed; leaves&nbsp;4–7 re-attest the same four libraries cleanly)</span>
 </p>
 <p class="muted">Every box above is computed from the live log at page render — leaf hashes,
-internal nodes, the root, and the signature are the real ones. Before signing this
+internal nodes, the root, and the signature are the real ones. The code that signs the log is itself an entry in the log — and checks its own entry before signing. In detail: before signing this
 root, the provider Merkle-verified its own signing library's leaf
 (index {provenance.get('signing_library_leaf_index','?')},
 certificates {escape(str(provenance.get('signing_library_certificates_proven','?')))})
@@ -237,12 +236,12 @@ identical.</td>
 <td><a href="{base}/log-public-key">this site</a> · <a href="{mirror}/blob/main/provider.ed25519.pub">mirror</a></td></tr>
 <tr><td><b>2</b></td><td><code>&lt;library&gt;.attestation.json</code></td>
 <td><strong>The claim.</strong> Which repo, which exact git commit, which theorems,
-which observed axiom cones, what machine protection — signed by the provider.</td>
-<td>table above, or <a href="{mirror}">mirror</a> <code>entries/</code></td></tr>
+which observed axiom cones (the exact set of assumptions each proof ultimately rests on), what machine protection — signed by the provider.</td>
+<td>table below, or <a href="{mirror}">mirror</a> <code>entries/</code></td></tr>
 <tr><td><b>3</b></td><td><code>&lt;library&gt;.receipt.json</code></td>
 <td><strong>The proof of inclusion.</strong> Binds artifact&nbsp;2 into the signed tree:
-leaf index, sibling hashes, the Signed Tree Head. ~25 lines of Python verify it (stdlib hashing; signature checks shell out to the <code>openssl</code> binary).</td>
-<td>table above, or <a href="{mirror}">mirror</a> <code>receipts/</code></td></tr>
+leaf index, sibling hashes, the Signed Tree Head (STH). A one-page Python core verifies it — printed as Appendix&nbsp;C of the paper; the shipped <code>verify.py</code> wraps that core with full fail-closed binding checks (stdlib hashing; signature checks shell out to the <code>openssl</code> binary).</td>
+<td>table below, or <a href="{mirror}">mirror</a> <code>receipts/</code></td></tr>
 <tr><td>+</td><td>the full mirror clone</td>
 <td><strong>Maximal benefit: become a witness.</strong> Every leaf + every signed head
 ever issued + <code>verify.py</code> (Python stdlib + the <code>openssl</code> binary for
@@ -257,17 +256,19 @@ consumers.)</td>
 <h2>Attested libraries</h2>
 <table><tr><th>component</th><th>artifact 2</th><th>artifact 3</th><th>status</th></tr>{rows}</table>
 
+<p class="muted">One certificate = one machine-checked theorem together with its exact assumption set (its axiom cone).</p>
+
 <h2>Three ways to use it</h2>
 <div class="steps">
 <div class="card"><strong>Quick check</strong> (any machine, milliseconds): download
 artifacts 1–3, then<br>
 <code>pacta receipt-verify --attestation … --receipt … --log-public-key provider.ed25519.pub</code>
-<br><span class="muted">No Lean, no Rust, no account. Add <code>--sth-store pins.json</code> for split-view defense.</span></div>
-<div class="card"><strong>Zero-install audit</strong>: <code>git clone {mirror} &amp;&amp; python3 verify.py --all</code>
-<br><span class="muted">Standard-library Python only. You become a witness of the whole history.</span></div>
+<br><span class="muted">No Lean, no Rust, no account. The <code>pacta</code> CLI ships in the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a> (<code>pip install .</code> from a clone). Add <code>--sth-store pins.json</code> to remember every Signed Tree Head (STH) you accept — your defense against a split view (the operator showing different histories to different consumers).</span></div>
+<div class="card"><strong>Zero-install audit</strong>: <code>git clone {mirror} &amp;&amp; cd lean-transparency-log &amp;&amp; python3 verify.py --all</code>
+<br><span class="muted">Standard-library Python plus the system <code>openssl</code> binary (signature checks fail closed without it). You become a witness of the whole history.</span></div>
 <div class="card"><strong>Autonomous agent</strong>: the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta</a>
 tool adds STH pinning, freshness policy, online refresh from this service, risk scoring
-(R0–R5) with policy-gated consequences, and optionally verifies every signature through
+(R0–R5, six named residual-risk classes) with policy-gated consequences, and optionally verifies every signature through
 the proof-attested Ed25519 code path itself (<code>--require-verified-verifier</code>).</div>
 </div>
 
@@ -290,19 +291,19 @@ view.</div>
 <div class="card"><span class="pill warn">does not mean</span> A verified binary. The
 proofs cover Rust <em>source</em>; clone the attested commit (the commit id identifies the
 committed git tree — not external dependencies, toolchain downloads, or generated artifacts) and
-build it yourself — compiler and build are declared trusted base
-until the reproducible-builds program (R5) lands. Every attestation carries its full
-residual-risk list. Honesty about the boundary is the product.</div>
+build it yourself — compiler and build are declared trusted base (assumed, not proven)
+until the reproducible-builds program lands and retires risk class R5. Every attestation carries its full
+residual-risk list — the enumerated assumptions inside its <code>attestation.json</code>. Honesty about the boundary is the product.</div>
 
 <h2>You hold the ruler</h2>
 <div class="card">The list of assumptions a certificate is <em>allowed</em> to rest on
 is not something this site hands you at verification time — it is a
 <strong>requirements card</strong> that lives in <em>your</em> tooling, on
 <em>your</em> disk, and that you can read in five minutes or rewrite from first
-principles: Lean's three foundational axioms, plus — for the signature tiers only —
+principles: Lean's three foundational axioms, plus — for the signature tiers only (the top proof layers, where full signature verification is proven) —
 named placeholders for SHA-512 and the wire format. Your tooling ignores this
 operator's pass/fail labels entirely and re-derives every verdict by comparing the
-attestation's <em>observed</em> axiom list against <em>your</em> card, name by name.
+attestation's <em>observed</em> axiom list (its cone) against <em>your</em> card, name by name.
 The operator is trusted to copy down what the proof kernel printed — never to
 interpret it.</div>
 <div class="card">A card you write yourself will match this log's supply
@@ -312,13 +313,13 @@ shrunk until every remaining axiom justifies its existence. If your card is
 negotiate — the gap is itemized, never blurred, and you have three honest options:
 accept a <em>named</em> line item, walk away, or prove the missing piece and enter it
 into this same log. <strong>If your ruler is stricter than our supply, your ruler is
-our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
-<a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">course</a>.)</div>
+our roadmap.</strong> (The full walk-through is lecture&nbsp;11 of the Jupyter course in the
+<a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repo</a>.)</div>
 
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 23 pages, <strong>v0.11 — revised August&nbsp;2026</strong>; the version is printed on the
+(PDF, 25 pages, <strong>v0.11 — revised August&nbsp;2026</strong>; the version is printed on the
 title page) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
@@ -334,14 +335,12 @@ instantiation section for the SLH-DSA (FIPS&nbsp;205) verify path — eleven cer
 five uninterpreted hash oracles, exact cones — and a certificate appendix mirroring the
 Ed25519 tiers.</div>
 
-<div class="card"><strong>The paper's snapshot vs. today's log.</strong> The paper analyses
-the log's 16&nbsp;July&nbsp;2026 snapshot — thirteen leaves, still leaves&nbsp;0–12 today,
-byte-identical, its pinned head still head&nbsp;#5 of <code>sth-history.jsonl</code>. Everything
-since is additive: the four Ed25519 corpora re-attested at 44 certificates each
-(leaves&nbsp;13–16), the accumulator's hardened model (leaf&nbsp;17), the first post-quantum
-subject (leaf&nbsp;18), and dual-signed heads from tree&nbsp;14 on.
-<code>python3 verify.py --all</code> re-verifies the paper-era prefix together with everything
-after it.</div>
+<div class="card"><strong>Paper and log, one story.</strong> Since v0.11 the paper
+describes this deployment as it runs — nineteen leaves, dual-signed heads, the
+post-quantum verify path as leaf&nbsp;18 with its own certificate appendix. The log is
+append-only and keeps growing past any paper revision; every number the paper states
+stays checkable against the retained history: <code>python3 verify.py --all</code>
+re-verifies all of it, paper-era and after, from a clone of the mirror.</div>
 
 <p class="muted">Log heads are signed offline; this service is read-only and holds no
 key material. Provider tooling, agent tooling, and the full Jupyter course live in the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a>.</p>
