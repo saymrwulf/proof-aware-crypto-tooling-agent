@@ -181,3 +181,32 @@ def test_webdocs_source_carries_no_stale_paper_claims():
     # first-use glosses the page promised: STH and axiom cones
     assert "Signed Tree Head (STH)" in text
     assert "axiom cones (the exact set of assumptions" in text
+
+
+def test_svg_tree_boxes_never_overlap_or_spill():
+    # Regression for 2026-08-16: fixed-width leaf boxes shingled once the
+    # log outgrew the 8-leaf design, and a fixed head box let its caption
+    # spill. Render the tree at several sizes and assert geometry.
+    import re
+
+    from pacta_provider.webdocs import _svg_tree
+
+    class _E:
+        def __init__(self, i):
+            self.leaf_hash = f"{i:02x}" * 32
+            self.leaf = {"attestation": {"subject": {"component": "betrusted-ed25519-verified"},
+                                         "certificates": [{"status": "proven", "axiom_status": "clean"}]}}
+
+    for n in (8, 19, 33):
+        svg = _svg_tree([_E(i) for i in range(n)], "ab" * 32, "verified-dalek-serial")
+        rects = [(float(m.group(1)), float(m.group(2)), float(m.group(3)))
+                 for m in re.finditer(r'<rect x="([-0-9.]+)" y="([0-9.]+)" width="([0-9.]+)"', svg)]
+        leaf_y = max(y for _, y, _ in rects)
+        leaves = sorted((x, w) for x, y, w in rects if y == leaf_y)
+        assert len(leaves) == n
+        for (x1, w1), (x2, _w2) in zip(leaves, leaves[1:]):
+            assert x1 + w1 <= x2 + 0.01, f"leaf boxes overlap at n={n}"
+        # head caption must fit its box: longest line estimated at 5.3px/char
+        head = re.search(r'<rect x="[-0-9.]+" y="[0-9.]+" width="([0-9.]+)" height="46"', svg)
+        title = re.search(r'font-weight="bold">([^<]+)</text>', svg).group(1)
+        assert len(title) * 7.0 <= float(head.group(1)), "head title spills"

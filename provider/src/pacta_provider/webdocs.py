@@ -50,6 +50,13 @@ def _leaf_ok(entry: LogEntry) -> bool:
     )
 
 
+def _leaf_short(component: str) -> str:
+    """Compact display name for a leaf box at small spans."""
+    return (component.replace("-ed25519-verified", "")
+            .replace("ltl-accumulator-verified", "accum")
+            .replace("fips205-slhdsa-verified", "slh-dsa"))
+
+
 def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str, head_label: str = "Ed25519") -> str:
     """The accumulator, drawn from its real leaves."""
     if not entries:
@@ -77,12 +84,22 @@ def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str, head
                 ok = _leaf_ok(entry)
                 component = (((entry.leaf.get("attestation") or {}).get("subject")) or {}).get("component", "?")
                 fill, stroke = ("#e2f2e9", "#1e7f4f") if ok else ("#f4f4f6", "#8a93a0")
-                out.append(f'<rect x="{x-56}" y="{y-22}" width="112" height="44" rx="5" fill="{fill}" stroke="{stroke}" stroke-width="1.4"/>')
-                out.append(f'<text x="{x}" y="{y-6}" text-anchor="middle" fill="#333">leaf {node_index}</text>')
-                short = escape(str(component).replace("-ed25519-verified", ""))
+                # Boxes must FIT the per-leaf span at any tree size (the
+                # 2026-08-16 lesson: fixed 112px boxes shingled at 19
+                # leaves). Rich boxes while they fit, compact ones after.
+                box_w = min(112.0, span * 0.94)
+                compact = box_w < 100
+                short = escape(_leaf_short(str(component)))
                 label = short if ok else f"{short} ✗"
-                out.append(f'<text x="{x}" y="{y+8}" text-anchor="middle" fill="{stroke}">{label}</text>')
-                out.append(f'<text x="{x}" y="{y+19}" text-anchor="middle" fill="#999" font-size="9">{node.hex()[:10]}…</text>')
+                if compact:
+                    out.append(f'<rect x="{x-box_w/2:.1f}" y="{y-18}" width="{box_w:.1f}" height="36" rx="4" fill="{fill}" stroke="{stroke}" stroke-width="1.2"/>')
+                    out.append(f'<text x="{x}" y="{y-4}" text-anchor="middle" fill="#333" font-size="8">leaf {node_index}</text>')
+                    out.append(f'<text x="{x}" y="{y+9}" text-anchor="middle" fill="{stroke}" font-size="7">{label}</text>')
+                else:
+                    out.append(f'<rect x="{x-box_w/2:.1f}" y="{y-22}" width="{box_w:.1f}" height="44" rx="5" fill="{fill}" stroke="{stroke}" stroke-width="1.4"/>')
+                    out.append(f'<text x="{x}" y="{y-6}" text-anchor="middle" fill="#333">leaf {node_index}</text>')
+                    out.append(f'<text x="{x}" y="{y+8}" text-anchor="middle" fill="{stroke}">{label}</text>')
+                    out.append(f'<text x="{x}" y="{y+19}" text-anchor="middle" fill="#999" font-size="9">{node.hex()[:10]}…</text>')
             else:
                 is_root = level_index == len(levels) - 1
                 out.append(f'<rect x="{x-50}" y="{y-15}" width="100" height="30" rx="5" fill="{"#eef0f7" if is_root else "#fff"}" stroke="{"#3b4d8f" if is_root else "#bbb"}" stroke-width="{1.6 if is_root else 1}"/>')
@@ -91,11 +108,19 @@ def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str, head
                 for child in (2 * node_index, 2 * node_index + 1):
                     if (level_index - 1, child) in positions:
                         cx, cy = positions[(level_index - 1, child)]
-                        out.append(f'<line x1="{x}" y1="{y+15}" x2="{cx}" y2="{cy-22 if level_index==1 else cy-15}" stroke="#ccc"/>')
+                        leaf_top = 18 if len(entries) > 9 else 22
+                        out.append(f'<line x1="{x}" y1="{y+15}" x2="{cx}" y2="{cy-leaf_top if level_index==1 else cy-15}" stroke="#ccc"/>')
     root_x, root_y = positions[(len(levels) - 1, 0)]
-    out.append(f'<rect x="{root_x-190}" y="{root_y-72}" width="380" height="34" rx="6" fill="#e2f2e9" stroke="#1e7f4f" stroke-width="1.6"/>')
-    out.append(f'<text x="{root_x}" y="{root_y-58}" text-anchor="middle" fill="#1e7f4f" font-weight="bold">Signed Tree Head — {escape(head_label)}({root_hex[:12]}…)</text>')
-    out.append(f'<text x="{root_x}" y="{root_y-46}" text-anchor="middle" fill="#1e7f4f" font-size="9">signed by: {escape(signing_backend)} (verify path attested; signing itself not proven)</text>')
+    # The head box sizes itself to its longest line (the 2026-08-16
+    # lesson: a fixed 380px box let a growing caption spill both sides).
+    title = f"Signed Tree Head — {head_label}({root_hex[:12]}…)"
+    line2 = f"signed by: {signing_backend}"
+    line3 = "(verify path attested; signing itself not proven)"
+    head_w = max(len(title) * 7.0, len(line2) * 5.3, len(line3) * 5.3) + 28
+    out.append(f'<rect x="{root_x-head_w/2:.1f}" y="{root_y-84}" width="{head_w:.1f}" height="46" rx="6" fill="#e2f2e9" stroke="#1e7f4f" stroke-width="1.6"/>')
+    out.append(f'<text x="{root_x}" y="{root_y-70}" text-anchor="middle" fill="#1e7f4f" font-weight="bold">{escape(title)}</text>')
+    out.append(f'<text x="{root_x}" y="{root_y-58}" text-anchor="middle" fill="#1e7f4f" font-size="9">{escape(line2)}</text>')
+    out.append(f'<text x="{root_x}" y="{root_y-47}" text-anchor="middle" fill="#1e7f4f" font-size="9">{escape(line3)}</text>')
     out.append(f'<line x1="{root_x}" y1="{root_y-38}" x2="{root_x}" y2="{root_y-15}" stroke="#1e7f4f" stroke-width="1.4"/>')
     out.append("</svg>")
     return "".join(out)
