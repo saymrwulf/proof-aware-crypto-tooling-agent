@@ -80,7 +80,7 @@ def test_web_endpoints_and_online_proof_roundtrip(tmp_path):
         with urllib.request.urlopen(base + "/docs", timeout=10) as r:
             page = r.read().decode()
         assert "BEGIN PUBLIC KEY" in page
-        assert "pin this key" in page.lower()
+        assert "pin these keys" in page.lower()
         # operator-dropped documents: served by bare name, absent from the
         # endpoint index, traversal-safe
         site = tmp_path / "log" / "site"
