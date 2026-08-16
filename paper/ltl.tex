@@ -26,6 +26,7 @@
 \newcommand{\Hh}{\mathsf{H}}
 \newcommand{\hleaf}{\mathsf{h}_{\rm leaf}}
 \newcommand{\hnode}{\mathsf{h}_{\rm node}}
+\hyphenation{time-stamp time-stamps}
 \newcommand{\MTH}{\mathsf{MTH}}
 \newcommand{\Root}{\mathsf{Root}}
 \newcommand{\Path}{\mathsf{Path}}
@@ -135,7 +136,7 @@ The contribution is not a new Merkle tree and not a new theorem prover. It is a
 trust decomposition for distributing machine-checked correctness evidence:
 
 \begin{center}
-\fbox{\parbox{0.91\linewidth}{
+\fbox{\parbox{0.91\linewidth}{\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000
 \textbf{Expensive deterministic verification produces an observation.
 Transparency makes that observation accountable. Consumer-local policy decides
 whether the observation is acceptable.}}}
@@ -295,7 +296,7 @@ observed axiom-name set. The deployed schema additionally carries diagnostics,
 resource controls, scope, and exclusions.
 
 \begin{definition}[Attestation-transparency scheme]
-An attestation-transparency scheme is a tuple
+An attestation-transparency scheme is a~\mbox{tuple}
 \[
 \Pi=(\mathsf{KeyGen},\mathsf{Append},\mathsf{ProveIncl},
 \mathsf{VerifyIncl},\mathsf{ProveCons},\mathsf{VerifyCons},\mathsf{Verdict})
@@ -1207,32 +1208,42 @@ boundary axiom, \code{LTLAcc.sha256}.
 \centering
 \begin{tikzpicture}[
   >=Latex,
-  box/.style={draw,rounded corners=2pt,minimum width=1.03cm,minimum height=.52cm,font=\scriptsize,align=center},
+  box/.style={draw,rounded corners=2pt,minimum width=.78cm,minimum height=.5cm,font=\tiny,align=center,inner sep=1.5pt},
   fail/.style={box,fill=black!6,draw=black!45,text=black!60},
+  pq/.style={box,fill=violet!8,draw=violet!60!black,text=violet!55!black},
   ok/.style={box,fill=green!7!white,draw=deepgreen,text=deepgreen!80!black},
   acc/.style={box,fill=blue!7!white,draw=deepblue,text=deepblue},
   arrow/.style={->,draw=black!55}
 ]
-\foreach \i in {0,...,3} {\node[fail] (l\i) at (1.08*\i,0) {\i\\failed};}
-\foreach \i in {4,...,7} {\node[ok] (l\i) at (1.08*\i,0) {\i\\clean};}
-\foreach \i in {8,...,11} {\node[ok] (l\i) at (1.08*\i,0) {\i\\clean};}
-\node[acc] (l12) at (1.08*12,0) {12\\accum.};
+\foreach \i in {0,...,3} {\node[fail] (l\i) at (0.82*\i,0) {\i\\failed};}
+\foreach \i in {4,...,7} {\node[ok] (l\i) at (0.82*\i,0) {\i\\clean};}
+\foreach \i in {8,...,11} {\node[ok] (l\i) at (0.82*\i,0) {\i\\clean};}
+\node[acc] (l12) at (0.82*12,0) {12\\accum.};
+\foreach \i in {13,...,16} {\node[ok] (l\i) at (0.82*\i,0) {\i\\re-att.};}
+\node[acc] (l17) at (0.82*17,0) {17\\accum.};
+\node[pq] (l18) at (0.82*18,0) {18\\slh-dsa};
 \draw[decorate,decoration={brace,mirror,raise=5pt},black!45]
-  ($(l0.south west)+(-.05,0)$)--($(l3.south east)+(.05,0)$)
+  ($(l0.south west)+(.05,0)$)--($(l3.south east)+(-.05,0)$)
   node[midway,below=11pt,font=\scriptsize]{run 1};
 \draw[decorate,decoration={brace,mirror,raise=5pt},deepgreen]
-  ($(l4.south west)+(-.05,0)$)--($(l7.south east)+(.05,0)$)
+  ($(l4.south west)+(.05,0)$)--($(l7.south east)+(-.05,0)$)
   node[midway,below=11pt,font=\scriptsize]{run 2};
 \draw[decorate,decoration={brace,mirror,raise=5pt},deepgreen]
-  ($(l8.south west)+(-.05,0)$)--($(l11.south east)+(.05,0)$)
+  ($(l8.south west)+(.05,0)$)--($(l11.south east)+(-.05,0)$)
   node[midway,below=11pt,font=\scriptsize]{run 3};
-\node[draw,rounded corners,fill=softgray,minimum width=4.3cm,minimum height=.7cm,font=\small] (sth) at (6.7,1.65)
-  {signed head: size 13, root \code{3488a2d0...}};
-\draw[arrow] (l12.north) -- (sth.south east);
+\draw[decorate,decoration={brace,mirror,raise=5pt},deepblue]
+  ($(l13.south west)+(.05,0)$)--($(l18.south east)+(-.05,0)$)
+  node[midway,below=11pt,font=\scriptsize]{August 2026};
+\node[draw,rounded corners,fill=softgray,minimum width=5.9cm,minimum height=.85cm,align=center,font=\small] (sth) at (7.4,1.75)
+  {signed head: size 19, root \code{7ee23940...}\\dual-signed: Ed25519 $+$ SLH-DSA};
 \draw[arrow] (l6.north) -- (sth.south west);
+\draw[arrow] (l18.north) -- (sth.south east);
 \end{tikzpicture}
-\caption{The public 13-leaf deployment. Failure leaves are retained; entry 13
-attests the accumulator corpus itself, scoped to the recursive model.}
+\caption{The public nineteen-leaf deployment. Failure leaves are retained; leaf
+12 (the thirteenth entry) attests the accumulator corpus itself, scoped to the
+recursive model; leaves 13--16 re-attest the four forks at 44 certificates
+each; leaf 17 the hardened accumulator corpus; leaf 18 the SLH-DSA verify
+path. Heads are dual-signed from size 14 on.}
 \label{fig:deployment}
 \end{figure}
 
@@ -1249,11 +1260,11 @@ refinement from the deployed iterative consistency verifier remain outside the
 corpus.
 
 \begin{center}\small
-\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
 \toprule
 Layer & Mechanized evidence & Explicit boundary \\
 \midrule
-Merkle definitions & MTH, Root, Path, recursive ConsRec & single SHA-256 boundary axiom \\
+Merkle definitions & $\MTH$, $\Root$, $\Path$, recursive $\ConsRec$ & single SHA-256 boundary axiom \\
 Inclusion & completeness and named collision extractor & collision resistance interpreted externally \\
 Consistency & recursive-model soundness and extractor & no general consistency-completeness theorem \\
 Pinning & per-step monotonicity and prefix correctness & signature layer and multi-step closure external \\
@@ -1332,7 +1343,7 @@ structure actually differs.
 
 \paragraph{Transparency.}
 Certificate Transparency introduced publicly auditable append-only logs for
-certificate issuance~\cite{ct1,ct2}; Crosby and Wallach developed efficient
+certificate issuance~\cite{ct1,ct2}; Crosby and Wallach built efficient
 tamper-evident history trees~\cite{crosby}; Dowling et al. formalized security
 notions for secure logging and CT~\cite{dghs} --- the games of
 \S\ref{sec:games} adapt that two-transcript style to replay attestation, with
@@ -1557,24 +1568,38 @@ Verification Pipeline with AI Provers: An Experience Report. arXiv:2605.30106,
 
 \end{thebibliography}
 
+% Appendix policy (declared 2026-08-16): the appendix block starts on a
+% fresh page and then flows continuously -- no page breaks between
+% individual appendices. The claim matrix is one unbreakable tabularx.
+\clearpage
 \appendix
 
 \section{End-to-end claim matrix}\label{app:matrix}
 \begin{center}\small
-\begin{tabularx}{\textwidth}{@{}XXX@{}}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
 \toprule
 Consumer conclusion & Established by & Remaining assumption \\
 \midrule
-Leaf has an authentic opening with a position-bound leaf value at index $m$ under head $h$ & inclusion proof and signed head & SHA-256 collision resistance; correct public key; EUF-CMA of the head signature \\
+Leaf has an authentic opening with a position-bound leaf value at index $m$ under head $h$ & inclusion proof and signed head & \mbox{SHA-256} collision resistance; correct public key; \mbox{EUF-CMA} of the head signature \\
+\addlinespace[3pt]
 Head root commits the published numbered leaf list & full-mirror recomputation (\code{verify.py --all}) & mirror availability and retention \\
-Head was authorized by the log identity & Ed25519 verification & correct key acquisition; EUF-CMA \\
-New pinned head extends old pinned head & consistency proof & SHA-256 collision resistance; recursive-model soundness; authentic size/root pairing for deployment \\
-Equal-size unequal roots in one log context conflict & two valid signatures & correct public key; EUF-CMA; operationally, a retaining observer must compare the heads \\
+\addlinespace[3pt]
+Head was authorized by the log identity & Ed25519 verification & correct key acquisition; \mbox{EUF-CMA} \\
+\addlinespace[3pt]
+New pinned head extends old pinned head & consistency proof & \mbox{SHA-256} collision resistance; recursive-model soundness; authentic size/root pairing for deployment \\
+\addlinespace[3pt]
+Equal-size unequal roots in one log context conflict & two valid signatures & correct public key; \mbox{EUF-CMA}; operationally, a retaining observer must compare the heads \\
+\addlinespace[3pt]
 Observed cone matches local boundary policy & exact set equality & semantic identity of named declarations \\
-Operator claims the kernel produced the observation & attestation signature and leaf inclusion & correct provider key; EUF-CMA \\
+\addlinespace[3pt]
+Operator claims the kernel produced the observation & attestation signature and leaf inclusion & correct provider key; \mbox{EUF-CMA} \\
+\addlinespace[3pt]
 Kernel actually produced the recorded observation & not cryptographically established; independently checkable by replay & operator and replay-pipeline honesty, or faithful independent replay \\
+\addlinespace[3pt]
 Recorded cone was produced by an audit that performed its checks & not established --- the audit driver is itself part of the replay pipeline & audit-gate integrity; adversarial gate self-tests reduce this exposure, they do not eliminate it \\
+\addlinespace[3pt]
 Source corresponds to deployed binary & not established & reproducible build and compiler assurance \\
+\addlinespace[3pt]
 Claimed signer implementation produced STH & not established & execution provenance \\
 \bottomrule
 \end{tabularx}
@@ -1595,7 +1620,6 @@ additionally relies on an unmechanized authentic-size/root invariant
 Its exclusions name SHA-256 collision resistance, deployed-verifier extensional
 equality, the signature/STH layer, and asymptotic cost claims.
 
-\clearpage
 \section{Compact receipt-verification core}\label{app:verifier}
 The following code is only the Merkle inclusion core. A complete receipt
 verifier must additionally validate the signed tree head, log identifier,
@@ -1671,17 +1695,17 @@ five oracles.
 \begin{center}\small
 \begin{tabular}{@{}lll@{}}
 \toprule
-Layer & Lean declaration(s) & oracles in the cone \\
+Layer & Lean declaration(s) & Oracles in the cone \\
 \midrule
-digit/byte plumbing & \code{to_int_loop_eq}, \code{to_byte_loop_eq} & --- \\
- & \code{wots_csum_loop_eq}, \code{base2b_outer_loop_eq} & --- \\
-chain walk & \code{chain_free_loop_eq} & \code{f} \\
+Digit/byte plumbing & \code{to_int_loop_eq}, \code{to_byte_loop_eq} & --- \\
+ & \code{wots_csum_loop_eq}, \code{base2b_outer_loop_eq} & \\
+Chain walk & \code{chain_free_loop_eq} & \code{f} \\
 WOTS pk recomputation & \code{wots_loop1_eq} & \code{f} \\
 XMSS Merkle ascent & \code{xmss_loop_eq} & \code{h} \\
 FORS inner ascent & \code{fors_inner_loop_eq} & \code{h} \\
 FORS outer loop & \code{fors_outer_loop_eq} & \code{f}, \code{h} \\
-hypertree walk & \code{ht_loop_eq} & \code{f}, \code{h}, \code{t_l} \\
-acceptance characterization & \code{slh_verify_128s_accepts_iff} & all five \\
+Hypertree walk & \code{ht_loop_eq} & \code{f}, \code{h}, \code{t_l} \\
+Acceptance characterization & \code{slh_verify_128s_accepts_iff} & all five \\
 \bottomrule
 \end{tabular}
 \end{center}
