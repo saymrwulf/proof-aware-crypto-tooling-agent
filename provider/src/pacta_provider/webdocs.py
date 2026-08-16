@@ -221,12 +221,81 @@ def render_docs(log: TransparencyLog, base_path: str) -> str:
 · <a href="https://zkdefi.org/saymrwulf">code</a>
 · <a href="https://zkdefi.com/">cv</a></p>
 <h1>LTL — the Lean Transparency Log</h1>
-<p class="tagline"><strong>One sentence:</strong> a public, append-only Merkle
-accumulator (a hash tree that only ever grows) of <em>signed statements that the <a href="https://lean-lang.org">Lean&nbsp;4</a> formal proofs of specific
+<p><strong>What happened here, in plain terms:</strong> we took real cryptographic
+code — four production Ed25519 signature libraries and the verification path of
+SLH-DSA (FIPS&nbsp;205), the post-quantum signature standard — and machine-checked
+mathematical proofs about it with the <a href="https://lean-lang.org">Lean&nbsp;4</a>
+proof assistant. Re-checking those proofs yourself takes a toolchain and about half
+an hour of compute per library. This site is the shortcut that does not ask for
+blind trust: a public, tamper-evident ledger of signed statements about every proof
+check we ran — so you decide how much of our work you re-verify, from a millisecond
+signature check to redoing everything.</p>
+
+<p class="tagline"><strong>The same thing, in one precise sentence:</strong> a public, append-only Merkle
+accumulator (a hash tree that only ever grows) of <em>signed statements that the Lean&nbsp;4 formal proofs of specific
 cryptographic Rust libraries, at specific git commits, re-check by machine with exactly
 their documented assumptions</em> — so that you can trust a proof result by checking
 <strong>one required signature (Ed25519) and ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes in
 milliseconds</strong>, instead of running a theorem prover for hours.</p>
+
+<h2>Choose where you stand — the trust ladder</h2>
+<p>Every rung below is a legitimate place to stand. Each states what you still take
+on trust, what you do, what it costs, and what you know afterwards. Climb one rung
+at a time — the whole service is built so that you can.</p>
+
+<div class="steps">
+<div class="card"><strong>&ldquo;I just want the history held honest.&rdquo;</strong> — anyone, one minute.<br>
+Still trusted: everything — but lying becomes attributable.
+<pre>git clone https://github.com/saymrwulf/lean-transparency-log &amp;&amp; cd lean-transparency-log &amp;&amp; python3 verify.py --all</pre>
+<span class="muted">Python plus the system <code>openssl</code> binary; fails closed without it.
+Afterwards you hold every leaf and every Signed Tree Head (STH) ever issued. If the
+operator ever shows anyone a conflicting history, your copy exposes it — you are a
+witness. A split view (the operator showing different histories to different
+consumers) survives only until two witnesses compare.</span></div>
+
+<div class="card"><strong>&ldquo;I trust the operator&rsquo;s reports; bind him to them.&rdquo;</strong> — milliseconds.<br>
+Still trusted: that the recorded observations are honest.
+Download the three artifacts (key, claim, inclusion proof — table below), then:
+<pre>pacta receipt-verify --attestation … --receipt … --log-public-key provider.ed25519.pub</pre>
+<span class="muted">The <code>pacta</code> CLI ships in the
+<a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a>
+(<code>pip install .</code> from a clone); a one-page Python core (the paper&rsquo;s
+Appendix&nbsp;C) does the same check without it. Add <code>--sth-store pins.json</code> to
+remember every head you accept. Afterwards the exact claim — repository, commit,
+theorems, assumptions — is cryptographically pinned to the operator&rsquo;s key inside an
+append-only history: he can never rewrite or deny it. What he <em>observed</em>, you
+have not yet checked.</span></div>
+
+<div class="card"><strong>&ldquo;I accept his observations — not his judgment.&rdquo;</strong> — minutes; the rung most people miss.<br>
+Still trusted: the recorded axiom lists; <em>not</em> the operator&rsquo;s pass/fail labels.
+Compare each attestation&rsquo;s recorded assumption cones against a requirements card
+you write yourself — <code>pacta</code> automates the comparison, and lecture&nbsp;11 of the
+<a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">Jupyter course</a>
+walks through it.
+<span class="muted">Afterwards every verdict is <em>your</em> verdict, re-derived from your
+own ruler; operator labels can veto but never grant acceptance (details in
+&ldquo;You hold the ruler&rdquo; below).</span></div>
+
+<div class="card"><strong>&ldquo;I don&rsquo;t trust his observations — I&rsquo;ll run the proofs myself.&rdquo;</strong> — about 30&nbsp;minutes per library.<br>
+Still trusted: the published Lean sources and the extraction that produced them;
+<em>not</em> the operator&rsquo;s execution. Clone the attested repository at its pinned
+commit and press its check button (<code>verification/check.sh</code>) with a Lean&nbsp;4
+toolchain: the kernel re-checks every certificate on your machine and the axiom
+audit prints the exact assumption cones.
+<span class="muted">Afterwards the theorem prover accepted on <em>your</em> hardware —
+the operator is out of the loop entirely.</span></div>
+
+<div class="card"><strong>&ldquo;I trust none of it — I&rsquo;ll rebuild the whole path.&rdquo;</strong> — weeks.<br>
+Still trusted: Lean&rsquo;s kernel, the extraction tools, and your compiler — the floor,
+which we name rather than hide. Pin the upstream Rust source yourself, extract it to
+Lean with Charon/Aeneas (every repository ships its <code>extract.sh</code>, pinned
+toolchain versions, and byte-pinned generated models for comparison), re-read the
+theorem statements against FIPS&nbsp;205 / RFC&nbsp;9162 / the curve equations, and re-prove
+or audit each certificate.
+<span class="muted">Afterwards you have reproduced the estate and no longer need us —
+which is the point. There is no rung above this one: even here you trust a kernel, a
+compiler, and your silicon. Anyone offering zero trust is selling something.</span></div>
+</div>
 
 <h2>The trust anchors — pin these keys (one required, one additive)</h2>
 {_trust_anchor_html(log, metadata, base, mirror)}
@@ -284,30 +353,6 @@ consumers.)</td>
 
 <p class="muted">One certificate = one machine-checked theorem together with its exact assumption set (its axiom cone).</p>
 
-<h2>Three ways to use it</h2>
-<div class="steps">
-<div class="card"><strong>Quick check</strong> (any machine, milliseconds): download
-artifacts 1–3, then<br>
-<code>pacta receipt-verify --attestation … --receipt … --log-public-key provider.ed25519.pub</code>
-<br><span class="muted">No Lean, no Rust, no account. The <code>pacta</code> CLI ships in the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a> (<code>pip install .</code> from a clone). Add <code>--sth-store pins.json</code> to remember every Signed Tree Head (STH) you accept — your defense against a split view (the operator showing different histories to different consumers).</span></div>
-<div class="card"><strong>Zero-install audit</strong>: <code>git clone {mirror} &amp;&amp; cd lean-transparency-log &amp;&amp; python3 verify.py --all</code>
-<br><span class="muted">Standard-library Python plus the system <code>openssl</code> binary (signature checks fail closed without it). You become a witness of the whole history.</span></div>
-<div class="card"><strong>Autonomous agent</strong>: the <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta</a>
-tool adds STH pinning, freshness policy, online refresh from this service, risk scoring
-(R0–R5, six named residual-risk classes) with policy-gated consequences, and optionally verifies every signature through
-the proof-attested Ed25519 code path itself (<code>--require-verified-verifier</code>).</div>
-</div>
-
-<h2>API</h2>
-<pre>GET {base}/v1/sth                      latest Signed Tree Head
-GET {base}/v1/sth-history              the published head history (witness material)
-GET {base}/v1/sth-consistency?first=N  consistency proof from your pinned size
-GET {base}/v1/proof?component=NAME     inclusion proof (artifact 3, freshly issued)
-GET {base}/v1/attestation?component=NAME   the claim (artifact 2)
-GET {base}/v1/entries?start=N&amp;end=M    raw leaves
-GET {base}/v1/metadata                 log identity
-GET {base}/healthz</pre>
-
 <h2>What a verified inclusion means — and what it does not</h2>
 <div class="card"><span class="pill ok">means</span> The provider whose key you hold
 attests: the Lean proofs of the named repository at the named git commit re-check with
@@ -341,6 +386,24 @@ accept a <em>named</em> line item, walk away, or prove the missing piece and ent
 into this same log. <strong>If your ruler is stricter than our supply, your ruler is
 our roadmap.</strong> (The full walk-through is lecture&nbsp;11 of the Jupyter course in the
 <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repo</a>.)</div>
+
+<h2>For your tooling — the raw API</h2>
+<p>Humans never need these directly; every link on this page already uses them. They
+exist so that <em>your software</em> — a CI job, an autonomous agent, a package
+resolver — can consume the log without scraping HTML. The <code>pacta</code> CLI
+builds on them: STH pinning, freshness policy, risk scoring (R0–R5, six named
+residual-risk classes) with policy-gated consequences, and optionally
+<code>--require-verified-verifier</code>, which checks every signature through the
+proof-attested Ed25519 code path itself.</p>
+<pre>GET {base}/v1/sth                      latest Signed Tree Head
+GET {base}/v1/sth-history              the published head history (witness material)
+GET {base}/v1/sth-consistency?first=N  consistency proof from your pinned size
+GET {base}/v1/proof?component=NAME     inclusion proof (artifact 3, freshly issued)
+GET {base}/v1/attestation?component=NAME   the claim (artifact 2)
+GET {base}/v1/entries?start=N&amp;end=M    raw leaves
+GET {base}/v1/metadata                 log identity
+GET {base}/healthz</pre>
+
 
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
