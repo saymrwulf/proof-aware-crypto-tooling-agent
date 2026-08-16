@@ -162,7 +162,7 @@ proof subject of leaf&nbsp;18.</p>
     else:
         slh_block = ""
     return f"""<div class="card">
-<p style="margin-top:0">This key is the <strong>sole cryptographic identity anchor</strong>: it
+<p style="margin-top:0">This key is the <strong>required cryptographic identity anchor</strong> — the one every consumer must check: it
 authenticates that these statements were made by the operator (the same party the artifacts call “the provider”). It does not, by itself, make
 those statements true — each attestation's truth additionally rests on the replay, theorem,
 extraction and toolchain assumptions stated in that leaf (one signed entry of the tree below). Every tree head and attestation is
@@ -228,7 +228,7 @@ their documented assumptions</em> — so that you can trust a proof result by ch
 <strong>one required signature (Ed25519) and ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes in
 milliseconds</strong>, instead of running a theorem prover for hours.</p>
 
-<h2>The trust anchor — pin this key</h2>
+<h2>The trust anchors — pin these keys (one required, one additive)</h2>
 {_trust_anchor_html(log, metadata, base, mirror)}
 
 <h2>The accumulator, live</h2>
@@ -250,11 +250,12 @@ log id <code>{escape(str(metadata.get('log_id',''))[:16])}…</code>.</p>
 
 <h2>What do I download? — the three artifacts, unambiguously</h2>
 <p>To benefit from the accumulator you need <strong>exactly three files</strong> per
-library, plus optionally the whole mirror. Nothing else.</p>
+library, plus optionally the additive post-quantum key
+(<code>provider.slhdsa.pub</code>) and the whole mirror. Nothing else.</p>
 <table>
 <tr><th>#</th><th>Artifact</th><th>What it is</th><th>Where</th></tr>
 <tr><td><b>1</b></td><td><code>provider.ed25519.pub</code></td>
-<td><strong>The identity anchor.</strong> The provider's public key — the sole cryptographic
+<td><strong>The identity anchor.</strong> The provider's public key — the required cryptographic
 identity you pin. It authenticates the operator's statements; their truth rests on each leaf's
 stated assumptions. Fetch it from BOTH independent locations and compare; the copies must be
 identical.</td>
