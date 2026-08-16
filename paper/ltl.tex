@@ -12,7 +12,7 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,decorations.pathreplacing,calc}
 \usepackage[colorlinks=true,linkcolor=blue!55!black,citecolor=blue!55!black,urlcolor=blue!55!black]{hyperref}
-\hypersetup{pdftitle={Accountable Distribution of Machine-Checked Correctness Evidence: A Transparency Model and the Lean Transparency Log},pdfauthor={Olaf Horvath},pdfsubject={Transparency distribution of formal-verification replay evidence},pdfkeywords={formal verification, transparency log, Lean, Ed25519, Merkle tree, attestation}}
+\hypersetup{pdftitle={Accountable Distribution of Machine-Checked Correctness Evidence: A Transparency Model and the Lean Transparency Log},pdfauthor={Olaf Horvath},pdfsubject={Transparency distribution of formal-verification replay evidence},pdfkeywords={formal verification, transparency log, Lean, Ed25519, SLH-DSA, FIPS 205, Merkle tree, attestation}}
 \lefthyphenmin=2 \righthyphenmin=3
 
 \newtheorem{definition}{Definition}
@@ -47,7 +47,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.10}}
+\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.11}}
 
 \begin{document}
 \maketitle
@@ -73,10 +73,15 @@ We instantiate the model as the Lean Transparency Log (LTL), using Lean~4 replay
 attestations and an RFC~9162 Merkle tree. We give explicit
 collision-extracting arguments for inclusion and consistency, lift them to
 scheme-level accountability games with a composition theorem, and evaluate a
-live deployment over four production Ed25519 codebases. The public log
-contains thirteen leaves; the thirteenth attests a Lean mechanization of the
+live deployment over four production Ed25519 codebases and the verification
+path of SLH-DSA (FIPS~205), the hash-based post-quantum signature standard.
+The public log contains nineteen leaves, including a Lean mechanization of the
 accumulator's own security arguments (61 human-reviewed certificates with one
-project-specific uninterpreted SHA-256 boundary axiom). The mechanization effort also exposed,
+project-specific uninterpreted SHA-256 boundary axiom) and, as its newest
+entry, eleven certificates over the SLH-DSA-SHA2-128s verifier. Since tree
+size 14 every signed head additionally carries a deterministic SLH-DSA
+co-signature --- produced with the parameter set whose verification path the
+log itself attests. The mechanization effort also exposed,
 via differential testing, a nontrivial implementation boundary --- the
 deployed iterative consistency verifier is not extensionally equal to the
 recursive model on malformed size claims --- and the leaf records this
@@ -163,11 +168,14 @@ those observations with their own policy; operator labels can veto but cannot
 grant acceptance. We state clearly that axiom-name equality is not semantic
 identity of theorem statements.
 \item \textbf{A deployed cryptographic case study.}
-The log contains twelve historical replay leaves for four verified Ed25519
-codebases and a thirteenth leaf for the accumulator's own Lean corpus. The
-entry-13 corpus carries an environment-derived audit inventory of 222 compiled
-constants, 61 human-reviewed certificate cones, and a single uninterpreted
-SHA-256 axiom.
+The log contains nineteen leaves: three four-fork replay generations for the
+Ed25519 codebases (the newest at 44 certificates per fork), two attestations
+of the accumulator's own Lean corpus (entry 13 carries an environment-derived
+audit inventory of 222 compiled constants, 61 human-reviewed certificate
+cones, and a single uninterpreted SHA-256 axiom; leaf 17 re-attests the
+hardened state), and --- as leaf 18 --- the log's first post-quantum subject:
+eleven certificates over the SLH-DSA-SHA2-128s verification path
+(Appendix~\ref{app:slhtiers}).
 \item \textbf{A negative deployment result.}
 Differential testing found that the deployed iterative RFC-style consistency
 verifier and the recursive model proved in Lean are not extensionally equal:
@@ -451,6 +459,19 @@ A tree head contains schema-version and type tags, a log identifier, tree
 size, root hash, timestamp, and hash-algorithm identifier. The canonical JSON serialization of
 those fields is signed with Ed25519. The log identifier and version tag prevent
 cross-log and cross-protocol replay.
+
+Since tree size 14, every head additionally carries a \emph{deterministic}
+SLH-DSA-SHA2-128s (FIPS~205) signature over the same payload. The
+co-signature is additive: the Ed25519 signature remains the one every
+consumer must verify, and heads published before size 14 carry no
+post-quantum signature --- the standalone verifier reports them as absent
+rather than failing them, because an append-only log keeps the history of
+its own signature scheme. Determinism is chosen as an audit primitive: a
+deterministic re-sign of the same payload is byte-comparable, so ``same
+input, same signature'' becomes a diff rather than an assurance. The
+co-signature closes a further loop: its parameter set is exactly the one
+whose verification path is attested at leaf 18
+(\S\ref{sec:slhdsa}, Appendix~\ref{app:slhtiers}).
 
 The current implementation records signing-backend provenance alongside the
 signature, but that provenance is not execution attestation: an Ed25519
@@ -1040,7 +1061,7 @@ verifier inherits the refinement boundary of the previous subsection
 unchanged.
 \end{remark}
 
-\section{Lean and Ed25519 instantiation}\label{sec:instantiation}
+\section{Lean instantiation: Ed25519 and SLH-DSA}\label{sec:instantiation}
 
 \subsection{Proof corpus}
 
@@ -1083,6 +1104,38 @@ The separation keeps residual assumptions visible. SHA-512 and selected
 wire-format interfaces are opaque boundaries at the apex; lower arithmetic and
 group certificates use the foundational Lean axioms observed in the corpus.
 
+\subsection{The SLH-DSA verify path: the method on second terrain}\label{sec:slhdsa}
+
+The second campaign extracts the verification path of SLH-DSA (FIPS~205,
+parameter set SHA2-128s) from a pinned pure-Rust implementation through the
+same Charon/Aeneas route, starting from one monomorphic entry point with the
+five hash primitives marked opaque at the extraction boundary. The corpus is
+eleven certificates: ten loop-fidelity theorems (chain walking, WOTS
+recomputation and checksum, XMSS and FORS Merkle ascent, hypertree layering,
+digit/byte plumbing) and an acceptance characterization,
+\code{slh_verify_128s_accepts_iff}: for every message digest, signature, and
+public key at these parameters, the extracted verifier accepts exactly when
+the recomputed hypertree root byte-equals the public key's root --- no other
+acceptance path exists.
+
+The terrain differs from Ed25519 in one structural way, and the leaf says so.
+The Ed25519 bridges land in an independent second semantics
+($\mathbb{Z}/p\mathbb{Z}$, which the proof library understands without ever
+seeing the extracted code); SLH-DSA verification is hash chains and Merkle
+nodes all the way down, so the reference folds are built from the same five
+uninterpreted hash oracles (\code{h_msg}, \code{f}, \code{h},
+\code{t_l}, \code{t_len}, modeling the SHA-256 instantiations) that the
+extracted loops call. Each loop certificate therefore makes the extracted
+control flow \emph{visible} --- small, sequential, checkable against the
+standard's algorithms --- while the reading of fold against FIPS~205 remains
+a declared human step. The audit enforces every certificate's axiom set
+exactly in both directions, and the cone \emph{grows} up the pyramid ---
+pure bit arithmetic rests on the kernel alone; the apex carries all five
+oracles (Appendix~\ref{app:slhtiers}). Scope, stated in the leaf: the proved
+subject is a monomorphic facade whose bridge to the deployed generic verifier
+is a 137-case differential test; one inner digit-extraction loop carries no
+certificate; signing and key generation were never extracted.
+
 \subsection{Replay attestation}
 
 For every certificate the operator records:
@@ -1119,18 +1172,23 @@ deployed verifier?
 
 \subsection{Public state}
 
-As of 16 July 2026, the public log contains thirteen leaves and current root
+As of 15 August 2026, the public log contains nineteen leaves and current root
 \begin{center}
-\path{3488a2d0ff9f00415bb561d61b01a420e3ca2e0f7b29351ec9ebb3f57319da0d}.
+\path{7ee239406890cf4ad59cc83ac3faa3d5cc48b29202159ee8c25bffd9737d32d8}.
 \end{center}
-Every signed head issued since public mirroring began is retained --- six
-heads, at tree sizes 8 through 13 --- together with every leaf and receipt, in
-an append-only Git mirror; a clone re-verifies the entire log offline with the
-repository's standalone verifier.
+Every signed head issued since public mirroring began is retained --- twelve
+heads, at tree sizes 8 through 19, dual-signed from size 14 on --- together
+with every leaf and receipt, in an append-only Git mirror; a clone
+re-verifies the entire log offline with the repository's standalone verifier.
 The first twelve leaves are three four-fork replay generations. Leaves 0--3
 record a failed audit run and remain permanently visible. Leaves 4--7 record a
 clean replay. Leaves 8--11 re-attest rewritten repository histories rather
-than replacing the old leaves. A leaf whose pinned commit ceases to be
+than replacing the old leaves. Leaf 12 attests the accumulator's own Lean
+corpus (\S\ref{sec:deployment}, E3); leaves 13--16 re-attest the four
+Ed25519 corpora at 44 certificates each; leaf 17 re-attests the accumulator
+corpus at its hardened state; and leaf 18 attests the SLH-DSA-SHA2-128s
+verification path --- the log's first post-quantum subject, and the scheme
+that has co-signed every head since size 14. A leaf whose pinned commit ceases to be
 distributed decays from a replayable claim to a historical record; consumers
 act only on attestations whose subjects they can retrieve.
 
@@ -1599,5 +1657,44 @@ T4 & constructive decompression lift & \code{verify_accepts_iff_decompress} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\section{SLH-DSA verification certificates and their cones}\label{app:slhtiers}
+
+Eleven certificates over the extracted SLH-DSA-SHA2-128s verify path
+(leaf 18). Beyond Lean's three foundational axioms, each certificate's
+exact axiom set consists of the uninterpreted hash oracles listed ---
+enforced by the audit as set equality in both directions, so the table is
+machine-checked, not documentation. The cone grows with the layer: pure
+digit/byte arithmetic rests on the kernel alone; the apex carries all
+five oracles.
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Layer & Lean declaration(s) & oracles in the cone \\
+\midrule
+digit/byte plumbing & \code{to_int_loop_eq}, \code{to_byte_loop_eq} & --- \\
+ & \code{wots_csum_loop_eq}, \code{base2b_outer_loop_eq} & --- \\
+chain walk & \code{chain_free_loop_eq} & \code{f} \\
+WOTS pk recomputation & \code{wots_loop1_eq} & \code{f} \\
+XMSS Merkle ascent & \code{xmss_loop_eq} & \code{h} \\
+FORS inner ascent & \code{fors_inner_loop_eq} & \code{h} \\
+FORS outer loop & \code{fors_outer_loop_eq} & \code{f}, \code{h} \\
+hypertree walk & \code{ht_loop_eq} & \code{f}, \code{h}, \code{t_l} \\
+acceptance characterization & \code{slh_verify_128s_accepts_iff} & all five \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The oracles model the parameter set's SHA-256 hash-suite instantiations:
+\code{h_msg} (message digest), \code{f} (chain step and FORS leaf),
+\code{h} (Merkle node), \code{t_l} and \code{t_len} (the WOTS and FORS
+compressors --- two axioms over what is one Rust primitive, deliberately
+conservative, with the source's naming inversion against the standard's
+$T_\ell$/$T_k$ documented at the declarations). The acceptance
+characterization is a structural factorization, not a composition of the
+loop theorems: it would remain provable if any of the ten were deleted,
+and each loop certificate is meaningful exactly to the extent its
+reference fold has been read against FIPS~205.
 
 \end{document}

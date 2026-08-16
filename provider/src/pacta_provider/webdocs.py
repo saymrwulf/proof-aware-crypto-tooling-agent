@@ -318,7 +318,7 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 in the
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 23 pages, <strong>v0.10 — revised August&nbsp;2026</strong>; the version is printed on the
+(PDF, 23 pages, <strong>v0.11 — revised August&nbsp;2026</strong>; the version is printed on the
 title page) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
@@ -328,7 +328,11 @@ fork evidence — all discharged by named reductions), the policy boundary where
 operator labels can veto but never grant acceptance, and the measured model/deployment
 divergence reported as a result rather than hidden — now together with its closure: the
 divergence traced to one omitted RFC&nbsp;9162 conjunct (Step&nbsp;7's <code>sn&nbsp;=&nbsp;0</code>),
-zero divergences after the one-line restoration, confirmed by a three-way regression.</div>
+zero divergences after the one-line restoration, confirmed by a three-way regression.
+New in v0.11: the deployment evaluated to its current nineteen-leaf, dual-signed state, an
+instantiation section for the SLH-DSA (FIPS&nbsp;205) verify path — eleven certificates,
+five uninterpreted hash oracles, exact cones — and a certificate appendix mirroring the
+Ed25519 tiers.</div>
 
 <div class="card"><strong>The paper's snapshot vs. today's log.</strong> The paper analyses
 the log's 16&nbsp;July&nbsp;2026 snapshot — thirteen leaves, still leaves&nbsp;0–12 today,
