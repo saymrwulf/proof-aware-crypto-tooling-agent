@@ -302,7 +302,7 @@ picture is computed from the live log at page render — the leaf hashes, nodes,
 signature are the real ones:</p>
 {tree_svg}
 <p class="legend">
-<span><span class="sw" style="background:#e2f2e9;border:1px solid #1e7f4f"></span>verified attestation (all certificates proven, axiom cones boundary-exact)</span>
+<span><span class="sw" style="background:#e2f2e9;border:1px solid #1e7f4f"></span>verified attestation — every certificate proven, every assumption list exactly as declared</span>
 <span><span class="sw" style="background:#f4f4f6;border:1px solid #8a93a0"></span>historical audit-failure attestation — kept forever; an append-only ledger does not erase its bad day (leaves&nbsp;0–3: an early audit round that failed; leaves&nbsp;4–7 re-attest the same four libraries cleanly)</span>
 </p>
 <p class="muted">The library that signs the log is itself an entry in the log — what that entry proves is its <em>verify</em> path (no signing code is proven, here or anywhere) — and it checks its own entry before signing. In detail: before signing this
@@ -332,13 +332,13 @@ identical.</td>
 which observed axiom cones (the exact set of assumptions each proof ultimately rests on), what machine protection — signed by the provider.</td>
 <td>table below, or <a href="{mirror}">mirror</a> <code>entries/</code></td></tr>
 <tr><td><b>3</b></td><td><code>&lt;library&gt;.receipt.json</code></td>
-<td><strong>The proof of inclusion.</strong> Binds artifact&nbsp;2 into the signed tree:
+<td><strong>The proof of inclusion.</strong> Binds the claim into the signed tree:
 leaf index, sibling hashes, the Signed Tree Head (STH). About forty lines of ordinary
 Python verify it; the mirror&rsquo;s <code>verify.py</code> contains exactly that core, wrapped in
 fail-closed safety checks (stdlib hashing; signature checks shell out to the <code>openssl</code> binary).</td>
 <td>table below, or <a href="{mirror}">mirror</a> <code>receipts/</code></td></tr>
 <tr><td>+</td><td>the full mirror clone</td>
-<td><strong>Maximal benefit: become a witness.</strong> Every leaf + every signed head
+<td><strong>Maximal benefit: hold the complete history yourself (rung&nbsp;1 of the ladder).</strong> Every leaf + every signed head
 ever issued + <code>verify.py</code> (Python stdlib + the <code>openssl</code> binary for
 signatures; fails closed without them). <code>python3 verify.py --all</code>
 recomputes the entire tree and every historical head — you then hold a retained view that can
@@ -362,7 +362,7 @@ view.</div>
 proofs cover Rust <em>source</em>; clone the attested commit (the commit id identifies the
 committed git tree — not external dependencies, toolchain downloads, or generated artifacts) and
 build it yourself — compiler and build are declared trusted base (assumed, not proven)
-until the reproducible-builds program lands and retires risk class R5. Every attestation carries its full
+until the reproducible-builds program lands. Every attestation carries its full
 residual-risk list — the enumerated assumptions inside its <code>attestation.json</code>. Honesty about the boundary is the product.</div>
 
 <h2>You hold the ruler</h2>
