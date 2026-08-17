@@ -48,7 +48,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.12}}
+\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.13}}
 
 \begin{document}
 \maketitle
@@ -82,11 +82,12 @@ project-specific uninterpreted SHA-256 boundary axiom) and, as its newest
 entry, eleven certificates over the SLH-DSA-SHA2-128s verifier. Since tree
 size 14 every signed head additionally carries a deterministic SLH-DSA
 co-signature --- produced with the parameter set whose verification path the
-log itself attests. The mechanization effort also exposed,
-via differential testing, a nontrivial implementation boundary --- the
-deployed iterative consistency verifier is not extensionally equal to the
-recursive model on malformed size claims --- and the leaf records this
-limitation explicitly. The contribution is a cryptographic distribution
+log itself attests. The mechanization effort also exposed, via
+differential testing, a nontrivial model/implementation divergence --- on
+malformed size claims, the deployed iterative consistency verifier was not
+extensionally equal to the recursive model proved in Lean (since closed;
+this paper reports the pre-closure measurements) --- recorded explicitly
+in the corresponding log entry. The contribution is a cryptographic distribution
 model for machine-checked correctness evidence, with an end-to-end deployed
 instantiation that carries scoped proofs about its own accountability
 machinery.
@@ -147,7 +148,9 @@ temporal logic~\cite{pnueli}; we note the collision once and rely on context.}
 is the complete instantiation evaluated in this paper. Its subjects are four
 Rust Ed25519 codebases with Lean~4~\cite{lean4} certificates against extracted
 models. Leaf 12 --- its thirteenth entry --- attests the Lean corpus
-that mechanizes the log's own accumulator arguments. Thus the paper's central
+that mechanizes the security arguments of the log's own Merkle accumulator
+(the tree of \S\ref{sec:construction} together with its inclusion and
+consistency verifiers). The paper's central
 claim survives replacement of Lean, Ed25519, or RFC~9162 by other components;
 what is essential is the distribution and accountability model.
 
@@ -169,8 +172,8 @@ those observations with their own policy; operator labels can veto but cannot
 grant acceptance. We state clearly that axiom-name equality is not semantic
 identity of theorem statements.
 \item \textbf{A deployed cryptographic case study.}
-The log contains nineteen leaves: three four-fork replay generations for the
-Ed25519 codebases (the newest at 44 certificates per fork), two attestations
+The log contains nineteen leaves: three replay generations across the four
+Ed25519 codebases (the newest at 44 certificates per fork; a \emph{certificate} throughout this paper is one theorem's kernel-checked proof together with its recorded axiom cone), two attestations
 of the accumulator's own Lean corpus (leaf 12 carries an environment-derived
 audit inventory of 222 compiled constants, 61 human-reviewed certificate
 cones, and a single uninterpreted SHA-256 axiom; leaf 17 re-attests the
@@ -183,7 +186,7 @@ verifier and the recursive model proved in Lean are not extensionally equal:
 there are malformed size/root combinations accepted only by the deployed
 verifier. We characterize 3,867 divergences in 73,573 pinned boundary tests
 --- every one deployed-accepts-only --- and scope the public attestation
-accordingly. (Post-submission closure, July 2026: the divergence was traced to
+accordingly. (Subsequently closed: the divergence was traced to
 the deployed verifier omitting RFC~9162 \S2.1.4.2 Step~7's terminal
 $sn=0$ condition; restoring that one conjunct removes every divergence in the
 pinned family, confirmed by a three-way regression against an independent
@@ -197,16 +200,18 @@ binary correspondence, compiler correctness, extraction faithfulness,
 side-channel resistance, SHA-512 correctness, or execution provenance of the
 signing binary. The present leaf schema identifies theorem declarations by
 repository commit and name, not by a canonical digest of their elaborated Lean
-types. These are explicit boundaries, not hidden qualifications.
+types. These are explicit boundaries, not hidden qualifications
+(Appendix~\ref{app:matrix} tabulates every consumer-facing claim with its
+establishing mechanism and remaining assumption).
 
 \section{The distribution problem}\label{sec:problem}
 
 \subsection{Three evidence modes}
 
 Let a subject repository at commit $g$ contain theorem declarations
-$T_1,\dots,T_q$. A deterministic verifier execution produces an observation
-$O_g$ containing success/failure and the reported assumption cone of each
-$T_i$ --- the set of axioms the checked proof of $T_i$ ultimately rests on. There are three natural ways to consume this result.
+$\Theta_1,\dots,\Theta_q$. A deterministic verifier execution produces an observation
+$O_g$ containing success/failure and the reported \emph{axiom cone} (synonymously, the observed axiom-name set) of each
+$\Theta_i$ --- the set of axioms the checked proof of $\Theta_i$ ultimately rests on. There are three natural ways to consume this result.
 
 \begin{description}[leftmargin=1.5em,itemsep=4pt]
 \item[Direct replay.] The consumer reconstructs the verifier environment and
@@ -293,7 +298,8 @@ A replay attestation $a$ contains at least
 \]
 where $N_i$ is a declaration name, $s_i$ is replay status, and $A_i$ is the
 observed axiom-name set. The deployed schema additionally carries diagnostics,
-resource controls, scope, and exclusions.
+resource controls, a machine-readable \emph{scope block} (the deployed
+leaf-12 instance is quoted verbatim in Appendix~\ref{app:entry13}), and exclusions.
 
 \begin{definition}[Attestation-transparency scheme]
 An attestation-transparency scheme is a~\mbox{tuple}
@@ -304,7 +310,7 @@ An attestation-transparency scheme is a~\mbox{tuple}
 over a hash function and signature scheme. $\mathsf{Append}$ commits the
 canonical serialization of an attestation as the next leaf and returns a signed
 tree head. $\mathsf{Verdict}$ is parameterized by consumer-local policy and
-does not consume an operator verdict as positive evidence.
+does not consume an operator label as positive evidence.
 \end{definition}
 
 \begin{definition}[Accountable replay distribution]
@@ -315,9 +321,10 @@ determined leaf value at its claimed position; (ii) a
 consumer accepts a later view only as the same view or a verified extension;
 (iii) two valid equal-size heads with unequal roots, in one log and protocol
 context, form transferable evidence
-that the key holder signed incompatible views; and (iv) positive acceptance of
+that the key holder signed incompatible views, except under signature
+forgery; and (iv) positive acceptance of
 a theorem boundary is a function of recorded observations and consumer-local
-policy, not of an operator verdict.
+policy, not of an operator label.
 \end{definition}
 
 The definition is intentionally an accountability property, not a validity
@@ -389,8 +396,8 @@ of the operator public key.
 
 The model deliberately does not cryptographically exclude fabricated kernel
 observations; the same holds when the operator's replay harness is defective
-rather than dishonest. That is a statement about a physical execution on the operator's
-machine. The mechanism instead makes the claimed execution target precise
+rather than dishonest. Whether the kernel actually ran as claimed is a
+fact about a physical execution on the operator's machine. The mechanism instead makes the claimed execution target precise
 enough for a third party to replay.
 
 \subsection{Consumer goals}
@@ -407,7 +414,7 @@ a later view only if it is the same view or a verified extension. Two valid
 heads of equal size and unequal roots, in one log context, are transferable
 evidence that the key holder signed incompatible views. Unequal-size forks
 require retained history, gossip, or a witness. The transition discipline
-itself is syntactic, enforced by the pin rule by construction; the semantic
+itself is syntactic, enforced by the pin rule (\S4.3) by construction; the semantic
 content --- an opened position cannot change value across accepted views ---
 is a theorem (\S\ref{sec:games}).
 \item[G3: Policy separation.] The operator's positive label cannot make a
@@ -459,15 +466,17 @@ consistency proofs are the RFC~9162 algorithms~\cite{ct2}.
 A tree head contains schema-version and type tags, a log identifier, tree
 size, root hash, timestamp, and hash-algorithm identifier. The canonical JSON serialization of
 those fields is signed with Ed25519. The log identifier and version tag prevent
-cross-log and cross-protocol replay.
+cross-log and cross-protocol replay. We call the leaf history a head
+commits to a \emph{view}, and write \emph{signed view} for that history
+as represented by its signed head.
 
 Since tree size 14, every head additionally carries a \emph{deterministic}
 SLH-DSA-SHA2-128s (FIPS~205) signature over the same payload. The
 co-signature is additive: the Ed25519 signature remains the one every
 consumer must verify, and heads published before size 14 carry no
-post-quantum signature --- the standalone verifier reports them as absent
-rather than failing them, because an append-only log keeps the history of
-its own signature scheme. Determinism is chosen as an audit primitive: a
+post-quantum signature --- the standalone verifier reports the co-signature as
+absent on such heads rather than rejecting them: an append-only log
+necessarily preserves the history of its own signature-scheme upgrades. Determinism is chosen as an audit primitive: a
 deterministic re-sign of the same payload is byte-comparable, so ``same
 input, same signature'' becomes a diff rather than an assurance. The
 co-signature closes a further loop: its parameter set is exactly the one
@@ -491,6 +500,9 @@ same-size fork evidence;
 \item larger size: accept iff a consistency proof verifies, then update;
 \item smaller size: reject as rollback.
 \end{itemize}
+
+We call this transition discipline the \emph{pin rule}, and the persisted
+pair $(n_{\mathrm{pin}},r_{\mathrm{pin}})$ the \emph{pin-store}.
 Freshness is an external availability policy. A persisted pin detects rollback
 relative to local history; it does not prove that a client sees the globally
 latest signed head.
@@ -523,9 +535,10 @@ This section states the consumer-facing arguments in the form used by the Lean
 mechanization. The proofs are elementary but explicit: successful false
 openings yield concrete SHA-256 collisions rather than appealing to an informal
 ``Merkle trees are secure'' statement. The explicitness is load-bearing: over a
-fixed-width hash a bare ``some collision exists'' is vacuously true by
-counting, so each soundness statement is about a named extractor function, and
-the corpus pins a machine-checked non-vacuity guard for every extractor.
+fixed-width hash, ``some collision exists'' is trivially true by counting;
+each soundness statement therefore names an explicit extractor function,
+and the corpus pins a machine-checked guard that each extractor's output
+really is a collision (distinct preimages, equal digests).
 
 \subsection{Inclusion}
 
@@ -588,7 +601,9 @@ $|D_0|=n_0\le n_1=|D_1|$, $D_0\neq D_1[0{:}n_0]$, and
 \ConsRec(n_0,n_1,C,\top,\MTH(D_0))
    =(\MTH(D_0),\MTH(D_1)),
 \]
-$\mathcal{E}_{\rm cons}(D_0,D_1,C)$ returns a SHA-256 collision.
+$\mathcal{E}_{\rm cons}(D_0,D_1,C)$ returns a SHA-256 collision. (The hypothesis supplies the honest
+$\MTH(D_0)$ as the pinned value; \S5.3 measures the deployed flow, which
+has no such mechanized supplier.)
 \end{theorem}
 \begin{proof}
 The new-root component is a hash fold over the shape of the $n_1$ tree. Compare
@@ -602,13 +617,16 @@ collision.
 \end{proof}
 
 The theorem's hypothesis pins the honest old root $\MTH(D_0)$. The deployed
-flow has no mechanized supplier of that pin; the next subsection measures what
-the iterative verifier does when size claims alone steer its walk.
+flow contains nothing mechanized that guarantees the pinned value is the
+honest old root; the next subsection measures the iterative verifier's
+behavior when only the claimed sizes constrain its reconstruction.
 
 \begin{proposition}[Pin-store safety]
 Assume EUF-CMA security of the head signature and collision resistance of
 SHA-256. A consumer following the pin transition accepts only a nondecreasing
-sequence of sizes whose exhibited leaf lists are prefix-related. Two accepted
+sequence of sizes; if leaf lists are exhibited for two accepted heads,
+they are prefix-related except under collision (see the mapping paragraph
+of \S\ref{sec:games}). Two accepted
 heads under the same key, in one log context, with equal size and unequal
 roots are transferable evidence that the key holder signed incompatible
 views.
@@ -616,7 +634,8 @@ views.
 \begin{proof}
 Rollback is rejected syntactically. At equal size the transition is accepted
 only with equal roots; if the two exhibited equal-length leaf lists differed,
-whole-tree binding would extract a SHA-256 collision, so under collision
+whole-tree root binding (each root determines its committed leaf list up
+to collision) would extract a SHA-256 collision, so under collision
 resistance the lists are equal. A larger head is accepted only after a
 consistency proof, so non-prefix acceptance yields a collision by the previous
 theorem. Equal-size unequal roots in one log context, with valid signatures, are two
@@ -630,7 +649,7 @@ certificate is a function only of $\Obs_a(c)$ and $\Policy(c)$. An operator
 label cannot change a nonconforming observation into a conforming one.
 \end{proposition}
 \begin{proof}
-The comparison is set equality and takes no positive operator verdict as input.
+The comparison is set equality and takes no positive operator label as input.
 A deployment may conservatively treat an operator failure label as a veto, but
 a veto cannot grant acceptance.
 \end{proof}
@@ -989,7 +1008,7 @@ queried to the signing oracle; its valid signature is an existential forgery,
 which $\mathcal{B}_{\rm fr}$ outputs.
 \end{proof}
 
-\begin{lemma}[Policy separation]\label{lem:policy}
+\begin{lemma}[Policy separation --- Proposition~2 restated for the scheme package]\label{lem:policy}
 For every leaf $a$ and certificate $c$, the verdict computed by
 $\mathsf{Verdict}$ equals $[\Obs_a(c)=\Policy(c)]$; it reads no operator
 label, and acceptance consults the operator's status only as a veto. This is
@@ -1008,8 +1027,8 @@ separation.
 \end{definition}
 
 \begin{theorem}[Collision-extractable accountability of the construction]\label{thm:main}
-The LTL construction --- the RFC~9162 tree, the canonical signed heads of
-\S4.2 in their fixed context $\chi$, the pin rule of \S4.3, and the policy
+The LTL construction with the recursive verifiers of \S\ref{sec:security}
+--- the RFC~9162 tree, the canonical signed heads of \S4.2 in their fixed context $\chi$, the pin rule of \S4.3, and the policy
 verdict of \S\ref{sec:model} --- is collision-extractably accountable, with
 $\mathcal{B}_{\rm pb}$ ($\le 2(\lceil\log_2 n\rceil{+}1)$ hash evaluations),
 $\mathcal{B}_{\rm hist}$ ($O(k\log n_k)$), and the one-forgery reductions
@@ -1088,52 +1107,58 @@ per fork --- the log records both generations as separate leaves), covering:
 mathematical point equation.
 \end{itemize}
 
-The signature apex can be summarized as follows. Let $k$ be the challenge
-scalar produced by an opaque SHA-512 boundary and let $r_1$ be the raw $R$ bytes
+The signature apex is organized as four tiers T1--T4
+(Appendix~\ref{app:tiers}). Let $c$ be the challenge scalar produced by an opaque SHA-512 boundary and let $\bar R$ be the raw $R$ bytes
 from the signature. The corpus separates:
 \begin{description}[leftmargin=1.5em,itemsep=2pt]
 \item[T1:] acceptance iff the verifier's recomputed compressed bytes equal
-$r_1$;
+$\bar R$;
 \item[T2:] those recomputed bytes are the canonical encoding of
-$[k](-A)+[s]B$;
+$[c](-A)+[s]B$;
 \item[T3:] canonical encoding is injective on valid curve points;
 \item[T4:] acceptance iff constructive decompression of $R$ yields
-$[k](-A)+[s]B$.
+$[c](-A)+[s]B$.
 \end{description}
 
 The separation keeps residual assumptions visible. SHA-512 and selected
 wire-format interfaces are opaque boundaries at the apex; lower arithmetic and
 group certificates use the foundational Lean axioms observed in the corpus.
 
-\subsection{The SLH-DSA verify path: the method on second terrain}\label{sec:slhdsa}
+\subsection{A second instantiation: the SLH-DSA verify path}\label{sec:slhdsa}
 
-The second campaign extracts the verification path of SLH-DSA (FIPS~205,
+The second campaign extracts the verification path of SLH-DSA
+(FIPS~205~\cite{fips205},
 parameter set SHA2-128s) from a pinned pure-Rust implementation through the
 same Charon/Aeneas route, starting from one monomorphic entry point with the
 five hash primitives marked opaque at the extraction boundary. The corpus is
-eleven certificates: ten loop-fidelity theorems (chain walking, WOTS
-recomputation and checksum, XMSS and FORS Merkle ascent, hypertree layering,
-digit/byte plumbing) and an acceptance characterization,
+eleven certificates: ten \emph{loop-fidelity} theorems --- each stating
+that an extracted loop computes the same value as a reference recursive
+fold --- covering chain walking, WOTS recomputation and checksum, XMSS and
+FORS Merkle ascent, hypertree layering, and digit/byte plumbing
+(Appendix~\ref{app:slhtiers} lists each with its exact cone) and an acceptance characterization,
 \code{slh_verify_128s_accepts_iff}: for every message digest, signature, and
 public key at these parameters, the extracted verifier accepts exactly when
 the recomputed hypertree root byte-equals the public key's root --- no other
 acceptance path exists.
 
 The terrain differs from Ed25519 in one structural way, and the leaf says so.
-The Ed25519 bridges land in an independent second semantics
-($\mathbb{Z}/p\mathbb{Z}$, which the proof library understands without ever
-seeing the extracted code); SLH-DSA verification is hash chains and Merkle
-nodes all the way down, so the reference folds are built from the same five
-uninterpreted hash oracles (\code{h_msg}, \code{f}, \code{h},
-\code{t_l}, \code{t_len}, modeling the SHA-256 instantiations) that the
-extracted loops call. Each loop certificate therefore makes the extracted
+For Ed25519, each theorem relates extracted code to an independent
+mathematical semantics (arithmetic over $\mathbb{Z}/p\mathbb{Z}$,
+formalized with no reference to the extracted code); SLH-DSA verification
+is hash chains and Merkle nodes all the way down, so its reference
+specifications are folds over the same five uninterpreted hash oracles
+(\code{h_msg}, \code{f}, \code{h}, \code{t_l}, \code{t_len}, modeling
+the SHA-256 instantiations --- uninterpreted function symbols in the
+logic, not random oracles) that the extracted loops call --- there is no
+independent second semantics to land in. Each loop certificate therefore makes the extracted
 control flow \emph{visible} --- small, sequential, checkable against the
 standard's algorithms --- while the reading of fold against FIPS~205 remains
 a declared human step. The audit enforces every certificate's axiom set
 exactly in both directions, and the cone \emph{grows} up the pyramid ---
 pure bit arithmetic rests on the kernel alone; the apex carries all five
 oracles (Appendix~\ref{app:slhtiers}). Scope, stated in the leaf: the proved
-subject is a monomorphic facade whose bridge to the deployed generic verifier
+subject is a monomorphic facade (the fixed-parameter entry point above)
+whose bridge to the deployed generic verifier
 is a 137-case differential test; one inner digit-extraction loop carries no
 certificate; signing and key generation were never extracted.
 
@@ -1181,13 +1206,15 @@ Every signed head issued since public mirroring began is retained --- twelve
 heads, at tree sizes 8 through 19, dual-signed from size 14 on --- together
 with every leaf and receipt, in an append-only Git mirror; a clone
 re-verifies the entire log offline with the repository's standalone verifier.
-The first twelve leaves are three four-fork replay generations. Leaves 0--3
+The first twelve leaves are three replay generations across the four
+Ed25519 codebases. Leaves 0--3
 record a failed audit run and remain permanently visible. Leaves 4--7 record a
 clean replay. Leaves 8--11 re-attest rewritten repository histories rather
 than replacing the old leaves. Leaf 12 attests the accumulator's own Lean
 corpus (\S\ref{sec:deployment}, E3); leaves 13--16 re-attest the four
 Ed25519 corpora at 44 certificates each; leaf 17 re-attests the accumulator
-corpus at its hardened state; and leaf 18 attests the SLH-DSA-SHA2-128s
+corpus at its hardened state (the same corpus after closure of external
+review findings); and leaf 18 attests the SLH-DSA-SHA2-128s
 verification path --- the log's first post-quantum subject, and the scheme
 that has co-signed every head since size 14. A leaf whose pinned commit ceases to be
 distributed decays from a replayable claim to a historical record; consumers
@@ -1252,7 +1279,8 @@ path. Heads are dual-signed from size 14 on.}
 Leaf 12 is not a claim that the whole service is formally verified. The Lean
 corpus covers the recursive Merkle model, inclusion completeness and
 collision-extracting soundness, the consistency extractor, and the Merkle-layer
-share of pin-store safety. The abstract root-binding lemma from the paper is
+share of pin-store safety. The folklore whole-tree root-binding property (a root determines its
+committed leaf list up to SHA-256 collision) is
 mechanized through the specializations needed by the extractors rather than as
 one quantified hash-fold theorem. Signature unforgeability, execution
 provenance, the full signed-head state machine, asymptotic cost, and the
@@ -1278,9 +1306,10 @@ Scheme-level games (\S\ref{sec:games}) & paper-level explicit reductions & two-t
 \subsection{Cost and reproducibility}
 
 A replay of one Ed25519 fork requires approximately 30 minutes of end-to-end
-guarded replay time under the pinned environment, a figure corroborated by the
+resource-guarded (memory- and time-capped) replay time under the pinned environment, a figure corroborated by the
 inter-leaf issuance spacing visible in the published log. Receipt verification requires one Ed25519
-signature and a logarithmic number of SHA-256 node computations. The
+signature and a logarithmic number of SHA-256 node computations (the
+complete inclusion core is printed as Appendix~\ref{app:verifier}). The
 accumulator corpus is independently reviewable with a pinned public Lean
 release; an environment-derived inventory fails closed on added, removed, or
 axiom-smuggling declarations.
@@ -1381,8 +1410,9 @@ explicitly open.
 
 \section{Limitations and research agenda}\label{sec:limitations}
 
-The subject corpus maintains a numbered ledger of fifteen known gaps together
-with their closure options; this section groups the load-bearing ones.
+The subject corpus maintains a numbered public file, \code{KNOWN-GAPS},
+of fifteen gaps with their closure options (the scope block of
+Appendix~\ref{app:entry13} cites its items 14 and 15); this section groups the load-bearing ones.
 
 \paragraph{Operator observation trust.}
 A malicious operator can fabricate a replay report. Signatures and Merkle
@@ -1416,7 +1446,7 @@ isolated clients to receive that view. Independent witnesses or gossip are the
 natural next deployment step.
 
 \paragraph{Consistency refinement.}
-The recursive model is proved; the iterative deployment diverges from it on
+The recursive model is proved; the iterative deployment diverged from it on
 malformed inputs, every observed divergence being deployed-accepts-only. The strongest closure is either to deploy
 $\ConsRec$-equivalent semantics or to mechanize the signed-head and pin-store
 flow and prove the authentic-pair refinement theorem.
@@ -1486,7 +1516,7 @@ The author designed the system and is responsible for every claim. Claude
 tooling, and manuscript review. Their output was not accepted as evidence;
 claims were retained only after human review or reproducible artifact checks.
 
-\begin{thebibliography}{22}
+\begin{thebibliography}{23}
 \itemsep2pt
 \bibitem{ct1} B. Laurie, A. Langley, E. K\"asper. Certificate Transparency.
 RFC 6962, 2013.
@@ -1565,6 +1595,9 @@ Collision-Resistant Hashing without the Keys. VIETCRYPT, LNCS 4341, pp.
 \bibitem{klaus2026} N. Klaus, J. Conejero, P. Tolmach. A Rust-to-Lean
 Verification Pipeline with AI Provers: An Experience Report. arXiv:2605.30106,
 2026.
+
+\bibitem{fips205} National Institute of Standards and Technology.
+Stateless Hash-Based Digital Signature Standard. FIPS 205, August 2024.
 
 \end{thebibliography}
 
@@ -1682,6 +1715,11 @@ T4 & constructive decompression lift & \code{verify_accepts_iff_decompress} \\
 \end{tabular}
 \end{center}
 
+All four tiers share one opaque boundary --- the SHA-512 challenge hash
+and the selected wire-format interfaces (\S\ref{sec:instantiation});
+the arithmetic and group certificates beneath them rest on Lean's
+foundational axioms alone.
+
 \section{SLH-DSA verification certificates and their cones}\label{app:slhtiers}
 
 Eleven certificates over the extracted SLH-DSA-SHA2-128s verify path
@@ -1715,10 +1753,10 @@ The oracles model the parameter set's SHA-256 hash-suite instantiations:
 \code{h} (Merkle node), \code{t_l} and \code{t_len} (the WOTS and FORS
 compressors --- two axioms over what is one Rust primitive, deliberately
 conservative, with the source's naming inversion against the standard's
-$T_\ell$/$T_k$ documented at the declarations). The acceptance
-characterization is a structural factorization, not a composition of the
-loop theorems: it would remain provable if any of the ten were deleted,
-and each loop certificate is meaningful exactly to the extent its
-reference fold has been read against FIPS~205.
+$T_\ell$/$T_k$ documented at the declarations). The acceptance characterization is proved directly from the verifier's
+structure, not by composing the ten loop theorems --- it would remain
+provable if any of the ten were deleted. Conversely, each loop
+certificate carries assurance only insofar as a human has checked its
+reference fold against the corresponding FIPS~205 algorithm.
 
 \end{document}
