@@ -256,6 +256,7 @@ def verify_receipt(
     receipt: dict[str, Any],
     log_public_key_path: str | Path,
     require_signatures: str = "ed25519",
+    slhdsa_public_key_path: str | Path | None = None,
 ) -> ReceiptVerificationResult:
     diagnostics: list[str] = []
     if receipt.get("type") != RECEIPT_TYPE:
@@ -266,6 +267,29 @@ def verify_receipt(
     sth = receipt.get("sth") or {}
     sth_ok, sth_diagnostics, statuses = verify_signed_tree_head(sth, log_public_key_path, require_signatures=require_signatures)
     diagnostics.extend(sth_diagnostics)
+    if slhdsa_public_key_path is not None:
+        # The additive post-quantum co-signature (heads from tree size 14
+        # on). Absent on older heads is NOT a failure - an append-only log
+        # keeps its history; a present-but-bad signature fails closed.
+        from .slhdsa import verify_payload_slhdsa
+
+        slh = (sth.get("signatures") or {}).get("slh_dsa") or {}
+        if str(slh.get("status") or "absent") == "signed":
+            try:
+                slh_ok, slh_error = verify_payload_slhdsa(
+                    signed_tree_head_payload(sth),
+                    str(slh.get("signature_base64") or ""),
+                    slhdsa_public_key_path,
+                )
+            except Exception as exc:  # old OpenSSL, unreadable key: fail closed
+                slh_ok, slh_error = False, f"SLH-DSA verification unavailable: {exc}"
+            if slh_ok:
+                statuses["slh_dsa"] = "verified"
+            else:
+                statuses["slh_dsa"] = "failed"
+                diagnostics.append(f"SLH-DSA head co-signature did not verify: {slh_error}")
+        else:
+            statuses["slh_dsa"] = "absent"
     try:
         tree_size = int(receipt.get("tree_size"))
         leaf_index = int(receipt.get("leaf_index"))

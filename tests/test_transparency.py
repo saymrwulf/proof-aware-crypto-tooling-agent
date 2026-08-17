@@ -145,3 +145,42 @@ def test_requiring_both_signatures_fails_without_ml_dsa_backend(tmp_path):
     assert not result.accepted
     assert result.signatures["ed25519"] == "verified"
     assert result.signatures["ml_dsa"] != "verified"
+
+
+def test_receipt_verify_checks_slhdsa_cosignature(tmp_path):
+    # Rung 2 of the site promises both head signatures are checkable;
+    # this binds the promise to the tool (operator-caught 2026-08-16).
+    import pytest
+
+    from pacta import slhdsa
+
+    try:
+        slhdsa.generate_slhdsa_keypair(tmp_path / "slh.key", tmp_path / "slh.pub")
+    except Exception:
+        pytest.skip("OpenSSL without SLH-DSA support on this host")
+    attestation, private_key, public_key = _signed_attestation(tmp_path)
+    from pacta.yamlio import dump_data
+
+    dump_data(attestation, tmp_path / "attestation.yaml")
+    log = TransparencyLog(tmp_path / "log")
+    log.init("local-test-provider", public_key)
+    receipt = log.append_attestation(
+        tmp_path / "attestation.yaml", private_key, public_key,
+        receipt_out=tmp_path / "receipt.yaml",
+        slhdsa_private_key_path=tmp_path / "slh.key",
+        slhdsa_public_key_path=tmp_path / "slh.pub",
+    )
+    result = verify_receipt(attestation, receipt, public_key,
+                            slhdsa_public_key_path=tmp_path / "slh.pub")
+    assert result.accepted, result.diagnostics
+    assert result.signatures["slh_dsa"] == "verified"
+
+    tampered = __import__("copy").deepcopy(receipt)
+    sig = tampered["sth"]["signatures"]["slh_dsa"]["signature_base64"]
+    import base64 as _b64
+    raw = bytearray(_b64.b64decode(sig)); raw[0] ^= 0xFF
+    tampered["sth"]["signatures"]["slh_dsa"]["signature_base64"] = _b64.b64encode(bytes(raw)).decode()
+    bad = verify_receipt(attestation, tampered, public_key,
+                         slhdsa_public_key_path=tmp_path / "slh.pub")
+    assert not bad.accepted
+    assert bad.signatures["slh_dsa"] == "failed"

@@ -137,6 +137,7 @@ def build_parser() -> argparse.ArgumentParser:
     receipt_verify.add_argument("--receipt", required=True)
     receipt_verify.add_argument("--log-public-key", required=True)
     receipt_verify.add_argument("--require-signatures", choices=["ed25519", "both"], default="ed25519")
+    receipt_verify.add_argument("--slhdsa-public-key", help="Also verify the additive SLH-DSA head co-signature against this public key (OpenSSL >= 3.5; heads before tree size 14 report absent, not failed).")
     receipt_verify.add_argument("--sth-store", help="Path to the local STH pin store (split-view/rollback defense).")
     receipt_verify.add_argument("--consistency-proof", help="File with a hex consistency proof from the pinned tree size (provider: log-consistency).")
     receipt_verify.add_argument("--max-sth-age-seconds", type=int, help="Reject signed tree heads older than this (freshness policy).")
@@ -476,7 +477,8 @@ def cmd_score(args: argparse.Namespace) -> int:
 def cmd_receipt_verify(args: argparse.Namespace) -> int:
     attestation = load_attestation(args.attestation)
     receipt = load_receipt(args.receipt)
-    result = verify_receipt(attestation, receipt, args.log_public_key, require_signatures=args.require_signatures)
+    result = verify_receipt(attestation, receipt, args.log_public_key, require_signatures=args.require_signatures,
+                            slhdsa_public_key_path=args.slhdsa_public_key)
     accountability_diagnostics = _log_accountability_checks(
         receipt,
         sth_store=args.sth_store,

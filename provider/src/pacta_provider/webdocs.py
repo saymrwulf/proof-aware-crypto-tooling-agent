@@ -255,8 +255,9 @@ two holders compare.</span></div>
 You still trust: that the operator&rsquo;s recorded observation is honest.<br>
 You need: four small files from the tables below — the two public keys, plus one library&rsquo;s
 claim file (&ldquo;attestation&rdquo;) and its proof of inclusion (&ldquo;receipt&rdquo;).
-<pre>pacta receipt-verify --attestation … --receipt … --log-public-key provider.ed25519.pub</pre>
-<span class="muted">Your machine checks one Ed25519 signature and
+<pre>pacta receipt-verify --attestation … --receipt … --log-public-key provider.ed25519.pub --slhdsa-public-key provider.slhdsa.pub</pre>
+<span class="muted">Your machine checks the required Ed25519 signature, the additive
+post-quantum co-signature (needs OpenSSL&nbsp;≥&nbsp;3.5; drop the second flag to skip it), and
 ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes — no proof assistant involved.
 The <code>pacta</code> tool ships in the
 <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a>
