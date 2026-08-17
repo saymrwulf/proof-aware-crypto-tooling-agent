@@ -48,7 +48,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.14}}
+\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.15}}
 
 \begin{document}
 \maketitle
@@ -112,7 +112,7 @@ This creates a problem that is logically downstream of proof construction:
 \begin{quote}
 \emph{How can a consumer that cannot execute the prover obtain precise,
 accountable evidence about a proof replay, without collapsing the result into
-an opaque provider verdict?}
+an opaque provider label?}
 \end{quote}
 
 A detached signature on the word ``verified'' authenticates an issuer but does
@@ -123,7 +123,10 @@ portability objective. Committees distribute trust but do not themselves fix
 the semantics of the attested result. Succinct proofs of verifier execution
 would provide validity rather than mere accountability, but require a circuit or
 verified-VM representation of the prover and are not yet the deployment
-assumption of the artifacts studied here.
+assumption of the artifacts studied here. Each alternative thus fails on
+one of two sides: the cost of checking stays with the consumer, or it
+disappears because belief in a label is demanded. The primitive studied
+here occupies the point between.
 
 We therefore study a narrower primitive: \emph{accountable delegation of
 deterministic proof replay}. The operator still observes the replay. The
