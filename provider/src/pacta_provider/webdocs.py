@@ -21,7 +21,8 @@ _STYLE = """
  h2{font-size:1.2rem;margin-top:2.6rem;border-bottom:2px solid var(--line);padding-bottom:.3rem}
  .tagline{font-size:1.05rem;color:var(--ink2);max-width:46rem}
  code,pre{font-family:ui-monospace,Menlo,Consolas,monospace;background:#eef0f3;border-radius:4px}
- code{padding:.1rem .3rem;font-size:.9em} pre{padding:.9rem;overflow-x:auto;font-size:.85rem}
+ code{padding:.1rem .3rem;font-size:.9em;overflow-wrap:anywhere}
+ pre{padding:.9rem;overflow-x:auto;font-size:.85rem;max-width:100%}
  table{border-collapse:collapse;width:100%;font-size:.93rem;background:#fff}
  td,th{border:1px solid var(--line);padding:.5rem .7rem;text-align:left;vertical-align:top}
  th{background:var(--accentbg)}
