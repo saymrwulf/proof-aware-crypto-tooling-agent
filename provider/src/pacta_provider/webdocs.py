@@ -392,7 +392,7 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 of the Jupyter c
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 25 pages, <strong>v0.13 — revised August&nbsp;2026</strong>; the version is printed on the
+(PDF, 25 pages, <strong>v0.14 — revised August&nbsp;2026</strong>; the version is printed on the
 title page) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level

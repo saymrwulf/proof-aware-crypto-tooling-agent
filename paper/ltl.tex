@@ -48,7 +48,7 @@ showstringspaces=false,breaklines=true,xleftmargin=.5em,xrightmargin=.5em}
 \large A Transparency Model and the Lean Transparency Log}
 \author{Olaf Horvath\\
 \small Olaf.Horvath@zkdefi.org \quad ORCID 0009-0004-8008-5805}
-\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.13}}
+\date{July 2026 \\ {\normalsize Revised: August 2026 --- v0.14}}
 
 \begin{document}
 \maketitle
@@ -518,7 +518,8 @@ $D$, $d$, $m$, $n$ & leaf list; leaf bytes; leaf index; tree size \\
 $\MTH(D)$;\ $k$ & Merkle root; split point (largest power of two below $n$) \\
 $\Path(m,D)$;\ $\Root(v,m,n,P)$ & inclusion path (leaf to root); path refold \\
 $\mathsf{Open}(d,m,n,P,r)$ & accepting opening: $m<n$ and $\Root(\hleaf(d),m,n,P)=r$ \\
-$\ConsRec$;\ $\mathsf{Ext}$ & recursive consistency verifier; pin-rule transition \\
+$\ConsRec$;\ $\mathsf{Ext}$ & recursive consistency verifier; pin-rule transition (\S\ref{sec:games}) \\
+$C$;\ $b$ & consistency proof; flag: old root is the pinned $r_0$ ($\top$) vs read from $C$ \\
 $\Obs_a(c)$;\ $\Policy(c)$ & axiom names recorded in leaf $a$; consumer's allowed set \\
 $\chi_{\rm enc}$;\ $\chi=(\chi_{\rm enc},pk)$ & payload-encoded head context; full context with the key \\
 $h=(n,r,t;\sigma)$;\ $\mathsf{Vf}_{pk}$ & signed head (size, root, timestamp); signature check \\
@@ -936,9 +937,9 @@ In the smallest growth case $2\to3$ --- the log's own transition in
 old tree and $P_0$ is simply the opening's within-prefix tail.
 
 \paragraph{Game $\mathsf{HIST}$ (local history binding).}
-$\mathcal{A}$ outputs a chain of head values $h_0,\dots,h_k$, transition
-proofs $C_1,\dots,C_k$ with $\mathsf{Ext}(n_{i-1},r_{i-1},n_i,r_i,C_i)=1$
-for every $1\le i\le k$, indices $0\le a<b\le k$, an index $m<n_a$, and
+$\mathcal{A}$ outputs a chain of head values $h_0,\dots,h_\ell$, transition
+proofs $C_1,\dots,C_\ell$ with $\mathsf{Ext}(n_{i-1},r_{i-1},n_i,r_i,C_i)=1$
+for every $1\le i\le \ell$, indices $0\le a<b\le \ell$, an index $m<n_a$, and
 openings with
 $\mathsf{Open}(d,m,n_a,P,r_a)=\mathsf{Open}(d',m,n_b,P',r_b)=1$ and
 $d\neq d'$. $\mathcal{A}$ wins iff everything verifies. (The chain is the
@@ -949,7 +950,7 @@ transcripts regardless of provenance.)
 \begin{theorem}[History binding]\label{thm:hist}
 There is an explicit algorithm $\mathcal{B}_{\rm hist}$ that, whenever
 $\mathcal{A}$ wins $\mathsf{HIST}$, outputs a SHA-256 collision, using
-$O(k\log n_k)$ hash evaluations.
+$O(\ell\log n_\ell)$ hash evaluations.
 \end{theorem}
 \begin{proof}
 By Lemma~\ref{lem:mono}, $m<n_a\le n_i$ for all $i\ge a$. Walk $t$ from $b$
@@ -962,7 +963,7 @@ at $h_a$ yields two accepting openings of $d\neq d'$ at $m$ under
 $(n_a,r_a)$, and Theorem~\ref{thm:pb} extracts the collision. Accepted
 transcripts have their RFC-determined logarithmic length --- malformed
 lengths reject --- so the walk costs at most the evaluations of replaying the
-$k$ transition transcripts and the two openings.
+$\ell$ transition transcripts and the two openings.
 \end{proof}
 
 \paragraph{Game $\mathsf{HEAD}$ (head authenticity).}
@@ -1031,7 +1032,7 @@ The LTL construction with the recursive verifiers of \S\ref{sec:security}
 --- the RFC~9162 tree, the canonical signed heads of \S4.2 in their fixed context $\chi$, the pin rule of \S4.3, and the policy
 verdict of \S\ref{sec:model} --- is collision-extractably accountable, with
 $\mathcal{B}_{\rm pb}$ ($\le 2(\lceil\log_2 n\rceil{+}1)$ hash evaluations),
-$\mathcal{B}_{\rm hist}$ ($O(k\log n_k)$), and the one-forgery reductions
+$\mathcal{B}_{\rm hist}$ ($O(\ell\log n_\ell)$), and the one-forgery reductions
 $\mathcal{B}_{\rm ha},\mathcal{B}_{\rm fr}$ of
 Theorems~\ref{thm:pb}--\ref{thm:fork}.
 \end{theorem}
