@@ -217,19 +217,24 @@ def render_docs(log: TransparencyLog, base_path: str) -> str:
 · <a href="https://zkdefi.org/saymrwulf">code</a>
 · <a href="https://zkdefi.com/">cv</a></p>
 <h1>LTL — the Lean Transparency Log</h1>
-<p>This site is a <strong>public notary for machine-checked proofs about cryptographic
-software</strong>. A proof assistant — <a href="https://lean-lang.org">Lean&nbsp;4</a>, a program
-that checks mathematical proofs mechanically — has verified precise statements about the code
-that <em>checks signatures</em>: in four widely deployed <strong>Ed25519</strong> libraries, in an
-implementation of <strong>SLH-DSA</strong> (FIPS&nbsp;205, the hash-based post-quantum signature
-standard), and in <strong>the Merkle-tree machinery of this log itself</strong>. Every completed
-proof check is recorded here as a signed, numbered entry that can never be altered or removed —
-{len(entries)} entries so far, drawn live further down this page.</p>
+<p><strong>Every known way of consuming formal verification fails on one of two
+sides: either the cost stays with you (re-running a theorem prover), or the cost
+disappears because you are asked to believe a label. This site holds the point in
+between — it makes machine-checked proof results as cheap to check as one
+signature and a handful of hashes, without turning them into trust. Every claim
+the operator ever makes is recorded here permanently, bound to his key, and
+scoped to its exact assumptions: he can never be believed, only held
+accountable.</strong></p>
 
-<p>Re-checking such proofs yourself takes a toolchain and real compute time. This log gives you
-cheaper positions to stand on: in milliseconds you can verify that the operator is permanently
-bound to every claim he ever made — and you can escalate, step by step, up to redoing
-everything yourself. The ladder below lists every position, cheapest first.</p>
+<p>Concretely: a proof assistant — <a href="https://lean-lang.org">Lean&nbsp;4</a>, a
+program that checks mathematical proofs mechanically — has verified precise
+statements about the code that <em>checks signatures</em>: in four widely deployed
+<strong>Ed25519</strong> libraries, in an implementation of <strong>SLH-DSA</strong>
+(FIPS&nbsp;205, the hash-based post-quantum signature standard), and in <strong>the
+Merkle-tree machinery of this log itself</strong>. Each completed proof check is one
+signed, numbered entry that can never be altered or removed — {len(entries)} entries
+so far, drawn live further down this page. How much of our work you re-verify is
+your choice, from milliseconds to everything:</p>
 
 <h2>Choose where you stand — the trust ladder</h2>
 
