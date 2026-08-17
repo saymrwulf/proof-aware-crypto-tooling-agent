@@ -42,7 +42,6 @@ _STYLE = """
  .sw{display:inline-block;width:.8rem;height:.8rem;border-radius:3px;vertical-align:-1px;margin-right:.3rem}
 """
 
-
 def _leaf_ok(entry: LogEntry) -> bool:
     certificates = ((entry.leaf.get("attestation") or {}).get("certificates")) or []
     return bool(certificates) and all(
@@ -50,13 +49,11 @@ def _leaf_ok(entry: LogEntry) -> bool:
         for certificate in certificates
     )
 
-
 def _leaf_short(component: str) -> str:
     """Compact display name for a leaf box at small spans."""
     return (component.replace("-ed25519-verified", "")
             .replace("ltl-accumulator-verified", "accum")
             .replace("fips205-slhdsa-verified", "slh-dsa"))
-
 
 def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str, head_label: str = "Ed25519") -> str:
     """The accumulator, drawn from its real leaves."""
@@ -126,7 +123,6 @@ def _svg_tree(entries: list[LogEntry], root_hex: str, signing_backend: str, head
     out.append("</svg>")
     return "".join(out)
 
-
 def _trust_anchor_html(log: TransparencyLog, metadata: dict[str, Any], base: str, mirror: str) -> str:
     """The provider public key, displayed in full on the front page. The key
     is the one thing a consumer takes on trust, once - hiding it behind a
@@ -175,7 +171,6 @@ verify against it.</p>
 &nbsp;·&nbsp; raw: <a href="{base}/log-public-key"><code>{base or ''}/log-public-key</code></a>
 &nbsp;·&nbsp; <code>curl -s https://ltl.zkdefi.org/log-public-key</code></p>
 {slh_block}</div>"""
-
 
 def render_docs(log: TransparencyLog, base_path: str) -> str:
     base = "/" + base_path.strip("/") if base_path.strip("/") else ""
@@ -374,7 +369,9 @@ is not something this site hands you at verification time — it is a
 <strong>requirements card</strong> that lives in <em>your</em> tooling, on
 <em>your</em> disk, and that you can read in five minutes or rewrite from first
 principles: Lean's three foundational axioms, plus — for the signature tiers only (the top proof layers, where full signature verification is proven) —
-named placeholders for SHA-512 and the wire format. Your tooling ignores this
+named placeholders for SHA-512 (the hash function Ed25519 uses internally —
+the proofs treat it as an assumption, not as proven) and the byte-level wire
+format. Your tooling ignores this
 operator's pass/fail labels entirely and re-derives every verdict by comparing the
 attestation's <em>observed</em> axiom list (its cone) against <em>your</em> card, name by name.
 The operator is trusted to copy down what the proof kernel printed — never to
@@ -408,12 +405,6 @@ instantiation section for the SLH-DSA (FIPS&nbsp;205) verify path — eleven cer
 five uninterpreted hash oracles, exact cones — and a certificate appendix mirroring the
 Ed25519 tiers.</div>
 
-<div class="card"><strong>Paper and log, one story.</strong> Since the August 2026 revisions the paper
-describes this deployment as it runs — nineteen leaves, dual-signed heads, the
-post-quantum verify path as leaf&nbsp;18 with its own certificate appendix. The log is
-append-only and keeps growing past any paper revision; every number the paper states
-stays checkable against the retained history: the mirror clone from rung&nbsp;1 of the
-ladder re-verifies all of it, paper-era and after.</div>
 
 <p class="muted">Log heads are signed offline; this service is read-only and holds no
 key material. Provider tooling, agent tooling, and the full Jupyter course live in the
