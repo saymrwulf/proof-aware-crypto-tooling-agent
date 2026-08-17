@@ -210,3 +210,16 @@ def test_svg_tree_boxes_never_overlap_or_spill():
         head = re.search(r'<rect x="[-0-9.]+" y="[0-9.]+" width="([0-9.]+)" height="46"', svg)
         title = re.search(r'font-weight="bold">([^<]+)</text>', svg).group(1)
         assert len(title) * 7.0 <= float(head.group(1)), "head title spills"
+
+
+def test_openapi_document_served_and_valid():
+    # The machine interface is published the industry-standard way
+    # (operator order 2026-08-16: no endpoint box on the human page).
+    import json as _json
+
+    from pacta_provider.web import _openapi_document
+
+    doc = _openapi_document("")
+    assert doc["openapi"].startswith("3.")
+    assert "/v1/sth" in doc["paths"] and "/log-public-key" in doc["paths"]
+    _json.dumps(doc)  # serializable

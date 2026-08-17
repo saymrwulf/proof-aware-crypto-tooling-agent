@@ -20,6 +20,39 @@ from .transparency_log import TransparencyLog
 
 API_VERSION = "v1"
 
+def _openapi_document(base: str) -> dict:
+    """The machine interface, described the industry-standard way (OpenAPI 3)
+    instead of a hand-written endpoint box on the human docs page."""
+    q = lambda name, desc, req=True: {"name": name, "in": "query", "required": req,
+                                      "description": desc, "schema": {"type": "string"}}
+    ok = {"200": {"description": "success"}}
+    return {
+        "openapi": "3.0.3",
+        "info": {"title": "Lean Transparency Log",
+                 "description": "Read-only CT-style interface of the LTL. "
+                                "Heads are signed offline; this service holds no key material.",
+                 "version": API_VERSION},
+        "servers": [{"url": "https://ltl.zkdefi.org" + base}],
+        "paths": {
+            "/log-public-key": {"get": {"summary": "Required Ed25519 public key (PEM)", "responses": ok}},
+            "/log-slhdsa-public-key": {"get": {"summary": "Additive post-quantum SLH-DSA public key (PEM)", "responses": ok}},
+            "/healthz": {"get": {"summary": "Liveness and current tree size", "responses": ok}},
+            "/paper": {"get": {"summary": "The current paper (PDF)", "responses": ok}},
+            f"/{API_VERSION}/metadata": {"get": {"summary": "Log identity", "responses": ok}},
+            f"/{API_VERSION}/sth": {"get": {"summary": "Latest Signed Tree Head", "responses": ok}},
+            f"/{API_VERSION}/sth-history": {"get": {"summary": "Every Signed Tree Head ever issued (witness material)", "responses": ok}},
+            f"/{API_VERSION}/sth-consistency": {"get": {"summary": "Consistency proof from a pinned size",
+                "parameters": [q("first", "your pinned old tree size")], "responses": ok}},
+            f"/{API_VERSION}/proof": {"get": {"summary": "Inclusion proof (freshly issued receipt)",
+                "parameters": [q("component", "component name", False), q("leaf_hash", "leaf hash (hex)", False)], "responses": ok}},
+            f"/{API_VERSION}/attestation": {"get": {"summary": "Newest attestation for a component",
+                "parameters": [q("component", "component name")], "responses": ok}},
+            f"/{API_VERSION}/entries": {"get": {"summary": "Raw leaves in [start, end)",
+                "parameters": [q("start", "first index", False), q("end", "one past last index", False)], "responses": ok}},
+        },
+    }
+
+
 
 def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdfs: dict[str, bytes] | None = None):
     paper_pdfs = paper_pdfs or {}
@@ -78,6 +111,8 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            elif route == "/openapi.json":
+                self._send(200, _openapi_document(base))
             elif route == "/healthz":
                 self._send(200, {"ok": True, "tree_size": len(log.entries())})
             elif route == f"/{API_VERSION}/metadata":
@@ -153,6 +188,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                         f"{base}/log-public-key",
                         f"{base}/log-slhdsa-public-key",
                         f"{base}/healthz",
+                        f"{base}/openapi.json",
                         f"{base}/{API_VERSION}/metadata",
                         f"{base}/{API_VERSION}/sth",
                         f"{base}/{API_VERSION}/sth-history",
