@@ -150,7 +150,7 @@ def _trust_anchor_html(log: TransparencyLog, metadata: dict[str, Any], base: str
 <p style="margin-top:0"><strong>Key&nbsp;2 — SLH-DSA (FIPS&nbsp;205), post-quantum.</strong> Heads from tree size&nbsp;14 on carry a second signature from this key;
 older heads legitimately have none — an append-only log keeps its history. Check it where your
 tooling allows (OpenSSL&nbsp;≥&nbsp;3.5). The kind of code that verifies such signatures is itself
-a proof subject of this log (leaf&nbsp;18).</p>
+a proof subject of this log (entry&nbsp;18).</p>
 <pre style="margin-bottom:.4rem">{slh_pem}</pre>
 <p class="muted" style="margin:.2rem 0 0">SHA-256 fingerprint <code>{slh_fp}</code>
 &nbsp;·&nbsp; raw: <a href="{base}/log-slhdsa-public-key"><code>{base or ''}/log-slhdsa-public-key</code></a>
@@ -239,7 +239,8 @@ You still trust: the content of every claim. You defeat: silent rewriting.<br>
 You need: Python&nbsp;3 and the <code>openssl</code> command (preinstalled on most Linux and macOS systems).
 <pre>git clone https://github.com/saymrwulf/lean-transparency-log &amp;&amp; cd lean-transparency-log &amp;&amp; python3 verify.py --all</pre>
 <span class="muted">This fetches the log&rsquo;s public mirror — a git repository holding every entry
-and every signed head ever issued — and re-computes every hash and signature in it. A green
+and every signed head ever issued (a head is the signed root fingerprint of the tree at a
+given size) — and re-computes every hash and signature in it. A green
 result means the history you now hold is internally consistent and signed. Keep the folder:
 if the operator ever shows a different history to anyone else, your copy proves it. A log
 that shows different histories to different people (a &ldquo;split view&rdquo;) survives only until
@@ -294,7 +295,9 @@ compiler, and your hardware.</span></div>
 <h2>The accumulator, live</h2>
 <p>The log is a <strong>Merkle tree</strong>: every entry (&ldquo;leaf&rdquo;) is hashed, hashes pair
 up level by level, and a single 32-byte root fingerprints the entire history; the operator signs
-that root. Changing any past entry would change the root — that is the tamper evidence. This
+that root. Changing any past entry would change the root — that is the tamper evidence. Each leaf
+records one proof run: a batch of <strong>certificates</strong> — one machine-checked theorem
+each, together with its exact assumption list. This
 picture is computed from the live log at page render — the leaf hashes, nodes, root, and
 signature are the real ones:</p>
 {tree_svg}
@@ -346,9 +349,8 @@ consumers.)</td>
 </table>
 
 <h2>Attested libraries</h2>
-<table><tr><th>component</th><th>artifact 2</th><th>artifact 3</th><th>status</th></tr>{rows}</table>
+<table><tr><th>library</th><th>claim (attestation)</th><th>proof of inclusion (receipt)</th><th>certificates proven</th></tr>{rows}</table>
 
-<p class="muted">One certificate = one machine-checked theorem together with its exact assumption set (its axiom cone).</p>
 
 <h2>What a verified inclusion means — and what it does not</h2>
 <div class="card"><span class="pill ok">means</span> The provider whose key you hold
@@ -366,7 +368,8 @@ residual-risk list — the enumerated assumptions inside its <code>attestation.j
 <h2>You hold the ruler</h2>
 <div class="card">The list of assumptions a certificate is <em>allowed</em> to rest on
 is not something this site hands you at verification time — it is a
-<strong>requirements card</strong> that lives in <em>your</em> tooling, on
+<strong>requirements card</strong> — a short plain-text file listing, by name, the
+assumptions you accept — that lives in <em>your</em> tooling, on
 <em>your</em> disk, and that you can read in five minutes or rewrite from first
 principles: Lean's three foundational axioms, plus — for the signature tiers only (the top proof layers, where full signature verification is proven) —
 named placeholders for SHA-512 (the hash function Ed25519 uses internally —
