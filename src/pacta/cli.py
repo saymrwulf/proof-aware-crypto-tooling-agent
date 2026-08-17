@@ -137,7 +137,7 @@ def build_parser() -> argparse.ArgumentParser:
     receipt_verify.add_argument("--receipt", required=True)
     receipt_verify.add_argument("--log-public-key", required=True)
     receipt_verify.add_argument("--require-signatures", choices=["ed25519", "both"], default="ed25519")
-    receipt_verify.add_argument("--slhdsa-public-key", help="Also verify the additive SLH-DSA head co-signature against this public key (OpenSSL >= 3.5; heads before tree size 14 report absent, not failed).")
+    receipt_verify.add_argument("--slhdsa-public-key", help="Also verify the second (post-quantum, SLH-DSA) head signature against this public key (OpenSSL >= 3.5; heads before tree size 14 report absent, not failed).")
     receipt_verify.add_argument("--sth-store", help="Path to the local STH pin store (split-view/rollback defense).")
     receipt_verify.add_argument("--consistency-proof", help="File with a hex consistency proof from the pinned tree size (provider: log-consistency).")
     receipt_verify.add_argument("--max-sth-age-seconds", type=int, help="Reject signed tree heads older than this (freshness policy).")

@@ -35,7 +35,7 @@ def _openapi_document(base: str) -> dict:
         "servers": [{"url": "https://ltl.zkdefi.org" + base}],
         "paths": {
             "/log-public-key": {"get": {"summary": "Required Ed25519 public key (PEM)", "responses": ok}},
-            "/log-slhdsa-public-key": {"get": {"summary": "Additive post-quantum SLH-DSA public key (PEM)", "responses": ok}},
+            "/log-slhdsa-public-key": {"get": {"summary": "Post-quantum SLH-DSA public key (PEM)", "responses": ok}},
             "/healthz": {"get": {"summary": "Liveness and current tree size", "responses": ok}},
             "/paper": {"get": {"summary": "The current paper (PDF)", "responses": ok}},
             f"/{API_VERSION}/metadata": {"get": {"summary": "Log identity", "responses": ok}},

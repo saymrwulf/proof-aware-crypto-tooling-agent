@@ -151,8 +151,7 @@ def _trust_anchor_html(log: TransparencyLog, metadata: dict[str, Any], base: str
         slh_pem = escape(slh_path.read_text(encoding="utf-8").strip())
         slh_fp = _h.sha256(slh_path.read_bytes()).hexdigest()
         slh_block = f"""<hr style="border:none;border-top:1px solid #ddd;margin:.8rem 0">
-<p style="margin-top:0"><strong>Key&nbsp;2 — SLH-DSA-SHA2-128s (FIPS&nbsp;205), additive
-post-quantum.</strong> Heads from tree size&nbsp;14 on carry a second signature from this key;
+<p style="margin-top:0"><strong>Key&nbsp;2 — SLH-DSA (FIPS&nbsp;205), post-quantum.</strong> Heads from tree size&nbsp;14 on carry a second signature from this key;
 older heads legitimately have none — an append-only log keeps its history. Check it where your
 tooling allows (OpenSSL&nbsp;≥&nbsp;3.5). The kind of code that verifies such signatures is itself
 a proof subject of this log (leaf&nbsp;18).</p>
@@ -256,8 +255,8 @@ You still trust: that the operator&rsquo;s recorded observation is honest.<br>
 You need: four small files from the tables below — the two public keys, plus one library&rsquo;s
 claim file (&ldquo;attestation&rdquo;) and its proof of inclusion (&ldquo;receipt&rdquo;).
 <pre>pacta receipt-verify --attestation … --receipt … --log-public-key provider.ed25519.pub --slhdsa-public-key provider.slhdsa.pub</pre>
-<span class="muted">Your machine checks the required Ed25519 signature, the additive
-post-quantum co-signature (needs OpenSSL&nbsp;≥&nbsp;3.5; drop the second flag to skip it), and
+<span class="muted">Your machine checks the required Ed25519 signature, the second (post-quantum) signature
+(needs OpenSSL&nbsp;≥&nbsp;3.5; drop the second flag to skip it), and
 ~{max(1,(latest.get('tree_size') or 1).bit_length())} hashes — no proof assistant involved.
 The <code>pacta</code> tool ships in the
 <a href="https://github.com/saymrwulf/proof-aware-crypto-tooling-agent">pacta repository</a>
@@ -320,7 +319,7 @@ log id <code>{escape(str(metadata.get('log_id',''))[:16])}…</code>.</p>
 
 <h2>What do I download? — the three artifacts, unambiguously</h2>
 <p>To benefit from the accumulator you need <strong>exactly three files</strong> per
-library, plus optionally the additive post-quantum key
+library, plus optionally the post-quantum key
 (<code>provider.slhdsa.pub</code>) and the whole mirror. Nothing else.</p>
 <table>
 <tr><th>#</th><th>Artifact</th><th>What it is</th><th>Where</th></tr>
