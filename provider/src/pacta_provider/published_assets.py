@@ -508,7 +508,7 @@ scoped to the mechanized model — it does not prove operator honesty,
 signing, or execution provenance). As of **2026-08** the log also attests
 the **SLH-DSA (FIPS 205) verify-path proofs** (leaf 18)
 ([`fips205-slhdsa-verified`](https://github.com/saymrwulf/fips205-slhdsa-verified))
-and its heads carry an **additive post-quantum SLH-DSA-SHA2-128s signature**
+and its heads carry a **second, post-quantum SLH-DSA-SHA2-128s signature**
 beside the required Ed25519 one. The current head is `latest-sth.json` —
 this README deliberately names no tree size, so it cannot go stale.
 
@@ -536,6 +536,9 @@ python3 verify.py --receipt receipts/dalek-ed25519-verified.receipt.json
 The online service (same data, live endpoints + customer documentation):
 **https://ltl.zkdefi.org**
 
+The design and its security analysis:
+**https://ltl.zkdefi.org/paper** (DOI [10.5281/zenodo.22057482](https://doi.org/10.5281/zenodo.22057482))
+
 The provider tooling, agent tooling, and course materials:
 **https://github.com/saymrwulf/proof-aware-crypto-tooling-agent**
 
@@ -548,7 +551,7 @@ trust ledger keeps its history. Tree heads are signed by the merkleized,
 proof-attested Ed25519 library itself, and each signature embeds the
 provider's own Merkle self-check of that library's leaf. Heads additionally
 carry a **deterministic SLH-DSA-SHA2-128s signature** over the same payload:
-additive, so Ed25519 remains the signature a consumer must check, and honest
+strictly additional, so Ed25519 remains the signature a consumer must check, and honest
 about scope — the estate's certificates cover the *verification* path of both
 algorithms; no signing operation is proven for either, and leaves themselves
 are Ed25519-signed at issuance only. Heads published before 2026-08 have no
