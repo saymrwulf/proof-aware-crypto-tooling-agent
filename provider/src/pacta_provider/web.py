@@ -67,6 +67,16 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
             except Exception as exc:  # noqa: BLE001 - the service must not die on a bad request
                 self._send(500, {"error": f"internal error: {type(exc).__name__}"})
 
+        def do_HEAD(self) -> None:  # noqa: N802 - link checkers and mail/chat
+            # unfurlers probe with HEAD; answer with the same headers as GET
+            # and no body (a 501 here makes every link look broken to them).
+            self._head_only = True
+            self.do_GET()
+
+        def _body(self, body: bytes) -> None:
+            if not getattr(self, "_head_only", False):
+                self.wfile.write(body)
+
         def _route(self) -> None:
             parsed = urlparse(self.path)
             path = parsed.path.rstrip("/")
@@ -91,7 +101,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                 self.send_header("Content-Disposition", 'inline; filename="ltl.pdf"')
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                self._body(body)
             elif route in ("/log-public-key", "/log-slhdsa-public-key"):
                 # TOFU mitigation depends on the key being published in two
                 # independent locations; this is the site's copy (the mirror
@@ -110,7 +120,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
                 self.send_header("Content-Type", "text/plain; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                self._body(body)
             elif route == "/openapi.json":
                 self._send(200, _openapi_document(base))
             elif route == "/healthz":
@@ -222,7 +232,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
             self.send_header("Content-Length", str(len(body)))
             self.send_header("X-Robots-Tag", "noindex, nofollow")
             self.end_headers()
-            self.wfile.write(body)
+            self._body(body)
             return True
 
         def _send(self, code: int, payload: dict[str, Any], code_if_error: int | None = None) -> None:
@@ -234,7 +244,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(body)
+            self._body(body)
 
         def _send_html(self, html: str) -> None:
             body = html.encode("utf-8")
@@ -242,7 +252,7 @@ def make_handler(log: TransparencyLog, base_path: str, docs_html: str, paper_pdf
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(body)
+            self._body(body)
 
         def log_message(self, fmt: str, *args: Any) -> None:  # quiet by default
             pass

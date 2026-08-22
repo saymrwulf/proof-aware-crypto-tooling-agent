@@ -223,3 +223,33 @@ def test_openapi_document_served_and_valid():
     assert doc["openapi"].startswith("3.")
     assert "/v1/sth" in doc["paths"] and "/log-public-key" in doc["paths"]
     _json.dumps(doc)  # serializable
+
+
+def test_head_requests_answer_like_get_without_body(tmp_path):
+    # Link checkers and mail/chat unfurlers probe with HEAD; a 501 made
+    # /paper look broken to them (found 2026-08-22 while verifying what
+    # the paper link serves).
+    import http.client
+    import shutil
+
+    _make_log(tmp_path)
+    shutil.copy2(tmp_path / "k.pub", tmp_path / "log" / "provider.ed25519.pub")
+    server = serve(str(tmp_path / "log"), port=0)
+    port = server.server_address[1]
+    import threading
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        for route, ctype in [("/", "text/html"), ("/v1/sth", "application/json"),
+                             ("/log-public-key", "text/plain")]:
+            conn.request("HEAD", route)
+            r = conn.getresponse()
+            body = r.read()
+            assert r.status == 200, (route, r.status)
+            assert ctype in r.getheader("Content-Type", ""), route
+            assert body == b"", (route, len(body))
+            assert int(r.getheader("Content-Length", "0")) > 0, route
+    finally:
+        server.shutdown()
