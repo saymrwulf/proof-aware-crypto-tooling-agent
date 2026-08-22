@@ -9,9 +9,10 @@ machinery hub and the only repo that changes freely.
 
 State snapshot (2026-08-16): log **19 leaves**, root `7ee23940…`, key
 fingerprint `874c8a00…`, heads dual-signed (Ed25519 + SLH-DSA) since
-size 14, paper **v0.11 (25 pp, revised August 2026)**, six attested
+size 14, paper **v0.15 (25 pp, revised August 2026;
+DOI 10.5281/zenodo.22057482)**, six attested
 components (SLH-DSA verify path = leaf 18, the first post-quantum
-entry), pacta suite 153 green.
+entry), pacta suite 157 green.
 
 ```mermaid
 flowchart LR
@@ -37,7 +38,7 @@ flowchart LR
     sig["dogfood signer<br/>verified-dalek binary"]
     lib["consumer library<br/>receipts · pin store · R0–R5"]
     wal["warden (code)<br/>quorum wallet · MCP · cockpit (local, read-only)"]
-    pap["paper<br/>v0.11 (archives in git history)"]
+    pap["paper<br/>v0.15 + DOI (archives in git history)"]
     crs["course + llms.txt<br/>14 notebooks"]
     key["SIGNING KEY (offline)"]
     ops["operational log state<br/>the true accumulator"]
@@ -119,10 +120,10 @@ deployed verifier; see the corpus KNOWN-GAPS ledger).
 
 | Repository | Lane | Role | Mutability |
 |---|---|---|---|
-| `curve25519-dalek-source`, `anza-cryptography-source`, `risc0-…-source`, `betrusted-…-source`, `pasta_curves-source` (+ `xous-core`, `litex-boards` context) | upstream | pinned inputs to extraction | **frozen — never modified** |
+| `curve25519-dalek-source`, `anza-cryptography-source`, `risc0-…-source`, `betrusted-…-source`, `pasta_curves-source` (+ `xous-core` context) | upstream | pinned inputs to extraction | **frozen — never modified** |
 | `fips205-source` | upstream | verbatim snapshot of `integritychain/fips205` (pure-Rust FIPS 205 / SLH-DSA); upstream pin `30bac08`, snapshot head `a3ce8e8` — deviations: CI workflows stripped + the documented Aeneas-compat/de-plumbing patch series (each commit individually justified) | pinned; moves only for transparent, individually-justified Aeneas-compat patches (nothing proposed upstream) |
 | `dalek-` / `anza-` / `risc0-` / `betrusted-ed25519-verified` | subject | Rust source + Lean proofs; 44 certs each, attested 44/44 as leaves 13–16 (2026-08-08); earlier 16-cert generations at leaves 8–11, first generations at 0–7 | attested commits fixed |
-| `pasta-pallas-verified` | subject | field layer proven; curve layer pending; **not attested** | changes freely |
+| `pasta-pallas-verified` | subject | field foundation proven (sub/neg, helpers, constants, primality, denotation); field completion and curve layer pending; **not attested** | changes freely |
 | `fips205-slhdsa-verified` | subject | SLH-DSA (FIPS 205) verify-path campaign, parameter set SLH-DSA-SHA2-128s; **11 certificates proven, `check.sh` green with an 18-attack self-test**; attested — leaf 18 (2026-08-08), the log's first post-quantum entry | attested commit fixed |
 | `ltl-accumulator-verified` | subject | 61-cert corpus about the log's accumulator model; **leaf 12 subject**, frozen `172a1d0`; hardened model re-attested as leaf 17 (2026-08-08) | frozen; doc-only commits allowed |
 | `proof-aware-crypto-tooling-agent` (this repo) | machinery | provider service, consumer library, warden (+ local read-only cockpit), dogfood signer, paper, course, tests | **changes freely — the hub** |
@@ -134,7 +135,7 @@ deployed verifier; see the corpus KNOWN-GAPS ledger).
 
 | Entity | What it is |
 |---|---|
-| **ltl.zkdefi.org** | droplet (caddy → docker `cloud-ltl-1`): homepage rendered from live leaves, `/v1` API, `/paper` (+`/v0.2`, `/v0.1`), key endpoint. Read-only; no key material on the server. Deployment configuration is maintained privately. |
+| **ltl.zkdefi.org** | droplet (caddy → docker `cloud-ltl-1`): homepage rendered from live leaves, `/v1` API, `/paper`, key endpoint. Read-only; no key material on the server. Deployment configuration is maintained privately. |
 | **Forgejo** (`cloud-forgejo-1`) | nightly (03:00) mirror of the entire saymrwulf GitHub account — disaster-recovery copy. |
 | **Signing key** | offline, operator-only; fingerprint `874c8a00…`; never on the server; public half published in two independent locations. |
 | **Operational log state** | `provider/state/transparency-log-main` — the true accumulator. Appends happen here; the mirror is its projection. |
