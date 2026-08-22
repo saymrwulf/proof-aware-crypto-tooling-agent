@@ -82,7 +82,7 @@ COURSE = {
                 - Perform a proof hygiene scan and explain why `sorry`, local axioms, and trivial theorem targets are dangerous.
                 - Explain how a third-party proof-checking provider changes the trusted base.
                 - Implement and verify RFC 9162-style Merkle inclusion and consistency proofs.
-                - Explain why Signed Tree Heads need accountable signatures, why Ed25519 is useful here, and why ML-DSA requires a real backend.
+                - Explain why Signed Tree Heads need accountable signatures, why Ed25519 is useful here, why ML-DSA requires a real backend, and how the shipped SLH-DSA co-signature differs from both.
                 - Design policy gates that convert verification evidence into consequences.
                 - Read R4 four-tier apex evidence, name its residual blockers, and write a research plan toward R5 production assurance.
                 """
@@ -1029,6 +1029,7 @@ COURSE = {
 
                 - `require-signatures ed25519`: verify Ed25519 and allow ML-DSA to be unavailable.
                 - `require-signatures both`: require Ed25519 and ML-DSA verified. If ML-DSA is unavailable, fail closed.
+                - `--slhdsa-public-key <pem>`: additionally verify the second (post-quantum) SLH-DSA co-signature on the head; heads before tree size 14 report `absent` (allowed), a present-but-wrong signature fails closed.
                 """
             ),
             code(
@@ -1048,6 +1049,53 @@ COURSE = {
                 Ed25519 is useful because it is widely deployed, fast, and directly relevant to the Ed25519 proof corpus. That creates a deliberate "eat your own dogfood" loop: the proof-checking ecosystem signs evidence using a primitive whose implementation family is under formal scrutiny.
 
                 ML-DSA adds post-quantum robustness for the accumulator signature layer. But it must be a real signature, not an aspirational label. If a host lacks ML-DSA, the correct result is an explicit blocker.
+                """
+            ),
+            md(
+                """
+                ## The second signature that actually shipped: SLH-DSA
+
+                Since tree size 14, every head of the LIVE log carries a second,
+                deterministic **SLH-DSA-SHA2-128s** (FIPS 205) signature beside the
+                required Ed25519 one. This is not the ML-DSA slot above - it is a
+                hash-based scheme, and it was chosen because the estate has PROVEN
+                its verify path (eleven certificates, log leaf 18): the log
+                co-signs with the parameter set whose verification path it itself
+                attests. Three design facts worth internalizing:
+
+                1. Heads published before size 14 carry no co-signature, and
+                   verifiers report them `ABSENT` rather than failing them - an
+                   append-only log keeps the history of its own signature-scheme
+                   upgrades.
+                2. The co-signature is deterministic on purpose: re-signing the
+                   same payload is byte-comparable, so "same input, same
+                   signature" becomes a diff you can run, not an assurance you
+                   must trust.
+                3. Signing is still never proven - here, as everywhere in this
+                   estate, certificates cover the VERIFY path only.
+                """
+            ),
+            code(
+                """
+                # Runnable where OpenSSL >= 3.5 is present; honest skip otherwise.
+                import tempfile
+                from pathlib import Path
+
+                from pacta import slhdsa
+
+                tmp = Path(tempfile.mkdtemp(prefix="nb06-slhdsa-"))
+                try:
+                    slhdsa.generate_slhdsa_keypair(tmp / "slh.key", tmp / "slh.pub")
+                except Exception as exc:
+                    print("SLH-DSA unavailable on this host (OpenSSL >= 3.5 needed):", exc)
+                else:
+                    payload = b"canonical STH payload bytes"
+                    block = slhdsa.slh_dsa_signature_block(payload, tmp / "slh.key", tmp / "slh.pub")
+                    ok, err = slhdsa.verify_payload_slhdsa(payload, block["signature_base64"], tmp / "slh.pub")
+                    print("co-signature verifies:", ok, err or "")
+                    block2 = slhdsa.slh_dsa_signature_block(payload, tmp / "slh.key", tmp / "slh.pub")
+                    print("deterministic (byte-equal re-sign):",
+                          block["signature_base64"] == block2["signature_base64"])
                 """
             ),
             md(
@@ -1749,6 +1797,7 @@ COURSE = {
                 - Modify a claim card to R2 and show that `build-library` is refused.
                 - Explain why a denial artifact is useful for auditability.
                 - Design a policy where an agent requires `both` Ed25519 and ML-DSA signatures for production deployment but allows Ed25519-only in a local lab.
+                - Extend it: when should the agent also require the SLH-DSA co-signature, given that heads before tree size 14 legitimately lack it?
                 - Write a downstream Rust pseudo-code snippet that imports the generated capsule before enabling a code path.
                 """
             ),
@@ -1770,7 +1819,7 @@ COURSE = {
                 - State precisely which parts of the dogfood verifier are certificate-covered and which are its trusted base.
                 - Extract a raw Ed25519 key from an OpenSSL PEM by hand (napkin) and mechanically (real).
                 - Demonstrate backend dispatch and the fail-closed `--require-verified-verifier` policy.
-                - Defend the hybrid post-quantum posture: one proven-classical signature plus one required-but-honest ML-DSA slot.
+                - Defend the three-legged post-quantum posture: proven-classical Ed25519, the shipped SLH-DSA co-signature with its attested verify path, and a required-but-honest ML-DSA slot.
                 """
             ),
             md(
@@ -1858,7 +1907,8 @@ COURSE = {
                 leaf, against the very tree it is about to sign. The verdict is
                 embedded in the signature block (`signing_provenance`: backend,
                 library commit, leaf index, `self_inclusion: verified`,
-                certificates 16/16). Lectures 6a/6b walk both sides of this.
+                certificates 44/44 - the signer's source family was re-attested at 44
+                certificates as leaf 13). Lectures 6a/6b walk both sides of this.
                 Honesty note unchanged: the library's VERIFY path is
                 certificate-covered; the signing path is declared trusted base -
                 but it is the attested artifact, not an un-attested third
@@ -1866,12 +1916,13 @@ COURSE = {
 
                 ## The post-quantum line, held honestly
 
-                The dogfood loop deliberately does NOT extend to ML-DSA. There is no formally verified ML-DSA implementation in this corpus, and pretending otherwise would poison the whole posture. The hybrid strategy is therefore asymmetric on purpose:
+                The posture has three legs now, and each is exactly as strong as it claims:
 
-                - **Ed25519 (classical): proven path.** The signature everyone can check today runs on certificate-covered code.
-                - **ML-DSA-65 (post-quantum): required, honest, unavailable-until-real.** The tree-head slot exists in every signed structure; `--require-signatures both` fails CLOSED on hosts without a real FIPS 204 backend; and when a real backend lands, the policy flips on without a schema change.
+                - **Ed25519 (classical): proven verify path, dogfooded.** The signature everyone can check today runs on certificate-covered code.
+                - **SLH-DSA-SHA2-128s (post-quantum): shipped and attested.** Since tree size 14 every live head carries a second, deterministic SLH-DSA co-signature. The estate proved the VERIFY path of a pinned Rust FIPS 205 implementation (eleven certificates) and appended that attestation as leaf 18 - so the co-signature uses exactly the parameter set the log itself attests. Consumers check it with `pacta receipt-verify ... --slhdsa-public-key provider.slhdsa.pub` or the mirror's `verify.py`. Signing remains unproven - verify paths only, always.
+                - **ML-DSA-65 (lattice PQ): required, honest, unavailable-until-real.** The tree-head slot exists in every signed structure; `--require-signatures both` fails CLOSED on hosts without a real FIPS 204 backend; when a real backend lands, the policy flips on without a schema change.
 
-                A migration strategy that records "we cannot do this yet" as a deployment blocker is strictly stronger than one that ships a placeholder. Blockers get fixed; placeholders get trusted.
+                A migration strategy that records "we cannot do this yet" as a deployment blocker is strictly stronger than one that ships a placeholder. Blockers get fixed; placeholders get trusted. And the SLH-DSA leg shows the endgame: a slot stops being aspirational the day its verify path enters the log.
                 """
             ),
             code(
@@ -2308,6 +2359,23 @@ COURSE = {
                 - Design `warden-treasury`: which member re-verifies Solana
                   transactions, and what exactly the RPC provider is still
                   trusted for after you do.
+                """
+            ),
+            md(
+                """
+                ## The human surface: see this wallet through the cockpit
+
+                Everything this notebook built programmatically has a read-only human console:
+
+                ```
+                pacta wallet cockpit --demo            # throwaway demo wallet, zero setup
+                pacta wallet cockpit --wallet DIR      # the wallet you just sealed here
+                ```
+
+                Open `/deck` for all six role stations live in parallel (the quorum bench you built is the
+                indigo pane; the ledger you hash-chained is re-verified on every page load), and `/manual`
+                for the lab-manual sessions that teach each role — Session 4's tamper drill breaks a *copy*
+                of a ledger exactly like this notebook's and watches two independent surfaces catch it.
                 """
             ),
         ]

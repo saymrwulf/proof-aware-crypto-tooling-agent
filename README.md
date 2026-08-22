@@ -125,11 +125,11 @@ The `notebooks/` directory contains a zero-to-hero teaching sequence for undergr
 - `03_lean_replay_and_axiom_audit.ipynb`: replay versus transpilation, Lean invocation, axiom audits.
 - `04_proof_hygiene_and_boundaries.ipynb`: `sorry`, local axioms, trivial targets, manifest coverage.
 - `05_third_party_attestation_provider.ipynb`: provider trust transformation and signed attestations.
-- `06_merkle_transparency_logs.ipynb`: RFC 9162-style Merkle proofs, STHs, Ed25519/ML-DSA policy.
+- `06_merkle_transparency_logs.ipynb`: RFC 9162-style Merkle proofs, STHs, the dual-signature head policy (Ed25519 + the shipped SLH-DSA co-signature) and the fail-closed ML-DSA slot.
 - `06a_provider_build_the_log.ipynb` / `06b_agent_verify_inclusion.ipynb`: the MIRRORED PAIR - one provider (builds, Lean-verifies, signs with the merkleized library, self-checks its own inclusion), many agents (verify inclusion from scratch in ~25 lines, no Lean); the domain separation is the design and the lecture structure mirrors it.
 - `07_agent_consequences.ipynb`: receipt-gated artifact builds and wallet-denial policy.
 - `08_capstone_research_program.ipynb`: audit the shipped R4 evidence; design the R5 discharge plan.
-- `09_dogfood_verified_crypto.ipynb`: the proven-path verifier in the agent's own loop; hybrid-PQC posture.
+- `09_dogfood_verified_crypto.ipynb`: the proven-path verifier in the agent's own loop; the three-legged PQ posture (Ed25519 dogfood, shipped SLH-DSA, honest ML-DSA slot).
 - `10_verified_custody_wallet.ipynb`: warden - the quorum custody boundary and signing firewall, ratchet-rule (toy 3-of-3, then the real four proven forks), plus the counterparty recomputing a custody card's inclusion proof.
 - `11_the_customers_eye_view.ipynb`: the counterparty's seat - what a customer can and cannot recompute about someone else's wallet from its custody card and the public log.
 
