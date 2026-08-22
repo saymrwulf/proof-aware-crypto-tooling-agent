@@ -397,21 +397,16 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 of the Jupyter c
 <h2>The paper</h2>
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
-(PDF, 25 pages, <strong>v0.15 — revised August&nbsp;2026</strong>; the version is printed on the
-title page; DOI <a href="https://doi.org/10.5281/zenodo.22057482">10.5281/zenodo.22057482</a>) — the trust decomposition (expensive verification produces an
-observation; transparency makes the observation accountable; consumer-local policy decides
-acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
-accountability GAMES with an explicit composition theorem (head authenticity, position
-binding, history binding with a fully proved prefix-transport induction, context-scoped
-fork evidence — all discharged by named reductions), the policy boundary where
-operator labels can veto but never grant acceptance, and the measured model/deployment
-divergence reported as a result rather than hidden — now together with its closure: the
-divergence traced to one omitted RFC&nbsp;9162 conjunct (Step&nbsp;7's <code>sn&nbsp;=&nbsp;0</code>),
-zero divergences after the one-line restoration, confirmed by a three-way regression.
-New in the August 2026 revisions: the deployment evaluated to its current nineteen-leaf, dual-signed state, an
-instantiation section for the SLH-DSA (FIPS&nbsp;205) verify path — eleven certificates,
-five uninterpreted hash oracles, exact cones — and a certificate appendix mirroring the
-Ed25519 tiers.</div>
+(PDF, 25 pages · v0.15, August&nbsp;2026 · DOI
+<a href="https://doi.org/10.5281/zenodo.22057482">10.5281/zenodo.22057482</a>).
+The full design and its security analysis: what the log guarantees, stated as
+precise games with proofs — and what it deliberately does not guarantee, with
+the same honesty discipline as this page, at referee depth. It also tells the
+project&rsquo;s best war story: the mechanized model caught our own deployed
+verifier omitting a single condition of RFC&nbsp;9162 — invisible to ordinary
+testing, 3,867 wrong acceptances across 73,573 adversarial cases, zero after
+the one-line fix. If you read one thing, read the claim matrix at the end:
+every promise, what establishes it, and what remains assumed.</div>
 
 
 <p class="muted">Log heads are signed offline; this service is read-only and holds no
