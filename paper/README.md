@@ -17,7 +17,10 @@ two-sided dilemma explicitly in the introduction and aligns the
 introduction's question with the abstract (label, not verdict). The
 version submitted for review (July 17, 2026, sha256 `7f140356…`) is
 preserved unchanged in this repository's git history. The live copy at
-<https://ltl.zkdefi.org/paper> serves the current revision.
+<https://ltl.zkdefi.org/paper> serves the current revision; the v0.15
+revision is archived with DOI
+[10.5281/zenodo.22057482](https://doi.org/10.5281/zenodo.22057482)
+(CC BY 4.0).
 
 Superseded early drafts (v0.1, v0.2) were removed from the working tree
 on 2026-08-15; like every prior state of this folder, they remain

@@ -398,7 +398,7 @@ our roadmap.</strong> (The full walk-through is lecture&nbsp;11 of the Jupyter c
 <div class="card"><a href="{base}/paper"><strong>Accountable Distribution of Machine-Checked
 Correctness Evidence: A Transparency Model and the Lean Transparency Log</strong></a>
 (PDF, 25 pages, <strong>v0.15 — revised August&nbsp;2026</strong>; the version is printed on the
-title page) — the trust decomposition (expensive verification produces an
+title page; DOI <a href="https://doi.org/10.5281/zenodo.22057482">10.5281/zenodo.22057482</a>) — the trust decomposition (expensive verification produces an
 observation; transparency makes the observation accountable; consumer-local policy decides
 acceptance), collision-extracting soundness for inclusion and consistency, scheme-level
 accountability GAMES with an explicit composition theorem (head authenticity, position
